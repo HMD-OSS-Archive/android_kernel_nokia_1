@@ -43,6 +43,7 @@
 #define SIM_NUMBER		"simnum"
 #define FQCXMLPATH		"fqc_xml"
 #define RAMRESULT_PROC		"dramtest_result"
+#define SKUID_PROC		"skuid"
 
 #define FIH_PON_APR_MODEM_FATAL           "0x10000000\n"
 #define FIH_PON_APR_KERNEL_PANIC          "0x20000000\n"

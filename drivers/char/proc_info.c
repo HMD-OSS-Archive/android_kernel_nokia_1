@@ -29,6 +29,7 @@
 #define MEMINFO "/proc/meminfo"
 
 extern unsigned short fih_hwid;
+extern char *saved_command_line;
 extern int sec_schip_enabled(void);
 
 //extern unsigned short fih_gethwid(void);
@@ -1117,6 +1118,25 @@ static int fqc_xml_path_show(struct seq_file *s, void *unused)
 }
 
 
+static int skuid_show(struct seq_file *s, void *unused)
+{
+	char fih_skuid[30];
+	char *p, *q;
+
+	p = strstr(saved_command_line, "fih_skuid=");
+	if (p == NULL) return 0;
+	p = p+10;
+	q = p;
+	while(*q != ' ') q++;
+	strncpy(fih_skuid, p, (int)(q-p));
+	printk("%s: fih_skuid=%s\n", __func__, fih_skuid);
+
+	seq_printf(s, "%s\n", fih_skuid);
+
+	return 0;
+}
+
+
 static int baseband_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, baseband_show, &inode->i_private);
@@ -1277,6 +1297,11 @@ static int sim_number_open(struct inode *inode, struct file *file)
 static int fqc_xml_path_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, fqc_xml_path_show, &inode->i_private);
+}
+
+static int skuid_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, skuid_show, &inode->i_private);
 }
 
 
@@ -1529,6 +1554,13 @@ static const struct file_operations sim_number_fops = {
 
 static const struct file_operations fqc_xml_path_fops = {
         .open        = fqc_xml_path_open,
+        .read        = seq_read,
+        .llseek      = seq_lseek,
+        .release     = single_release,
+};
+
+static const struct file_operations skuid_fops = {
+        .open        = skuid_open,
         .read        = seq_read,
         .llseek      = seq_lseek,
         .release     = single_release,
@@ -1858,6 +1890,10 @@ static int __init proc_info_module_init(void)
 	entry = proc_create(FQCXMLPATH, S_IFREG | S_IRUGO, NULL, &fqc_xml_path_fops);
 	if(entry == NULL)
 		printk("creat proc %s fail\n", FQCXMLPATH);
+
+	entry = proc_create(SKUID_PROC, S_IFREG | S_IRUGO, NULL, &skuid_fops);
+	if(entry == NULL)
+		printk("creat proc %s fail\n", SKUID_PROC);
 
 	return 0;
 }
