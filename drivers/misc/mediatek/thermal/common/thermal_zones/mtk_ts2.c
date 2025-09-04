@@ -78,7 +78,7 @@ int mtkts_get_ts2_temp(void)
 		return -127000;
 }
 
-static int tsallts_get_temp(struct thermal_zone_device *thermal, unsigned long *t)
+static int tsallts_get_temp(struct thermal_zone_device *thermal, int *t)
 {
 #if MTK_ALLTS_SW_FILTER == 1
 	int curr_temp;
@@ -112,7 +112,7 @@ static int tsallts_get_temp(struct thermal_zone_device *thermal, unsigned long *
 
 	last_abb_read_temp = curr_temp;
 	curr_temp = temp_temp;
-	*t = (unsigned long)curr_temp;
+	*t = (int)curr_temp;
 	return ret;
 #else
 	int curr_temp;
@@ -243,13 +243,13 @@ static int tsallts_get_trip_type(struct thermal_zone_device *thermal, int trip,
 	return 0;
 }
 
-static int tsallts_get_trip_temp(struct thermal_zone_device *thermal, int trip, unsigned long *temp)
+static int tsallts_get_trip_temp(struct thermal_zone_device *thermal, int trip, int *temp)
 {
 	*temp = trip_temp[trip];
 	return 0;
 }
 
-static int tsallts_get_crit_temp(struct thermal_zone_device *thermal, unsigned long *temperature)
+static int tsallts_get_crit_temp(struct thermal_zone_device *thermal, int *temperature)
 {
 	*temperature = TSALLTS_TEMP_CRIT;
 	return 0;
@@ -274,14 +274,14 @@ void mtkts_allts_start_ts2_timer(void)
 	if (!isTimerCancelled)
 		return;
 
+	isTimerCancelled = 0;
+
 	if (down_trylock(&sem_mutex))
 		return;
 
-	if (thz_dev != NULL && interval != 0) {
-		mod_delayed_work(system_freezable_wq, &(thz_dev->poll_queue),
-			round_jiffies(msecs_to_jiffies(1000))); /*1000 = 1sec */
-		isTimerCancelled = 0;
-	}
+	if (thz_dev != NULL && interval != 0)
+		mod_delayed_work(system_freezable_wq, &(thz_dev->poll_queue), round_jiffies(msecs_to_jiffies(1000)));
+	/*1000 = 1sec */
 
 	up(&sem_mutex);
 }

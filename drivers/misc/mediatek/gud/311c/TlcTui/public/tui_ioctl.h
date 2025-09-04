@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 TRUSTONIC LIMITED
+ * Copyright (c) 2013-2017 TRUSTONIC LIMITED
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -17,18 +17,22 @@
 
 #define MAX_BUFFER_NUMBER 3
 
+#ifndef u32
+#define u32 uint32_t
+#endif
+
 /* Command header */
 struct tlc_tui_command_t {
-	uint32_t     id;
-	uint32_t     data[2];
+	u32     id;
+	u32     data[2];
 };
 
 /* Response header */
 struct tlc_tui_response_t {
-	uint32_t	id;
-	uint32_t	return_code;
-	int		ion_fd[MAX_BUFFER_NUMBER];
-	uint32_t	screen_metrics[3];
+	u32	id;
+	u32	return_code;
+	int	ion_fd[MAX_BUFFER_NUMBER];
+	u32	screen_metrics[3];
 };
 
 /* Command IDs */
@@ -72,7 +76,7 @@ struct tlc_tui_response_t {
 
 #define TUI_IO_MAGIC	't'
 
-#define TUI_IO_NOTIFY	_IOW(TUI_IO_MAGIC, 1, uint32_t)
+#define TUI_IO_NOTIFY	_IOW(TUI_IO_MAGIC, 1, u32)
 #define TUI_IO_WAITCMD	_IOR(TUI_IO_MAGIC, 2, struct tlc_tui_command_t)
 #define TUI_IO_ACK	_IOW(TUI_IO_MAGIC, 3, struct tlc_tui_response_t)
 #define TUI_IO_INIT_DRIVER	_IO(TUI_IO_MAGIC, 4)

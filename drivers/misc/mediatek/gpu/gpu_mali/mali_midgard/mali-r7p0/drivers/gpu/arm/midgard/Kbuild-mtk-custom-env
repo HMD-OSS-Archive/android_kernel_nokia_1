@@ -43,15 +43,20 @@ ccflags-y += \
     -I$(MTK_TOP)/include/ \
     -I$(MTK_TOP)/include/mt-plat \
     -I$(MTK_TOP)/include/mt-plat/$(subst ",,$(CONFIG_MTK_PLATFORM))/include \
-    -I$(MTK_TOP)/base/power/$(subst ",,$(CONFIG_MTK_PLATFORM))/
+    -I$(MTK_TOP)/base/power/$(subst ",,$(CONFIG_MTK_PLATFORM))/ \
+    -I$(MTK_TOP)/base/power/include/
 
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/gpu/ged/include
 
 #include path for AEE
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include
 
+ifneq ($(CONFIG_FPGA_EARLY_PORTING), y)
 ifeq ($(CONFIG_MTK_GPU_COMMON_DVFS_SUPPORT),y)
 ccflags-y += -DENABLE_COMMON_DVFS
+endif
+else
+$(info $[MALI]CONFIG_FPGA_EARLY_PORTING is [${CONFIG_FPGA_EARLY_PORTING}])
 endif
 
 VER := $(if $(filter eng,$(TARGET_BUILD_VARIANT)),eng,user)

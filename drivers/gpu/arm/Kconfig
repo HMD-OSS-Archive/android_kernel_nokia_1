@@ -6,10 +6,6 @@
 # Foundation, and any use by you of this program is subject to the terms
 # of such GNU licence.
 #
-# A copy of the licence is included with the program, and can also be obtained
-# from Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
-# Boston, MA  02110-1301, USA.
-#
 #
 
-source "drivers/gpu/arm/mali/Kconfig"
+source "drivers/gpu/arm/midgard/Kconfig"

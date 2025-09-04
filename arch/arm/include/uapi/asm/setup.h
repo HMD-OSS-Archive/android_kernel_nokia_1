@@ -148,40 +148,6 @@ struct tag_memclk {
 	__u32 fmemclk;
 };
 
-/* general memory descriptor */
-struct mem_desc {
-	u64 start;
-	u64 size;
-};
-
-/* mblock is used by CPU */
-struct mblock {
-	u64 start;
-	u64 size;
-	u32 rank;	/* rank the mblock belongs to */
-};
-
-struct reserved_t {
-	u64 start;
-	u64 size;
-	u32 mapping;   /* mapping or unmap*/
-	char name[MBLOCK_RESERVED_NAME_SIZE];
-};
-
-struct mblock_info {
-	u32 mblock_num;
-	struct mblock mblock[MBLOCK_NUM_MAX];
-	u32 mblock_magic;
-	u32 mblock_version;
-	u32 reserved_num;
-	struct reserved_t reserved[MBLOCK_RESERVED_NUM_MAX];
-};
-
-struct dram_info {
-	u32 rank_num;
-	struct mem_desc rank_info[4];
-};
-
 struct tag {
 	struct tag_header hdr;
 	union {
@@ -211,6 +177,41 @@ struct tagtable {
 	__u32 tag;
 	int (*parse)(const struct tag *);
 };
+
+/* general memory descriptor */
+struct mem_desc {
+	u64 start;
+	u64 size;
+};
+
+/* mblock is used by CPU */
+struct mblock {
+	u64 start;
+	u64 size;
+	u32 rank;	/* rank the mblock belongs to */
+};
+
+struct mblock_reserved {
+	u64 start;
+	u64 size;
+	u32 mapping;   /* mapping or unmap*/
+	char name[MBLOCK_RESERVED_NAME_SIZE];
+};
+
+struct mblock_info {
+	u32 mblock_num;
+	struct mblock mblock[MBLOCK_NUM_MAX];
+	u32 mblock_magic;
+	u32 mblock_version;
+	u32 reserved_num;
+	struct mblock_reserved reserved[MBLOCK_RESERVED_NUM_MAX];
+};
+
+struct dram_info {
+	u32 rank_num;
+	struct mem_desc rank_info[4];
+};
+
 
 #define tag_member_present(tag,member)				\
 	((unsigned long)(&((struct tag *)0L)->member + 1)	\

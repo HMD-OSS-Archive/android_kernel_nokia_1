@@ -11,21 +11,21 @@
 # GNU General Public License for more details.
 #
 
-ifeq ($(strip $(CONFIG_ARCH_MT6735)),y)
+ifeq ($(strip $(CONFIG_MACH_MT6735)),y)
 vcodec_kernel_driver-objs :=        \
     videocodec_kernel_driver_D1.o      \
     common/val/src/val.o			\
     common/drv/src/drv_base.o
 endif
 
-ifeq ($(strip $(CONFIG_ARCH_MT6735M)),y)
+ifeq ($(strip $(CONFIG_MACH_MT6735M)),y)
 vcodec_kernel_driver-objs :=        \
     videocodec_kernel_driver_D2.o      \
     common/val/src/val.o			\
     common/drv/src/drv_base.o
 endif
 
-ifeq ($(strip $(CONFIG_ARCH_MT6753)),y)
+ifeq ($(strip $(CONFIG_MACH_MT6753)),y)
 vcodec_kernel_driver-objs :=        \
     videocodec_kernel_driver_D3.o      \
     common/val/src/val.o			\

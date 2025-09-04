@@ -20,18 +20,19 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/mmp/
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/2.0
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/$(MTK_PLATFORM)/
 
-ifeq ($(CONFIG_ARCH_MT6735),y)
+ifeq ($(CONFIG_MACH_MT6735),y)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/$(MTK_PLATFORM)/mt6735/
 obj-y += mt6735/
 ccflags-$(CONFIG_ARM64) += -mcmodel=large
 endif
-ifeq ($(CONFIG_ARCH_MT6735M),y)
+ifeq ($(CONFIG_MACH_MT6735M),y)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/$(MTK_PLATFORM)/mt6735m/
 obj-y += mt6735m/
 ccflags-$(CONFIG_ARM64) += -mcmodel=large
 endif
-ifeq ($(CONFIG_ARCH_MT6753),y)
+ifeq ($(CONFIG_MACH_MT6753),y)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/$(MTK_PLATFORM)/mt6753/
 obj-y += mt6753/
 ccflags-$(CONFIG_ARM64) += -mcmodel=large

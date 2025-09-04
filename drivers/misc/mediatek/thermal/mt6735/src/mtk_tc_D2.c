@@ -82,7 +82,7 @@ bank_t tscpu_g_bank[THERMAL_BANK_NUM] = {
 	       .ts_number = 1},
 	[2] = {
 	       .ts = {TS_FILL(MCU2)},
-	       .ts_number = 2},
+	       .ts_number = 1},
 };
 
 #ifdef CONFIG_OF
@@ -526,6 +526,12 @@ int get_immediate_ts3_wrap(void)
 
 	return curr_temp;
 }
+
+int (*get_immediate_tsX[THERMAL_SENSOR_NUM])(void) = {
+	get_immediate_ts1_wrap,
+	get_immediate_ts2_wrap,
+	get_immediate_ts3_wrap,
+};
 
 static void thermal_interrupt_handler(int bank)
 {

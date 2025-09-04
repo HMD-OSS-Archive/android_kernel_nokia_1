@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2019 MediaTek Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -44,16 +44,17 @@ typedef uint32_t dciReturnCode_t;
 /**
  * DCI command header.
  */
-typedef struct{
+struct dciCommandHeader_t {
 	dciCommandId_t commandId; /**< Command ID */
-} dciCommandHeader_t;
+};
 
 /**
  * DCI response header.
  */
-typedef struct{
-	dciResponseId_t     responseId; /**< Response ID (must be command ID | RSP_ID_MASK )*/
+struct dciResponseHeader_t {
+	/**< Response ID (must be command ID | RSP_ID_MASK )*/
+	dciResponseId_t     responseId;
 	dciReturnCode_t     returnCode; /**< Return code of command */
-} dciResponseHeader_t;
+};
 
 #endif

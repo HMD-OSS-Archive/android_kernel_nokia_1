@@ -30,8 +30,8 @@
 #include <ddp_pwm_mux.h>
 /* #include <mach/mt_gpio.h> */
 #include <disp_dts_gpio.h> /* DTS GPIO */
-#include <leds_drv.h>
-#include <leds_sw.h>
+#include <linux/leds.h>
+#include <mtk_leds_sw.h>
 #include <ddp_reg.h>
 #include <ddp_path.h>
 #include <primary_display.h>
@@ -56,7 +56,7 @@ static int pwm_dbg_en;
 #define PWM_LOG_BUFFER_SIZE 8
 
 
-static disp_pwm_id_t g_pwm_main_id = DISP_PWM0;
+static enum disp_pwm_id_t g_pwm_main_id = DISP_PWM0;
 static atomic_t g_pwm_backlight[1] = { ATOMIC_INIT(-1) };
 static atomic_t g_pwm_en[1] = { ATOMIC_INIT(-1) };
 static volatile int g_pwm_max_backlight[1] = { 1023 };
@@ -197,11 +197,11 @@ static void disp_pwm_query_backlight(char *debug_output)
 	PWM_NOTICE("%s", temp_buf);
 }
 
-static int disp_pwm_config_init(DISP_MODULE_ENUM module, disp_ddp_path_config *pConfig, void *cmdq)
+static int disp_pwm_config_init(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *pConfig, void *cmdq)
 {
 #ifndef CONFIG_FPGA_EARLY_PORTING
 	unsigned int pwm_div, pwm_src;
-	/* disp_pwm_id_t id = DISP_PWM0; */
+	/* enum disp_pwm_id_t id = DISP_PWM0; */
 	unsigned long reg_base = pwm_get_reg_base(DISP_PWM0);
 	int ret;
 	bool config_instantly = false;
@@ -250,7 +250,7 @@ static int disp_pwm_config_init(DISP_MODULE_ENUM module, disp_ddp_path_config *p
 }
 
 
-static int disp_pwm_config(DISP_MODULE_ENUM module, disp_ddp_path_config *pConfig, void *cmdq)
+static int disp_pwm_config(enum DISP_MODULE_ENUM module, struct disp_ddp_path_config *pConfig, void *cmdq)
 {
 	int ret = 0;
 
@@ -260,7 +260,7 @@ static int disp_pwm_config(DISP_MODULE_ENUM module, disp_ddp_path_config *pConfi
 	return ret;
 }
 
-static void disp_pwm_trigger_refresh(disp_pwm_id_t id, int quick)
+static void disp_pwm_trigger_refresh(enum disp_pwm_id_t id, int quick)
 {
 	if (g_ddp_notify != NULL) {
 #if defined(CONFIG_MTK_AAL_SUPPORT) && defined(DISP_PATH_DELAYED_TRIGGER_33ms_SUPPORT)
@@ -281,19 +281,19 @@ static void disp_pwm_trigger_refresh(disp_pwm_id_t id, int quick)
 
 
 /* Set the PWM which acts by default (e.g. ddp_bls_set_backlight) */
-void disp_pwm_set_main(disp_pwm_id_t main)
+void disp_pwm_set_main(enum disp_pwm_id_t main)
 {
 	g_pwm_main_id = main;
 }
 
 
-disp_pwm_id_t disp_pwm_get_main(void)
+enum disp_pwm_id_t disp_pwm_get_main(void)
 {
 	return g_pwm_main_id;
 }
 
 
-static void disp_pwm_set_drverIC_en(disp_pwm_id_t id, int enabled)
+static void disp_pwm_set_drverIC_en(enum disp_pwm_id_t id, int enabled)
 {
 #ifdef GPIO_LCM_LED_EN
 #ifndef CONFIG_FPGA_EARLY_PORTING
@@ -311,7 +311,7 @@ static void disp_pwm_set_drverIC_en(disp_pwm_id_t id, int enabled)
 }
 
 
-static void disp_pwm_set_enabled(cmdqRecHandle cmdq, disp_pwm_id_t id, int enabled)
+static void disp_pwm_set_enabled(cmdqRecHandle cmdq, enum disp_pwm_id_t id, int enabled)
 {
 	unsigned long reg_base = pwm_get_reg_base(id);
 	int index = index_of_pwm(id);
@@ -341,7 +341,7 @@ int disp_bls_set_max_backlight(unsigned int level_1024)
 	return disp_pwm_set_max_backlight(disp_pwm_get_main(), level_1024);
 }
 
-int disp_pwm_set_max_backlight(disp_pwm_id_t id, unsigned int level_1024)
+int disp_pwm_set_max_backlight(enum disp_pwm_id_t id, unsigned int level_1024)
 {
 	int index;
 
@@ -361,7 +361,7 @@ int disp_pwm_set_max_backlight(disp_pwm_id_t id, unsigned int level_1024)
 	return 0;
 }
 
-int disp_pwm_get_max_backlight(disp_pwm_id_t id)
+int disp_pwm_get_max_backlight(enum disp_pwm_id_t id)
 {
 	int index = index_of_pwm(id);
 	return g_pwm_max_backlight[index];
@@ -385,12 +385,12 @@ int disp_bls_set_backlight(int level_1024)
  * Returns:
  *  PWM duty in [0, 1023]
  */
-static int disp_pwm_level_remap(disp_pwm_id_t id, int level_1024)
+static int disp_pwm_level_remap(enum disp_pwm_id_t id, int level_1024)
 {
 	return level_1024;
 }
 
-int disp_pwm_set_backlight(disp_pwm_id_t id, int level_1024)
+int disp_pwm_set_backlight(enum disp_pwm_id_t id, int level_1024)
 {
 	int ret;
 #ifdef CONFIG_FPGA_EARLY_PORTING
@@ -465,14 +465,14 @@ static void disp_pwm_log(int level_1024, int log_type)
 int is_disp_pwm_driver_ready(void)
 {
 	int status = 1;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M)\
-	|| defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6735M)\
+	|| defined(CONFIG_MACH_MT6753)
 	status = primary_display_get_init_status();
 #endif
 	return status;
 }
 
-int disp_pwm_set_backlight_cmdq(disp_pwm_id_t id, int level_1024, void *cmdq)
+int disp_pwm_set_backlight_cmdq(enum disp_pwm_id_t id, int level_1024, void *cmdq)
 {
 	unsigned long reg_base;
 	int old_pwm;
@@ -548,7 +548,7 @@ int disp_pwm_set_backlight_cmdq(disp_pwm_id_t id, int level_1024, void *cmdq)
 	return 0;
 }
 
-static int ddp_pwm_power_on(DISP_MODULE_ENUM module, void *handle)
+static int ddp_pwm_power_on(enum DISP_MODULE_ENUM module, void *handle)
 {
 	unsigned int pwm_div = 0;
 	unsigned int pwm_src = 0;
@@ -560,7 +560,7 @@ static int ddp_pwm_power_on(DISP_MODULE_ENUM module, void *handle)
 #if defined(CONFIG_ARCH_MT6752)
 		enable_clock(MT_CG_DISP1_DISP_PWM_26M, "PWM");
 		enable_clock(MT_CG_DISP1_DISP_PWM_MM, "PWM");
-#elif defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#elif defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 		enable_clock(MT_CG_PWM_MM_SW_CG, "PWM");
 #else
 		enable_clock(MT_CG_PERI_DISP_PWM, "DISP_PWM");
@@ -580,7 +580,7 @@ static int ddp_pwm_power_on(DISP_MODULE_ENUM module, void *handle)
 	return 0;
 }
 
-static int ddp_pwm_power_off(DISP_MODULE_ENUM module, void *handle)
+static int ddp_pwm_power_off(enum DISP_MODULE_ENUM module, void *handle)
 {
 	unsigned int pwm_div = 0;
 	unsigned int pwm_src = 0;
@@ -595,7 +595,7 @@ static int ddp_pwm_power_off(DISP_MODULE_ENUM module, void *handle)
 #if defined(CONFIG_ARCH_MT6752)
 		disable_clock(MT_CG_DISP1_DISP_PWM_26M, "PWM");
 		disable_clock(MT_CG_DISP1_DISP_PWM_MM, "PWM");
-#elif defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#elif defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 		disable_clock(MT_CG_PWM_MM_SW_CG, "PWM");
 #else
 		disable_clock(MT_CG_PERI_DISP_PWM, "DISP_PWM");
@@ -612,14 +612,14 @@ static int ddp_pwm_power_off(DISP_MODULE_ENUM module, void *handle)
 	return 0;
 }
 
-static int ddp_pwm_init(DISP_MODULE_ENUM module, void *cmq_handle)
+static int ddp_pwm_init(enum DISP_MODULE_ENUM module, void *cmq_handle)
 {
 	ddp_pwm_power_on(module, cmq_handle);
 
 	return 0;
 }
 
-static int ddp_pwm_set_listener(DISP_MODULE_ENUM module, ddp_module_notify notify)
+static int ddp_pwm_set_listener(enum DISP_MODULE_ENUM module, ddp_module_notify notify)
 {
 	g_ddp_notify = notify;
 	return 0;
@@ -627,7 +627,7 @@ static int ddp_pwm_set_listener(DISP_MODULE_ENUM module, ddp_module_notify notif
 
 
 
-DDP_MODULE_DRIVER ddp_driver_pwm = {
+struct DDP_MODULE_DRIVER ddp_driver_pwm = {
 	.init = ddp_pwm_init,
 	.config = disp_pwm_config,
 	.power_on = ddp_pwm_power_on,

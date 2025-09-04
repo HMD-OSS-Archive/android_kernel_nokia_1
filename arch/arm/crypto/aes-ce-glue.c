@@ -15,7 +15,7 @@
 #include <crypto/ablk_helper.h>
 #include <crypto/algapi.h>
 #include <linux/module.h>
-
+#include <crypto/xts.h>
 
 MODULE_DESCRIPTION("AES-ECB/CBC/CTR/XTS using ARMv8 Crypto Extensions");
 MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
@@ -30,12 +30,10 @@ asmlinkage void ce_aes_ecb_encrypt(u8 out[], u8 const in[], u8 const rk[],
 asmlinkage void ce_aes_ecb_decrypt(u8 out[], u8 const in[], u8 const rk[],
 				   int rounds, int blocks);
 
-
 asmlinkage void ce_aes_cbc_encrypt(u8 out[], u8 const in[], u8 const rk[],
 				   int rounds, int blocks, u8 iv[]);
 asmlinkage void ce_aes_cbc_decrypt(u8 out[], u8 const in[], u8 const rk[],
 				   int rounds, int blocks, u8 iv[]);
-
 
 asmlinkage void ce_aes_ctr_encrypt(u8 out[], u8 const in[], u8 const rk[],
 				   int rounds, int blocks, u8 ctr[]);
@@ -160,6 +158,10 @@ static int xts_set_key(struct crypto_tfm *tfm, const u8 *in_key,
 	struct crypto_aes_xts_ctx *ctx = crypto_tfm_ctx(tfm);
 	int ret;
 
+	ret = xts_check_key(tfm, in_key, key_len);
+	if (ret)
+		return ret;
+
 	ret = ce_aes_expandkey(&ctx->key1, in_key, key_len / 2);
 	if (!ret)
 		ret = ce_aes_expandkey(&ctx->key2, &in_key[key_len / 2],
@@ -216,7 +218,6 @@ static int ecb_decrypt(struct blkcipher_desc *desc, struct scatterlist *dst,
 	kernel_neon_end();
 	return err;
 }
-
 
 static int cbc_encrypt(struct blkcipher_desc *desc, struct scatterlist *dst,
 		       struct scatterlist *src, unsigned int nbytes)
@@ -294,14 +295,15 @@ static int ctr_encrypt(struct blkcipher_desc *desc, struct scatterlist *dst,
 		u8 __aligned(8) tail[AES_BLOCK_SIZE];
 
 		/*
-		 * Minimum alignment is 8 bytes, so if nbytes is <= 8, we need
-		 * to tell aes_ctr_encrypt() to only read half a block.
+		 * Tell aes_ctr_encrypt() to process a tail block.
 		 */
-		blocks = (nbytes <= 8) ? -1 : 1;
+		blocks = -1;
 
-		ce_aes_ctr_encrypt(tail, tsrc, (u8 *)ctx->key_enc,
+		ce_aes_ctr_encrypt(tail, NULL, (u8 *)ctx->key_enc,
 				   num_rounds(ctx), blocks, walk.iv);
-		memcpy(tdst, tail, nbytes);
+		if (tdst != tsrc)
+			memcpy(tdst, tsrc, nbytes);
+		crypto_xor(tdst, tail, nbytes);
 		err = blkcipher_walk_done(desc, &walk, 0);
 	}
 	kernel_neon_end();
@@ -363,30 +365,28 @@ static struct crypto_alg aes_algs[] = { {
 	.cra_name		= "__ecb-aes-ce",
 	.cra_driver_name	= "__driver-ecb-aes-ce",
 	.cra_priority		= 0,
-	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER,
+	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER |
+				  CRYPTO_ALG_INTERNAL,
 	.cra_blocksize		= AES_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
-	.cra_alignmask		= 7,
 	.cra_type		= &crypto_blkcipher_type,
 	.cra_module		= THIS_MODULE,
 	.cra_blkcipher = {
 		.min_keysize	= AES_MIN_KEY_SIZE,
 		.max_keysize	= AES_MAX_KEY_SIZE,
-		.ivsize		= AES_BLOCK_SIZE,
+		.ivsize		= 0,
 		.setkey		= ce_aes_setkey,
 		.encrypt	= ecb_encrypt,
 		.decrypt	= ecb_decrypt,
 	},
-},
-
-{
+}, {
 	.cra_name		= "__cbc-aes-ce",
 	.cra_driver_name	= "__driver-cbc-aes-ce",
 	.cra_priority		= 0,
-	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER,
+	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER |
+				  CRYPTO_ALG_INTERNAL,
 	.cra_blocksize		= AES_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
-	.cra_alignmask		= 7,
 	.cra_type		= &crypto_blkcipher_type,
 	.cra_module		= THIS_MODULE,
 	.cra_blkcipher = {
@@ -397,16 +397,14 @@ static struct crypto_alg aes_algs[] = { {
 		.encrypt	= cbc_encrypt,
 		.decrypt	= cbc_decrypt,
 	},
-},
-
-{
+}, {
 	.cra_name		= "__ctr-aes-ce",
 	.cra_driver_name	= "__driver-ctr-aes-ce",
 	.cra_priority		= 0,
-	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER,
+	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER |
+				  CRYPTO_ALG_INTERNAL,
 	.cra_blocksize		= 1,
 	.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
-	.cra_alignmask		= 7,
 	.cra_type		= &crypto_blkcipher_type,
 	.cra_module		= THIS_MODULE,
 	.cra_blkcipher = {
@@ -421,10 +419,10 @@ static struct crypto_alg aes_algs[] = { {
 	.cra_name		= "__xts-aes-ce",
 	.cra_driver_name	= "__driver-xts-aes-ce",
 	.cra_priority		= 0,
-	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER,
+	.cra_flags		= CRYPTO_ALG_TYPE_BLKCIPHER |
+				  CRYPTO_ALG_INTERNAL,
 	.cra_blocksize		= AES_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct crypto_aes_xts_ctx),
-	.cra_alignmask		= 7,
 	.cra_type		= &crypto_blkcipher_type,
 	.cra_module		= THIS_MODULE,
 	.cra_blkcipher = {
@@ -442,7 +440,6 @@ static struct crypto_alg aes_algs[] = { {
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER|CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= AES_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
-	.cra_alignmask		= 7,
 	.cra_type		= &crypto_ablkcipher_type,
 	.cra_module		= THIS_MODULE,
 	.cra_init		= ablk_init,
@@ -450,21 +447,18 @@ static struct crypto_alg aes_algs[] = { {
 	.cra_ablkcipher = {
 		.min_keysize	= AES_MIN_KEY_SIZE,
 		.max_keysize	= AES_MAX_KEY_SIZE,
-		.ivsize		= AES_BLOCK_SIZE,
+		.ivsize		= 0,
 		.setkey		= ablk_set_key,
 		.encrypt	= ablk_encrypt,
 		.decrypt	= ablk_decrypt,
 	}
-},
-
-{
+}, {
 	.cra_name		= "cbc(aes)",
 	.cra_driver_name	= "cbc-aes-ce",
 	.cra_priority		= 300,
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER|CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= AES_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
-	.cra_alignmask		= 7,
 	.cra_type		= &crypto_ablkcipher_type,
 	.cra_module		= THIS_MODULE,
 	.cra_init		= ablk_init,
@@ -477,16 +471,13 @@ static struct crypto_alg aes_algs[] = { {
 		.encrypt	= ablk_encrypt,
 		.decrypt	= ablk_decrypt,
 	}
-},
-
-{
+}, {
 	.cra_name		= "ctr(aes)",
 	.cra_driver_name	= "ctr-aes-ce",
 	.cra_priority		= 300,
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER|CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= 1,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
-	.cra_alignmask		= 7,
 	.cra_type		= &crypto_ablkcipher_type,
 	.cra_module		= THIS_MODULE,
 	.cra_init		= ablk_init,
@@ -506,7 +497,6 @@ static struct crypto_alg aes_algs[] = { {
 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER|CRYPTO_ALG_ASYNC,
 	.cra_blocksize		= AES_BLOCK_SIZE,
 	.cra_ctxsize		= sizeof(struct async_helper_ctx),
-	.cra_alignmask		= 7,
 	.cra_type		= &crypto_ablkcipher_type,
 	.cra_module		= THIS_MODULE,
 	.cra_init		= ablk_init,

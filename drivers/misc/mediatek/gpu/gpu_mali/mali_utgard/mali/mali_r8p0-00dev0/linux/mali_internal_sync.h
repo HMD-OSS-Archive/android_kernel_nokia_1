@@ -23,6 +23,7 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/wait.h>
+#include <sync.h>
 #include <linux/fence.h>
 
 struct mali_internal_sync_timeline;
@@ -54,15 +55,21 @@ struct mali_internal_sync_point {
 };
 
 struct mali_internal_sync_fence_cb {
-        struct fence_cb cb;
-        struct fence *base;
-        struct mali_internal_sync_fence *sync_fence;
+	struct fence_cb cb;
+	struct fence *fence;
+	struct mali_internal_sync_fence *sync_file;
 };
 
 struct mali_internal_sync_fence {
-        struct file             *file;
-        struct kref             kref_count;
-        atomic_t num_fences;
+	struct file             *file;
+	struct kref             kref;
+	char		name[32];
+#ifdef CONFIG_DEBUG_FS
+	struct list_head	sync_file_list;
+#endif
+
+	int num_fences;
+
         wait_queue_head_t       wq;
         atomic_t                status;
         struct mali_internal_sync_fence_cb    cbs[];
@@ -106,13 +113,6 @@ void mali_internal_sync_timeline_signal(struct mali_internal_sync_timeline *sync
   * @return the new mali internal sync point if successful, NULL if not.
  */
 struct mali_internal_sync_point *mali_internal_sync_point_create(struct mali_internal_sync_timeline *sync_timeline, int size);
-
-/**
- * Create a mali internal sync fence
- * @param sync_pt The mali internel sync point to add
- * @return the mali internal sync fence if successful, NULL if not.
- */
-struct mali_internal_sync_fence *mali_internal_sync_fence_create(struct mali_internal_sync_point *sync_pt);
 
 /**
  * Merge mali internal sync fences

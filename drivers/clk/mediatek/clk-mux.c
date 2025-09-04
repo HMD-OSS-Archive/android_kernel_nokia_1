@@ -57,7 +57,8 @@ static inline struct mtk_mux_upd_data *to_mtk_mux_upd_data(struct clk_hw *hw)
 	return container_of(hw, struct mtk_mux_upd_data, hw);
 }
 
-static inline struct mtk_mux_clr_set_upd_data *to_mtk_mux_clr_set_upd_data(struct clk_hw *hw)
+static inline struct mtk_mux_clr_set_upd_data
+	*to_mtk_mux_clr_set_upd_data(struct clk_hw *hw)
 {
 	return container_of(hw, struct mtk_mux_clr_set_upd_data, hw);
 }
@@ -79,7 +80,8 @@ static int mtk_mux_upd_enable(struct clk_hw *hw)
 		clk_writel(val, mux->base + mux->mux_ofs);
 
 		if (mux->upd_shift >= 0)
-			clk_writel(BIT(mux->upd_shift), mux->base + mux->upd_ofs);
+			clk_writel(BIT(mux->upd_shift),
+			mux->base + mux->upd_ofs);
 	}
 
 	if (mux->lock)
@@ -105,7 +107,8 @@ static int mtk_mux_clr_set_upd_enable(struct clk_hw *hw)
 		clk_writel(val, mux->base + mux->mux_ofs);
 
 		if (mux->upd_shift >= 0)
-			clk_writel(BIT(mux->upd_shift), mux->base + mux->upd_ofs);
+			clk_writel(BIT(mux->upd_shift),
+			mux->base + mux->upd_ofs);
 	}
 
 	if (mux->lock)
@@ -131,7 +134,8 @@ static void mtk_mux_upd_disable(struct clk_hw *hw)
 		clk_writel(val, mux->base + mux->mux_ofs);
 
 		if (mux->upd_shift >= 0)
-			clk_writel(BIT(mux->upd_shift), mux->base + mux->upd_ofs);
+			clk_writel(BIT(mux->upd_shift),
+			mux->base + mux->upd_ofs);
 	}
 
 	if (mux->lock)
@@ -155,7 +159,8 @@ static void mtk_mux_clr_set_upd_disable(struct clk_hw *hw)
 		clk_writel(val, mux->base + mux->mux_ofs);
 
 		if (mux->upd_shift >= 0)
-			clk_writel(BIT(mux->upd_shift), mux->base + mux->upd_ofs);
+			clk_writel(BIT(mux->upd_shift),
+			mux->base + mux->upd_ofs);
 	}
 
 	if (mux->lock)
@@ -169,7 +174,8 @@ static int mtk_mux_upd_is_enabled(struct clk_hw *hw)
 	if (mux->gate_shift < 0)
 		return true;
 
-	return (clk_readl(mux->base + mux->mux_ofs) & BIT(mux->gate_shift)) == 0;
+	return (clk_readl(mux->base + mux->mux_ofs) &
+		BIT(mux->gate_shift)) == 0;
 }
 
 static int mtk_mux_clr_set_upd_is_enabled(struct clk_hw *hw)
@@ -179,13 +185,14 @@ static int mtk_mux_clr_set_upd_is_enabled(struct clk_hw *hw)
 	if (mux->gate_shift < 0)
 		return true;
 
-	return (clk_readl(mux->base + mux->mux_ofs) & BIT(mux->gate_shift)) == 0;
+	return (clk_readl(mux->base + mux->mux_ofs) &
+		BIT(mux->gate_shift)) == 0;
 }
 
 static u8 mtk_mux_upd_get_parent(struct clk_hw *hw)
 {
 	struct mtk_mux_upd_data *mux = to_mtk_mux_upd_data(hw);
-	int num_parents = __clk_get_num_parents(hw->clk);
+	int num_parents = clk_hw_get_num_parents(hw);
 	u32 mask = GENMASK(mux->mux_width - 1, 0);
 	u32 val;
 
@@ -201,7 +208,7 @@ static u8 mtk_mux_upd_get_parent(struct clk_hw *hw)
 static u8 mtk_mux_clr_set_upd_get_parent(struct clk_hw *hw)
 {
 	struct mtk_mux_clr_set_upd_data *mux = to_mtk_mux_clr_set_upd_data(hw);
-	int num_parents = __clk_get_num_parents(hw->clk);
+	int num_parents = clk_hw_get_num_parents(hw);
 	u32 mask = GENMASK(mux->mux_width - 1, 0);
 	u32 val;
 
@@ -234,7 +241,8 @@ static int mtk_mux_upd_set_parent(struct clk_hw *hw, u8 index)
 		clk_writel(val, mux->base + mux->mux_ofs);
 
 		if (mux->upd_shift >= 0)
-			clk_writel(BIT(mux->upd_shift), mux->base + mux->upd_ofs);
+			clk_writel(BIT(mux->upd_shift),
+			mux->base + mux->upd_ofs);
 	}
 
 	if (mux->lock)
@@ -259,14 +267,18 @@ static int mtk_mux_clr_set_upd_set_parent(struct clk_hw *hw, u8 index)
 	val |= index << mux->mux_shift;
 
 	if (val != orig) {
+		#if defined(CONFIG_MACH_MT6799)
+		writel(val, mux->base + mux->mux_ofs);
+		#else
 		val = (mask << mux->mux_shift);
 		writel(val, mux->base + mux->mux_clr_ofs);
 
 		val = (index << mux->mux_shift);
 		writel(val, mux->base + mux->mux_set_ofs);
-
+		#endif
 		if (mux->upd_shift >= 0)
-			clk_writel(BIT(mux->upd_shift), mux->base + mux->upd_ofs);
+			clk_writel(BIT(mux->upd_shift),
+			mux->base + mux->upd_ofs);
 	}
 
 	if (mux->lock)
@@ -358,7 +370,7 @@ void __init mtk_clk_register_mux_upds(const struct mtk_mux_upd *mus,
 		clk = mtk_clk_register_mux_upd(mu, base, lock);
 
 		if (IS_ERR(clk)) {
-			pr_err("Failed to register clk %s: %ld\n",
+			pr_notice("Failed to register clk %s: %ld\n",
 					mu->name, PTR_ERR(clk));
 			continue;
 		}
@@ -368,7 +380,8 @@ void __init mtk_clk_register_mux_upds(const struct mtk_mux_upd *mus,
 	}
 }
 
-struct clk * __init mtk_clk_register_mux_clr_set_upd(const struct mtk_mux_clr_set_upd *mu,
+struct clk * __init mtk_clk_register_mux_clr_set_upd(
+		const struct mtk_mux_clr_set_upd *mu,
 		void __iomem *base, spinlock_t *lock)
 {
 	struct clk *clk;
@@ -380,7 +393,7 @@ struct clk * __init mtk_clk_register_mux_clr_set_upd(const struct mtk_mux_clr_se
 		return ERR_PTR(-ENOMEM);
 
 	init.name = mu->name;
-	init.flags = CLK_SET_RATE_PARENT;
+	init.flags = (mu->flags) | CLK_SET_RATE_PARENT;
 #if WORKAROUND_318_WARNING
 	init.parent_names = (const char **)mu->parent_names;
 #else
@@ -413,7 +426,8 @@ struct clk * __init mtk_clk_register_mux_clr_set_upd(const struct mtk_mux_clr_se
 	return clk;
 }
 
-void __init mtk_clk_register_mux_clr_set_upds(const struct mtk_mux_clr_set_upd *mus,
+void __init mtk_clk_register_mux_clr_set_upds(
+		const struct mtk_mux_clr_set_upd *mus,
 		int num, void __iomem *base, spinlock_t *lock,
 		struct clk_onecell_data *clk_data)
 {
@@ -426,7 +440,7 @@ void __init mtk_clk_register_mux_clr_set_upds(const struct mtk_mux_clr_set_upd *
 		clk = mtk_clk_register_mux_clr_set_upd(mu, base, lock);
 
 		if (IS_ERR(clk)) {
-			pr_err("Failed to register clk %s: %ld\n",
+			pr_notice("Failed to register clk %s: %ld\n",
 					mu->name, PTR_ERR(clk));
 			continue;
 		}

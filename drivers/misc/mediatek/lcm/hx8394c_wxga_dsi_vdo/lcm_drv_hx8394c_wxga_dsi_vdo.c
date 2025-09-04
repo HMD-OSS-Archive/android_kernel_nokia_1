@@ -46,10 +46,10 @@ void lcm_request_gpio_control(struct device *dev)
 	pr_notice("[KE/LCM] GPIO_LCD_RST = 0x%x\n", GPIO_LCD_RST);
 }
 
-static int lcm_probe(struct device *dev)
+static int lcm_platform_probe(struct platform_device *pdev)
 {
+	struct device	*dev = &pdev->dev;
 	lcm_request_gpio_control(dev);
-
 	return 0;
 }
 
@@ -59,10 +59,10 @@ static const struct of_device_id lcm_of_ids[] = {
 };
 
 static struct platform_driver lcm_driver = {
+	.probe = lcm_platform_probe,
 	.driver = {
 		   .name = "hx8394c_wxga_dsi_vdo",
 		   .owner = THIS_MODULE,
-		   .probe = lcm_probe,
 #ifdef CONFIG_OF
 		   .of_match_table = lcm_of_ids,
 #endif

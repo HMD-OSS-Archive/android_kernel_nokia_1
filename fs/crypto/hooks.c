@@ -5,7 +5,6 @@
  */
 
 #include <linux/ratelimit.h>
-#include <linux/namei.h>
 #include "fscrypt_private.h"
 
 /**
@@ -37,7 +36,7 @@ int fscrypt_file_open(struct inode *inode, struct file *filp)
 	if (err)
 		return err;
 
-	dir = dget_parent(filp->f_path.dentry);
+	dir = dget_parent(file_dentry(filp));
 	if (IS_ENCRYPTED(d_inode(dir)) &&
 	    !fscrypt_has_permitted_context(d_inode(dir), inode)) {
 		fscrypt_warn(inode->i_sb,
@@ -212,9 +211,9 @@ EXPORT_SYMBOL_GPL(__fscrypt_encrypt_symlink);
  *
  * Return: the presentable symlink target or an ERR_PTR()
  */
-void *fscrypt_get_symlink(struct inode *inode, const void *caddr,
+const char *fscrypt_get_symlink(struct inode *inode, const void *caddr,
 				unsigned int max_size,
-				struct nameidata *nd)
+				struct delayed_call *done)
 {
 	const struct fscrypt_symlink_data *sd;
 	struct fscrypt_str cstr, pstr;
@@ -262,8 +261,8 @@ void *fscrypt_get_symlink(struct inode *inode, const void *caddr,
 		goto err_kfree;
 
 	pstr.name[pstr.len] = '\0';
-	nd_set_link(nd, pstr.name);
-	return NULL;
+	set_delayed_call(done, kfree_link, pstr.name);
+	return pstr.name;
 
 err_kfree:
 	kfree(pstr.name);

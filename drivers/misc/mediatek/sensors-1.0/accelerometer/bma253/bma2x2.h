@@ -130,7 +130,8 @@ enum BMA_TYPE {
 static int bma2x2_i2c_probe(struct i2c_client *client,
 	const struct i2c_device_id *id);
 static int bma2x2_i2c_remove(struct i2c_client *client);
-#if !defined(CONFIG_HAS_EARLYSUSPEND)
+//#if !defined(CONFIG_HAS_EARLYSUSPEND)
+#if 0
 static int bma2x2_suspend(struct i2c_client *client, pm_message_t msg);
 static int bma2x2_resume(struct i2c_client *client);
 #endif

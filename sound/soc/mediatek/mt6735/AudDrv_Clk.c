@@ -65,7 +65,7 @@
 #include <linux/spinlock.h>
 #include <linux/delay.h>
 #ifdef _MT_IDLE_HEADER
-#include "mt_idle.h"
+#include <mt_idle.h>
 #include "mt_clk_id.h"
 #endif
 #include <linux/err.h>
@@ -980,7 +980,7 @@ void AudDrv_APLL24M_Clk_On(void)
 
 #else
 
-#if 0				/* if clock from WHPLL, but WHPLL used by RF in denali */
+#if 0				/* if clock from WHPLL, but WHPLL used by RF in MT6735 */
 		if (aud_clks[CLOCK_TOP_AUD_MUX2].clk_prepare) {
 			ret = clk_enable(aud_clks[CLOCK_TOP_AUD_MUX2].clock);
 			if (ret) {

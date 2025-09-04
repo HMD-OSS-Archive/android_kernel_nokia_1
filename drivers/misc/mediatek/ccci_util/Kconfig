@@ -39,7 +39,7 @@ config MD1_SIZE
 	hex "Configure modem 1 rserved RO+RW memory size"
 	depends on MTK_CCCI_DRIVER || MTK_CCCI_EXT || MTK_ECCCI_DRIVER
 	default 0x5000000
- 	help
+	help
 	   modem 1 memory size.
 
 
@@ -48,14 +48,14 @@ config MD1_SMEM_SIZE
 	hex "Configure modem 1 rserved share memory size"
 	depends on MTK_CCCI_DRIVER || MTK_CCCI_EXT || MTK_ECCCI_DRIVER
 	default 0x200000
- 	help
+	help
 	   modem 1 share memory size.
 
 
 config MTK_MD2_SUPPORT
 	int "configure modem 1 boot up capability"
 	depends on MTK_CCCI_EXT
-	default 0
+	default 1
 	help
 	  modem 2 mode:
 	  1=>2g,
@@ -72,7 +72,7 @@ config MD2_SIZE
 	hex "Configure modem 2 rserved RO+RW memory size"
 	depends on MTK_CCCI_EXT || MTK_ECCCI_DRIVER
 	default 0x1000000
- 	help
+	help
 	  modem 2 memory size.
 
 

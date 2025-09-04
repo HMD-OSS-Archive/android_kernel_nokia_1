@@ -29,7 +29,7 @@
 #endif
 #include <linux/atomic.h>
 #include <asm/setup.h>
-#include <mt-plat/mt_devinfo.h>
+#include <mt-plat/mtk_devinfo.h>
 #include "devinfo.h"
 
 enum {

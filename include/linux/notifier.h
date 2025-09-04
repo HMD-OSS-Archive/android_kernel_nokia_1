@@ -47,6 +47,8 @@
  * runtime initialization.
  */
 
+struct notifier_block;
+
 typedef	int (*notifier_fn_t)(struct notifier_block *nb,
 			unsigned long action, void *data);
 
@@ -189,8 +191,6 @@ static inline int notifier_to_errno(int ret)
  */
  
 /* CPU notfiers are defined in include/linux/cpu.h. */
-
-extern struct raw_notifier_head cpu_chain;
 
 /* netdevice notifiers are defined in include/linux/netdevice.h */
 

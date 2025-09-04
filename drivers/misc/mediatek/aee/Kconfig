@@ -2,6 +2,7 @@ config MTK_AEE_FEATURE
 	tristate "Enable Android Exception Enhancement"
 	default n
 	select FIQ_GLUE if !TRUSTONIC_TEE_SUPPORT && !ARM_PSCI && !TRUSTY
+	select TRACER_SNAPSHOT
 	help
 	  AEE (Android Exception Engine) that designed by  Mediatek is an
 	  exception catching and debugging information generation mechanism.
@@ -41,4 +42,8 @@ config MTK_AEE_MRDUMP
 	bool "MT-RAMDUMP support"
 	default n
 	help
-	  MT-RAMDUMP support full system ramdump when kernel occur.
+	  MTK_AEE_MRDUMP is the kernel config of MRDUMP feature
+	  MRDUMP (Memory RAM Dump) based on MT-RAMDUMP is designed as a memory
+	  dump mechanism for debugging system to dump DRAM content at MTK
+	  android phone platform
+

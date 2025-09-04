@@ -192,12 +192,12 @@ static u32 _teec_setup_operation(struct teec_session_imp *session,
 				      TEEC_MEM_INPUT) &&
 				      (param_type ==
 				      TEEC_MEMREF_PARTIAL_OUTPUT)) ||
-				    (((ext->memref.parent->
-				       flags & TEEC_MEM_INOUT) ==
+				    (((ext->memref.parent->flags
+				       & TEEC_MEM_INOUT) ==
 				      TEEC_MEM_OUTPUT) &&
 				     (param_type ==
 					 TEEC_MEMREF_PARTIAL_INPUT))) {
-					mc_dev_err(
+					mc_dev_notice(
 					"PARTIAL data flow inconsistency");
 					*return_origin = TEEC_ORIGIN_API;
 					teec_result =
@@ -210,7 +210,7 @@ static u32 _teec_setup_operation(struct teec_session_imp *session,
 				if (ext->memref.offset +
 				    ext->memref.size >
 				    ext->memref.parent->size) {
-					mc_dev_err
+					mc_dev_notice
 					    ("PARTIAL offset/size error");
 					*return_origin = TEEC_ORIGIN_API;
 					teec_result =
@@ -232,7 +232,7 @@ static u32 _teec_setup_operation(struct teec_session_imp *session,
 				}
 				break;
 			default:
-				mc_dev_err("cycle %d, default", i);
+				mc_dev_notice("cycle %d, default", i);
 				*return_origin = TEEC_ORIGIN_API;
 				teec_result = TEEC_ERROR_BAD_PARAMETERS;
 				break;
@@ -242,13 +242,13 @@ static u32 _teec_setup_operation(struct teec_session_imp *session,
 		}
 
 		if (n_buf > MC_MAP_MAX) {
-			mc_dev_err("too many buffers");
+			mc_dev_notice("too many buffers");
 			teec_result = TEEC_ERROR_EXCESS_DATA;
 		}
 
 		if ((teec_result == TEEC_SUCCESS) &&
 		    (tci->operation.is_cancelled)) {
-			mc_dev_err("the operation has been cancelled in COMMS");
+			mc_dev_notice("the operation has been cancelled in COMMS");
 			*return_origin = TEEC_ORIGIN_COMMS;
 			teec_result = TEEC_ERROR_CANCEL;
 		}
@@ -271,7 +271,7 @@ static u32 _teec_setup_operation(struct teec_session_imp *session,
 					}
 				}
 			} else {
-				mc_dev_err("client map failed: %d", ret);
+				mc_dev_notice("client map failed: %d", ret);
 				*return_origin = TEEC_ORIGIN_COMMS;
 				teec_result = TEEC_ERROR_GENERIC;
 			}
@@ -406,12 +406,12 @@ static u32 _teec_unwind_operation(struct teec_session_imp *session,
 			break;
 		}
 		default:
-			mc_dev_err("cycle %d, bad parameter", i);
+			mc_dev_notice("cycle %d, bad parameter", i);
 		}
 	}
 
 	if (n_buf > MC_MAP_MAX) {
-		mc_dev_err("too many buffers");
+		mc_dev_notice("too many buffers");
 		*return_origin = TEEC_ERROR_COMMUNICATION;
 		return TEEC_ERROR_EXCESS_DATA;
 	}
@@ -425,7 +425,7 @@ static u32 _teec_unwind_operation(struct teec_session_imp *session,
 						session->session_id,
 						map.bufs);
 		if (ret < 0)
-			mc_dev_err("client unmap failed: %d", ret);
+			mc_dev_notice("client unmap failed: %d", ret);
 	}
 
 	/* Some sanity checks */
@@ -457,7 +457,7 @@ u32 teec_initialize_context(const char *name, struct teec_context *context)
 	mc_dev_devel("== %s() ==============", __func__);
 
 	if (!context) {
-		mc_dev_err("context is NULL");
+		mc_dev_notice("context is NULL");
 		return TEEC_ERROR_BAD_PARAMETERS;
 	}
 
@@ -484,7 +484,7 @@ void teec_finalize_context(struct teec_context *context)
 
 	/* The parameter context MUST point to an initialized TEE Context */
 	if (!context) {
-		mc_dev_err("context is NULL");
+		mc_dev_notice("context is NULL");
 		return;
 	}
 
@@ -512,7 +512,7 @@ static void _teec_close_session(struct teec_session_imp *session_imp)
 	ret = client_remove_session(session_imp->context.client,
 				    session_imp->session_id);
 	if (ret)
-		mc_dev_err("%s failed: %d", __func__, ret);
+		mc_dev_notice("%s failed: %d", __func__, ret);
 
 	session_imp->active = false;
 }
@@ -532,7 +532,7 @@ static u32 _teec_call_ta(struct teec_session_imp *session,
 	teec_res = _teec_setup_operation(session, tci, operation,
 					 return_origin);
 	if (teec_res != TEEC_SUCCESS) {
-		mc_dev_err("_teec_setup_operation failed (%08x)", teec_res);
+		mc_dev_notice("_teec_setup_operation failed (%08x)", teec_res);
 		return teec_res;
 	}
 
@@ -540,7 +540,7 @@ static u32 _teec_call_ta(struct teec_session_imp *session,
 	ret = client_notify_session(session->context.client,
 				    session->session_id);
 	if (ret) {
-		mc_dev_err("Notify failed: %d", ret);
+		mc_dev_notice("Notify failed: %d", ret);
 		teec_error = TEEC_ERROR_COMMUNICATION;
 	} else {
 		/* Wait for the Trusted App response */
@@ -570,15 +570,15 @@ static u32 _teec_call_ta(struct teec_session_imp *session,
 					break;
 				case ERR_INVALID_SID:
 				case ERR_SID_NOT_ACTIVE:
-					mc_dev_err
+					mc_dev_notice
 					    ("mcWaitNotification failed: %d",
 					     ret);
-					mc_dev_err
+					mc_dev_notice
 					  ("mcGetSessionErrorCode returned %d",
 					   exit_code);
 					break;
 				default:
-					mc_dev_err("Target is DEAD");
+					mc_dev_notice("Target is DEAD");
 					*return_origin = TEEC_ORIGIN_TEE;
 					teec_error = TEEC_ERROR_TARGET_DEAD;
 					break;
@@ -596,7 +596,7 @@ static u32 _teec_call_ta(struct teec_session_imp *session,
 					  return_origin);
 	if (teec_res != TEEC_SUCCESS)
 		/* continue even in case of error */
-		mc_dev_err("_teec_unwind_operation (%08x)", teec_res);
+		mc_dev_notice("_teec_unwind_operation (%08x)", teec_res);
 
 	/* Cleanup */
 	if (teec_error != TEEC_SUCCESS) {
@@ -639,7 +639,7 @@ u32 teec_open_session(struct teec_context *context,
 	mc_dev_devel("== %s() ==============", __func__);
 	/* The parameter context MUST point to an initialized TEE Context */
 	if (!context) {
-		mc_dev_err("context is NULL");
+		mc_dev_notice("context is NULL");
 		if (return_origin)
 			*return_origin = TEEC_ORIGIN_API;
 
@@ -647,7 +647,7 @@ u32 teec_open_session(struct teec_context *context,
 	}
 
 	if (!context->imp.client) {
-		mc_dev_err("context not initialized");
+		mc_dev_notice("context not initialized");
 		if (return_origin)
 			*return_origin = TEEC_ORIGIN_API;
 
@@ -655,7 +655,7 @@ u32 teec_open_session(struct teec_context *context,
 	}
 
 	if (!session) {
-		mc_dev_err("session is NULL");
+		mc_dev_notice("session is NULL");
 		if (return_origin)
 			*return_origin = TEEC_ORIGIN_API;
 
@@ -675,7 +675,7 @@ u32 teec_open_session(struct teec_context *context,
 	session->imp.tci = NULL;
 	bulk_buf = (void *)get_zeroed_page(GFP_KERNEL);
 	if (!bulk_buf) {
-		mc_dev_err("get_zeroed_page failed on tci buffer allocation");
+		mc_dev_notice("get_zeroed_page failed on tci buffer allocation");
 		if (return_origin)
 			*return_origin = TEEC_ORIGIN_API;
 
@@ -708,7 +708,7 @@ u32 teec_open_session(struct teec_context *context,
 	} while (--timeout);
 
 	if (ret) {
-		mc_dev_err("%s failed: %d", __func__, ret);
+		mc_dev_notice("%s failed: %d", __func__, ret);
 		if (return_origin)
 			*return_origin = TEEC_ORIGIN_COMMS;
 
@@ -758,7 +758,7 @@ u32 teec_open_session(struct teec_context *context,
 
 	/* Check for error on communication level */
 	if (teec_res != TEEC_SUCCESS) {
-		mc_dev_err("_teec_call_ta failed(%08x)", teec_res);
+		mc_dev_notice("_teec_call_ta failed(%08x)", teec_res);
 		/*
 		 * Nothing to do here because _teec_call_ta closes broken
 		 * sessions
@@ -776,7 +776,7 @@ u32 teec_open_session(struct teec_context *context,
 
 	teec_res = tci->return_status;
 	if (teec_res != TEEC_SUCCESS) {
-		mc_dev_err("TA OpenSession EP failed(%08x)", teec_res);
+		mc_dev_notice("TA OpenSession EP failed(%08x)", teec_res);
 		goto error;
 	}
 
@@ -816,7 +816,7 @@ u32 teec_invoke_command(struct teec_session *session,
 	mc_dev_devel("== %s() ==============", __func__);
 
 	if (!session) {
-		mc_dev_err("session is NULL");
+		mc_dev_notice("session is NULL");
 		if (return_origin)
 			*return_origin = TEEC_ORIGIN_API;
 
@@ -824,7 +824,7 @@ u32 teec_invoke_command(struct teec_session *session,
 	}
 
 	if (!session->imp.active) {
-		mc_dev_err("session is inactive");
+		mc_dev_notice("session is inactive");
 		if (return_origin)
 			*return_origin = TEEC_ORIGIN_API;
 
@@ -843,7 +843,7 @@ u32 teec_invoke_command(struct teec_session *session,
 	teec_res = _teec_call_ta(&session->imp, operation,
 				 &return_origin_local);
 	if (teec_res != TEEC_SUCCESS) {
-		mc_dev_err("_teec_call_ta failed(%08x)", teec_res);
+		mc_dev_notice("_teec_call_ta failed(%08x)", teec_res);
 		if (return_origin)
 			*return_origin = return_origin_local;
 
@@ -870,7 +870,7 @@ void teec_close_session(struct teec_session *session)
 
 	/* The implementation MUST do nothing if session is NULL */
 	if (!session) {
-		mc_dev_err("session is NULL");
+		mc_dev_notice("session is NULL");
 		return;
 	}
 
@@ -883,7 +883,7 @@ void teec_close_session(struct teec_session *session)
 		teec_res = _teec_call_ta(&session->imp, NULL, &return_origin);
 		if (teec_res != TEEC_SUCCESS)
 			/* continue even in case of error */
-			mc_dev_err("_teec_call_ta failed(%08x)", teec_res);
+			mc_dev_notice("_teec_call_ta failed(%08x)", teec_res);
 
 		if (session->imp.active)
 			_teec_close_session(&session->imp);
@@ -911,7 +911,7 @@ u32 teec_register_shared_memory(struct teec_context *context,
 
 	/* The parameter context MUST point to an initialized TEE Context */
 	if (!context) {
-		mc_dev_err("context is NULL");
+		mc_dev_notice("context is NULL");
 		return TEEC_ERROR_BAD_PARAMETERS;
 	}
 	/*
@@ -919,7 +919,7 @@ u32 teec_register_shared_memory(struct teec_context *context,
 	 * defining the memory region to register
 	 */
 	if (!shared_mem) {
-		mc_dev_err("shared_mem is NULL");
+		mc_dev_notice("shared_mem is NULL");
 		return TEEC_ERROR_BAD_PARAMETERS;
 	}
 	/*
@@ -927,15 +927,15 @@ u32 teec_register_shared_memory(struct teec_context *context,
 	 * and MUST not be NULL
 	 */
 	if (!shared_mem->buffer) {
-		mc_dev_err("shared_mem->buffer is NULL");
+		mc_dev_notice("shared_mem->buffer is NULL");
 		return TEEC_ERROR_BAD_PARAMETERS;
 	}
 	if (shared_mem->flags & ~TEEC_MEM_INOUT) {
-		mc_dev_err("shared_mem->flags is incorrect");
+		mc_dev_notice("shared_mem->flags is incorrect");
 		return TEEC_ERROR_BAD_PARAMETERS;
 	}
 	if (!shared_mem->flags) {
-		mc_dev_err("shared_mem->flags is incorrect");
+		mc_dev_notice("shared_mem->flags is incorrect");
 		return TEEC_ERROR_BAD_PARAMETERS;
 	}
 
@@ -952,7 +952,7 @@ u32 teec_allocate_shared_memory(struct teec_context *context,
 
 	/* The parameter context MUST point to an initialized TEE Context */
 	if (!context) {
-		mc_dev_err("context is NULL");
+		mc_dev_notice("context is NULL");
 		return TEEC_ERROR_BAD_PARAMETERS;
 	}
 	/*
@@ -960,15 +960,15 @@ u32 teec_allocate_shared_memory(struct teec_context *context,
 	 * defining the memory region to register
 	 */
 	if (!shared_mem) {
-		mc_dev_err("shared_mem is NULL");
+		mc_dev_notice("shared_mem is NULL");
 		return TEEC_ERROR_BAD_PARAMETERS;
 	}
 	if (shared_mem->flags & ~TEEC_MEM_INOUT) {
-		mc_dev_err("shared_mem->flags is incorrect");
+		mc_dev_notice("shared_mem->flags is incorrect");
 		return TEEC_ERROR_BAD_PARAMETERS;
 	}
 	if (!shared_mem->flags) {
-		mc_dev_err("shared_mem->flags is incorrect");
+		mc_dev_notice("shared_mem->flags is incorrect");
 		return TEEC_ERROR_BAD_PARAMETERS;
 	}
 
@@ -989,7 +989,7 @@ void teec_release_shared_memory(struct teec_shared_memory *shared_mem)
 
 	/* The implementation MUST do nothing if shared_mem is NULL */
 	if (!shared_mem) {
-		mc_dev_err("shared_mem is NULL");
+		mc_dev_notice("shared_mem is NULL");
 		return;
 	}
 
@@ -1040,6 +1040,6 @@ void teec_request_cancellation(struct teec_operation *operation)
 	ret = client_notify_session(session->context.client,
 				    session->session_id);
 	if (ret)
-		mc_dev_err("Notify failed: %d", ret);
+		mc_dev_notice("Notify failed: %d", ret);
 }
 EXPORT_SYMBOL(teec_request_cancellation);

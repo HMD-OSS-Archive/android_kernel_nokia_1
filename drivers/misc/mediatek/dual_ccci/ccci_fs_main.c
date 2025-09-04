@@ -33,7 +33,6 @@
 #include <linux/device.h>
 #include <linux/cdev.h>
 #include <linux/spinlock.h>
-#include <linux/wakelock.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/wait.h>
@@ -42,6 +41,8 @@
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
 #include <ccci.h>
+#include "ccci_layer.h"
+
 #define CCCI_FS_DEVNAME  "ccci_fs"
 
 /* enable fs_tx or fs_rx log */
@@ -58,7 +59,7 @@ struct fs_ctl_block_t {
 	struct kfifo fs_fifo;
 	int reset_handle;
 	wait_queue_head_t fs_waitq;
-	struct wake_lock fs_wake_lock;
+	struct wakeup_source fs_wake_lock;
 	char fs_wakelock_name[16];
 	int fs_smem_size;
 };
@@ -89,7 +90,7 @@ static void ccci_fs_callback(void *private)
 			    (&ctl_b->fs_fifo, (unsigned char *)&msg.reserved,
 			     sizeof(msg.reserved)) == sizeof(msg.reserved)) {
 				wake_up_interruptible(&ctl_b->fs_waitq);
-				wake_lock_timeout(&ctl_b->fs_wake_lock, HZ / 2);
+				__pm_wakeup_event(&ctl_b->fs_wake_lock, HZ / 2);
 			} else {
 				CCCI_DBG_MSG(ctl_b->fs_md_id, "fs ",
 					     "[Error]Unable to put new request into fifo\n");
@@ -430,8 +431,7 @@ int ccci_fs_init(int md_id)
 	ctl_b->fs_dev_num = MKDEV(major, minor);
 	snprintf(ctl_b->fs_wakelock_name, sizeof(ctl_b->fs_wakelock_name),
 		 "ccci%d_fs", (md_id + 1));
-	wake_lock_init(&ctl_b->fs_wake_lock, WAKE_LOCK_SUSPEND,
-		       ctl_b->fs_wakelock_name);
+	wakeup_source_init(&ctl_b->fs_wake_lock, ctl_b->fs_wakelock_name);
 
 	ret =
 	    register_chrdev_region(ctl_b->fs_dev_num, 1,
@@ -488,7 +488,7 @@ void ccci_fs_exit(int md_id)
 
 	cdev_del(&ctl_b->fs_cdev);
 	unregister_chrdev_region(ctl_b->fs_dev_num, 1);
-	wake_lock_destroy(&ctl_b->fs_wake_lock);
+	__pm_relax(&ctl_b->fs_wake_lock);
 	kfree(ctl_b);
 	fs_ctl_block[md_id] = NULL;
 }

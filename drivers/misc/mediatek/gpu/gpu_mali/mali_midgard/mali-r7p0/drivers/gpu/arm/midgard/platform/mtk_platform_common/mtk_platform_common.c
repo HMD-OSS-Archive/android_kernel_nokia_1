@@ -1,14 +1,14 @@
 /*
- * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2016 MediaTek Inc.
  *
- * This program is free software: you can redistribute it and/or modify
+ * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
 #include <mali_kbase.h>
@@ -17,13 +17,14 @@
 #include <linux/proc_fs.h>
 
 #include <platform/mtk_platform_common.h>
-#include "mt_gpufreq.h"
+#ifdef ENABLE_COMMON_DVFS
+#include "mtk_gpufreq.h"
+#endif
 #include <mali_kbase_pm_internal.h>
 
 #include <ged_log.h>
 
 #include <linux/workqueue.h>
-#include <mt-plat/aee.h>
 
 #ifdef ENABLE_MTK_MEMINFO
 /*
@@ -85,19 +86,19 @@ bool mtk_kbase_dump_gpu_memory_usage()
 	int i = 0;
 
 	//output the total memory usage and cap for this device
-	pr_warn(KERN_DEBUG "%10s\t%16s\n", "PID", "Memory by Page");
-	pr_warn(KERN_DEBUG "============================\n");
+	pr_warn("%10s\t%16s\n", "PID", "GPU Memory by Page");
+	pr_warn("============================\n");
 
 	for(i = 0; (i < MTK_MEMINFO_SIZE) && (g_mtk_gpu_meminfo[i].pid != 0); i++) {
-		pr_warn(KERN_DEBUG "%10d\t%16d\n", g_mtk_gpu_meminfo[i].pid, \
+		pr_warn("%10d\t%16d\n", g_mtk_gpu_meminfo[i].pid, \
                                         g_mtk_gpu_meminfo[i].used_pages);
         }
 
-	pr_warn(KERN_DEBUG "============================\n");
-	pr_warn(KERN_DEBUG "%10s\t%16u\n", \
+	pr_warn("============================\n");
+	pr_warn("%10s\t%16u\n", \
 			"Total", \
 			g_mtk_gpu_total_memory_usage_in_pages_debugfs);
-	pr_warn(KERN_DEBUG "============================\n");
+	pr_warn("============================\n");
 	return true;
 }
 
@@ -190,6 +191,7 @@ static const struct file_operations kbasep_gpu_help_debugfs_fops = {
 static int proc_gpu_memoryusage_show(struct seq_file *m, void *v)
 {
 	ssize_t ret = 0;
+	int i = 0;
 
 #ifdef ENABLE_MTK_MEMINFO
 	int total_size_in_bytes;
@@ -198,7 +200,22 @@ static int proc_gpu_memoryusage_show(struct seq_file *m, void *v)
 	total_size_in_bytes = mtk_kbase_report_gpu_memory_usage();
 	peak_size_in_bytes = mtk_kbase_report_gpu_memory_peak();
 
-	ret = seq_printf(m, "curr: %10u, peak %10u\n", total_size_in_bytes, peak_size_in_bytes);
+	seq_printf(m, "curr: %10u byte, peak %10u byte\n", total_size_in_bytes, peak_size_in_bytes);
+
+	//output the total memory usage and cap for this device
+	seq_printf(m, "%10s\t%16s\n", "PID", "GPU Memory by Page");
+	seq_printf(m, "============================\n");
+
+	for(i = 0; (i < MTK_MEMINFO_SIZE) && (g_mtk_gpu_meminfo[i].pid != 0); i++) {
+		seq_printf(m, "%10d\t%16d\n", g_mtk_gpu_meminfo[i].pid, \
+		g_mtk_gpu_meminfo[i].used_pages);
+	}
+
+	seq_printf(m, "============================\n");
+	seq_printf(m, "%10s\t%16u\n", \
+		"Total", \
+		g_mtk_gpu_total_memory_usage_in_pages_debugfs);
+	seq_printf(m, "============================\n");
 #endif /* ENABLE_MTK_MEMINFO */
 
 	return ret;
@@ -219,6 +236,7 @@ static const struct file_operations kbasep_gpu_memory_usage_debugfs_open = {
 /// 2. For GL/CL utilization
 static int proc_gpu_utilization_show(struct seq_file *m, void *v)
 {
+#ifdef ENABLE_COMMON_DVFS
     unsigned long gl, cl0, cl1;
     unsigned int iCurrentFreq;
 
@@ -229,6 +247,9 @@ static int proc_gpu_utilization_show(struct seq_file *m, void *v)
     cl1 = kbasep_get_cl_js1_utilization();
 
     seq_printf(m, "gpu/cljs0/cljs1=%lu/%lu/%lu, frequency index=%d power(0:off, 1:0n):%d\n", gl, cl0, cl1, iCurrentFreq, mtk_get_vgpu_power_on_flag());
+#else
+    seq_printf(m, "GPU DVFS doesn't support\n");
+#endif
 
     return 0;
 }
@@ -248,12 +269,15 @@ static const struct file_operations kbasep_gpu_utilization_debugfs_fops = {
 /// 3. For query GPU frequency index
 static int proc_gpu_frequency_show(struct seq_file *m, void *v)
 {
-
+#ifdef ENABLE_COMMON_DVFS
     unsigned int iCurrentFreq;
 
     iCurrentFreq = mt_gpufreq_get_cur_freq_index();
 
     seq_printf(m, "GPU Frequency Index: %u\n", iCurrentFreq);
+#else
+    seq_printf(m, "GPU DVFS doesn't support\n");
+#endif
 
     return 0;
 }
@@ -436,11 +460,15 @@ int mtk_set_vgpu_power_on_flag(int power_on_id)
 
 int mtk_set_mt_gpufreq_target(int freq_id)
 {
+#ifdef ENABLE_COMMON_DVFS
     if (MTK_VGPU_POWER_ON == mtk_get_vgpu_power_on_flag()) {
         return  mt_gpufreq_target(freq_id);
     } else {
         ///pr_alert("MALI: VGPU power is off, ignore set freq: %d. \n",freq_id);
     }
+#else
+    pr_alert("MALI: GPU DVFS doesn't support\n");
+#endif
 
     return 0;
 }

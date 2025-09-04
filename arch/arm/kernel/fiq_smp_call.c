@@ -122,6 +122,8 @@ static int get_HW_cpuid(void)
  * Other kernel code or drivers should NOT use this function.
  * This function can only be used in the FIQ-WDT handler.
  */
+#define __get_cpu_var(var)      (*this_cpu_ptr(&(var)))
+
 int fiq_smp_call_function(fiq_smp_call_func_t func, void *info, int wait)
 {
 	struct cpumask *mask = (struct cpumask *)cpu_online_mask;

@@ -24,7 +24,7 @@
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include "devinfo.h"
-#include "mt_devinfo.h"
+#include <mt-plat/mtk_devinfo.h>
 
 
 /**************************************************************************

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 TRUSTONIC LIMITED
+ * Copyright (c) 2013-2017 TRUSTONIC LIMITED
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -17,6 +17,7 @@
 #include <linux/device.h>
 #include <linux/export.h>
 #include <linux/fs.h>
+#include <linux/mm_types.h>	/* struct vm_area_struct */
 
 #include "public/mc_user.h"
 
@@ -277,7 +278,7 @@ static long user_ioctl(struct file *file, unsigned int id, unsigned long arg)
 		break;
 	}
 	default:
-		mc_dev_err("unsupported command no %d\n", id);
+		mc_dev_notice("unsupported command no %d\n", id);
 		ret = -ENOIOCTLCMD;
 	}
 

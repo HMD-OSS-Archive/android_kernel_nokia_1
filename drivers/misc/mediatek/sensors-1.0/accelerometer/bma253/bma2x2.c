@@ -277,7 +277,8 @@ struct bma2x2_i2c_data {
 	struct early_suspend    early_drv;
 #endif
 };
-#if !defined(CONFIG_HAS_EARLYSUSPEND)
+//#if !defined(CONFIG_HAS_EARLYSUSPEND)
+#if 0
 static int bma2x2_suspend(struct i2c_client *client, pm_message_t msg);
 static int bma2x2_resume(struct i2c_client *client);
 #endif
@@ -299,7 +300,8 @@ static struct i2c_driver bma2x2_i2c_driver = {
 	},
 	.probe				= bma2x2_i2c_probe,
 	.remove				= bma2x2_i2c_remove,
-#if !defined(CONFIG_HAS_EARLYSUSPEND)
+//#if !defined(CONFIG_HAS_EARLYSUSPEND)
+#if 0
 	.suspend            = bma2x2_suspend,
 	.resume             = bma2x2_resume,
 #endif
@@ -2598,6 +2600,7 @@ static struct miscdevice bma2x2_device = {
 /*----------------------------------------------------------------------------*/
 #ifndef CONFIG_HAS_EARLYSUSPEND
 /*----------------------------------------------------------------------------*/
+#if 0
 static int bma2x2_suspend(struct i2c_client *client, pm_message_t msg)
 {
 	struct bma2x2_i2c_data *obj = i2c_get_clientdata(client);
@@ -2642,6 +2645,7 @@ static int bma2x2_resume(struct i2c_client *client)
 
 	return 0;
 }
+#endif
 /*----------------------------------------------------------------------------*/
 #else /*CONFIG_HAS_EARLY_SUSPEND is defined*/
 /*----------------------------------------------------------------------------*/
@@ -2904,9 +2908,13 @@ static int bma2x2_i2c_remove(struct i2c_client *client)
 	if (err)
 		GSE_ERR("bma150_delete_attr fail: %d\n", err);
 
+#if 0
 	err = misc_deregister(&bma2x2_device);
 	if (err)
 		GSE_ERR("misc_deregister fail: %d\n", err);
+#else
+	misc_deregister(&bma2x2_device);
+#endif
 
 #ifdef DMAREAD
 	if (I2CDMABuf_va != NULL) {

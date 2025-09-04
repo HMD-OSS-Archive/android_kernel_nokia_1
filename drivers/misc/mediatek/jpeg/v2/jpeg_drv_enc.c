@@ -38,7 +38,7 @@
 
 
 
-kal_uint32 _jpeg_enc_int_status = 0;
+kal_uint32 _jpeg_enc_int_status;
 
 
 int jpeg_isr_enc_lisr(void)
@@ -195,7 +195,7 @@ kal_uint32 jpeg_drv_enc_warm_reset(void)
 
 	while (0 == (REG_JPEG_ENC_DEBUG_INFO0 & JPEG_ENC_DEBUG_INFO0_GMC_IDLE_MASK)) {
 		timeout--;
-		if (0 == timeout) {
+		if (timeout == 0) {
 			JPEG_MSG("Wait for GMC IDLE timeout\n");
 			return 0;
 		}
@@ -338,7 +338,7 @@ void jpeg_drv_enc_set_restart_interval(kal_uint32 restart_interval)
 	unsigned int u4Value;
 
 	u4Value = REG_JPEG_ENC_CTRL;
-	if (0 != restart_interval) {
+	if (restart_interval != 0) {
 		u4Value |= JPEG_ENC_CTRL_RESTART_EN_BIT;
 		IMG_REG_WRITE((u4Value), REG_ADDR_JPEG_ENC_CTRL);
 	} else {
@@ -380,8 +380,7 @@ kal_uint32 jpeg_drv_enc_set_dst_buff(kal_uint32 dst_addr, kal_uint32 stall_size,
 
 	IMG_REG_WRITE((dst_addr & (~0xF)), REG_ADDR_JPEG_ENC_DST_ADDR0);
 
-    /* subtract stall address with 128 bytes in order to prevent HW write over */
-	IMG_REG_WRITE((((dst_addr + stall_size) & (~0xF)) - 128), REG_ADDR_JPEG_ENC_STALL_ADDR0);
+	IMG_REG_WRITE(((dst_addr + stall_size) & (~0xF)), REG_ADDR_JPEG_ENC_STALL_ADDR0);
 
 
 	return 1;

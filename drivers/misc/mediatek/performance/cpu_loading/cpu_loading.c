@@ -26,7 +26,7 @@
 
 #ifdef CONFIG_TRACING
 #include <linux/kallsyms.h>
-#include <linux/ftrace_event.h>
+#include <linux/trace_events.h>
 #endif
 
 #ifdef CONFIG_CPU_FREQ

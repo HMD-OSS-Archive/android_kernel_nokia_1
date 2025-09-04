@@ -57,7 +57,7 @@
 /* #define DEBUG_AUD_UL1 */
 /* #define DEBUG_AUD_DL1 */
 /* #define DEBUG_AUD_DAI */
-/* #define DENALI_FPGA_EARLYPORTING //Denali early porting */
+/* #define DENALI_FPGA_EARLYPORTING //MT6735 early porting */
 #define AUDIO_DL2_ISR_COPY_SUPPORT
 
 

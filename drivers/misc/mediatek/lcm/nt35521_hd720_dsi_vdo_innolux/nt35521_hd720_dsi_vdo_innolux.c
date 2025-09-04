@@ -216,7 +216,7 @@ static int tps65132_write_bytes(unsigned char addr, unsigned char value)
 // ---------------------------------------------------------------------------
 
 const static unsigned int BL_MIN_LEVEL =20;
-static LCM_UTIL_FUNCS lcm_util = {0};
+static struct LCM_UTIL_FUNCS lcm_util = {0};
 
 // ---------------------------------------------------------------------------
 //  Local Functions
@@ -329,14 +329,14 @@ static void push_table(struct LCM_setting_table *table, unsigned int count, unsi
 //  LCM Driver Implementations
 // ---------------------------------------------------------------------------
 
-static void lcm_set_util_funcs(const LCM_UTIL_FUNCS *util)
+static void lcm_set_util_funcs(const struct LCM_UTIL_FUNCS *util)
 {
-    	memcpy(&lcm_util, util, sizeof(LCM_UTIL_FUNCS));
+    	memcpy(&lcm_util, util, sizeof(struct LCM_UTIL_FUNCS));
 }
 
-static void lcm_get_params(LCM_PARAMS *params)
+static void lcm_get_params(struct LCM_PARAMS *params)
 {
-	memset(params, 0, sizeof(LCM_PARAMS));
+	memset(params, 0, sizeof(struct LCM_PARAMS));
 	params->type   = LCM_TYPE_DSI;
 
 	params->width  = FRAME_WIDTH;
@@ -559,7 +559,7 @@ static void lcm_resume(void)
 }
 
 
-LCM_DRIVER nt35521_hd720_dsi_vdo_innolux_lcm_drv =
+struct LCM_DRIVER nt35521_hd720_dsi_vdo_innolux_lcm_drv =
 {
     .name           	= "nt35521_hd720_dsi_vdo_innolux",
     .set_util_funcs 	= lcm_set_util_funcs,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 TRUSTONIC LIMITED
+ * Copyright (c) 2013-2017 TRUSTONIC LIMITED
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -17,10 +17,10 @@
 #include <linux/slab.h>
 #include <linux/device.h>
 #include <linux/debugfs.h>
-
+#include <linux/version.h>
 #include "public/mc_linux_api.h"
 
-#include "platform.h"	/* DEBUGFS_CREATE_BOOL_TAKES_A_BOOL */
+#include "platform.h"	/* TBASE_CORE_SWITCHER */
 #include "main.h"
 #include "fastcall.h"
 #include "logging.h"
@@ -74,7 +74,7 @@ static struct logging_ctx {
 	u16	prev_source;		/* Previous Log source */
 	char	line[LOG_LINE_SIZE + 1];/* Log Line buffer */
 	u32	line_len;		/* Log Line buffer current length */
-#ifndef DEBUGFS_CREATE_BOOL_TAKES_A_BOOL
+#if KERNEL_VERSION(4, 4, 0) > LINUX_VERSION_CODE
 	u32	enabled;		/* Log can be disabled via debugfs */
 #else
 	bool	enabled;		/* Log can be disabled via debugfs */
@@ -99,7 +99,8 @@ static inline void log_eol(u16 source)
 	else
 		/* TEE kernel */
 #ifdef TBASE_CORE_SWITCHER
-		dev_info(g_ctx.mcd, "mtk(%d)|%s\n", mc_active_core(), log_ctx.line);
+		dev_info(g_ctx.mcd, "mtk(%d)|%s\n",
+			mc_active_core(), log_ctx.line);
 #else
 		dev_info(g_ctx.mcd, "mtk|%s\n", log_ctx.line);
 #endif
@@ -185,7 +186,7 @@ static void log_worker(struct work_struct *work)
 	mutex_lock(&local_mutex);
 	while (log_ctx.trace_buf->head != log_ctx.tail) {
 		if (log_ctx.trace_buf->version != MC_LOG_VERSION) {
-			mc_dev_err("Bad log data v%d (exp. v%d), stop\n",
+			mc_dev_notice("Bad log data v%d (exp. v%d), stop\n",
 				   log_ctx.trace_buf->version, MC_LOG_VERSION);
 			log_ctx.dead = true;
 			break;
@@ -218,7 +219,7 @@ int mc_logging_start(void)
 				  BIT(LOG_BUF_ORDER) * PAGE_SIZE);
 
 	if (ret) {
-		mc_dev_err("shared traces setup failed\n");
+		mc_dev_notice("shared traces setup failed\n");
 		return ret;
 	}
 
@@ -268,5 +269,5 @@ void mc_logging_exit(void)
 	if (!log_ctx.buffer_is_shared)
 		free_pages(log_ctx.trace_page, LOG_BUF_ORDER);
 	else
-		mc_dev_err("log buffer unregister not supported\n");
+		mc_dev_notice("log buffer unregister not supported\n");
 }

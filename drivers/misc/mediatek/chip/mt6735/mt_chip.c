@@ -26,7 +26,7 @@
 #include <linux/of_address.h>
 #include <linux/printk.h>
 #include <mt-plat/mt_io.h>
-#include "mt_chip_common.h"
+#include "mtk_chip_common.h"
 
 extern u32 __attribute__((weak)) get_devinfo_with_index(u32);
 

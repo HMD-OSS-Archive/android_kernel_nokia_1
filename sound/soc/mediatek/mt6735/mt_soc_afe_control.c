@@ -75,7 +75,7 @@
 #include <linux/wait.h>
 #include <linux/spinlock.h>
 #include <linux/sched.h>
-#include <linux/wakelock.h>
+//#include <linux/wakelock.h>
 #include <linux/semaphore.h>
 #include <linux/jiffies.h>
 #include <linux/proc_fs.h>
@@ -1852,9 +1852,9 @@ bool SetModemPcmEnable(int modem_index, bool modem_pcm_on)
 			/* selects internal MD2/MD3 PCM interface (0x538[8]) */
 			mPcm1AsyncFifo = (Afe_Get_Reg(PCM_INTF_CON) & 0x0040) >> 6;
 			if (mPcm1AsyncFifo == 0) {
-				/* Afe_Set_Reg(AFE_ASRC_CON6, 0x005f188f, MASK_ALL);   // denali marked */
+				/* Afe_Set_Reg(AFE_ASRC_CON6, 0x005f188f, MASK_ALL);   // MT6735 marked */
 				Afe_Set_Reg(AFE_ASRC_CON0, 0x86083031, MASK_ALL);
-				/* Afe_Set_Reg(AFE_ASRC4_CON6, 0x005f188f, MASK_ALL);   // denali marked */
+				/* Afe_Set_Reg(AFE_ASRC4_CON6, 0x005f188f, MASK_ALL);   // MT6735 marked */
 				Afe_Set_Reg(AFE_ASRC4_CON0, 0x06003031, MASK_ALL);
 			}
 			Afe_Set_Reg(PCM_INTF_CON, 0x1, 0x1);

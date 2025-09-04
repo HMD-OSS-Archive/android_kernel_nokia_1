@@ -11,11 +11,5 @@
 # GNU General Public License for more details.
 #
 
-obj-y := emi_reg_rw.o
-
-ifeq ($(CONFIG_MTK_COMMON_EMI), y)
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/mt8127/include/
-obj-y += mt8127/
-else
-obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
-endif
+obj-$(CONFIG_MTK_EMI_MPU) := emi_reg_rw.o
+obj-$(CONFIG_MTK_EMI_MPU) += $(subst ",,$(CONFIG_MTK_PLATFORM))/

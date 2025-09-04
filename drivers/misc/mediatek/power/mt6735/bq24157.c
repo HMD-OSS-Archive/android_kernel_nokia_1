@@ -38,7 +38,7 @@ static const struct of_device_id bq24157_of_match[] = {
 
 MODULE_DEVICE_TABLE(of, bq24157_of_match);
 
-//add 
+//add
 struct of_device_id charger_of_match[] = {
     {.compatible = "mediatek,charger_bq24157"},
 	{},

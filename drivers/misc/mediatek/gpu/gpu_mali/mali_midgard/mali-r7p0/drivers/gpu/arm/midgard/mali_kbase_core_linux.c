@@ -100,7 +100,9 @@
 
 /* MTK GPU DVFS */
 #include <mali_kbase_pm.h>
-#include <mt_gpufreq.h>
+#ifdef ENABLE_COMMON_DVFS
+#include <mtk_gpufreq.h>
+#endif
 #include <mali_kbase_pm_defs.h>
 #include <mali_kbase_pm_internal.h>
 #include <ged_dvfs.h>
@@ -108,7 +110,7 @@
 unsigned int _mtk_mali_ged_log = 0;
 
 /* MTK chip version API */
-#include "mt_chip.h"
+#include "mtk_chip.h"
 
 /* GPU IRQ Tags */
 #define	JOB_IRQ_TAG	0
@@ -1334,7 +1336,7 @@ static int kbase_open(struct inode *inode, struct file *filp)
 	  */
 #else
 	debugfs_create_bool("infinite_cache", 0644, kctx->kctx_dentry,
-			&kctx->infinite_cache_active);
+			(bool*)&kctx->infinite_cache_active);
 #endif /* CONFIG_MALI_COH_USER */
 	kbasep_mem_profile_debugfs_add(kctx);
 
@@ -3278,7 +3280,7 @@ static int kbase_device_debugfs_init(struct kbase_device *kbdev)
 #ifndef CONFIG_MALI_COH_USER
 	debugfs_create_bool("infinite_cache", 0644,
 			debugfs_ctx_defaults_directory,
-			&kbdev->infinite_cache_active_default);
+			(bool*)&kbdev->infinite_cache_active_default);
 #endif /* CONFIG_MALI_COH_USER */
 
 	debugfs_create_size_t("mem_pool_max_size", 0644,
@@ -3767,7 +3769,7 @@ static int kbase_platform_device_probe(struct platform_device *pdev)
 #endif  /* CONFIG_HAVE_CLK */
 
 	/* MTK: common */
-	/*_mtk_mali_ged_log = ged_log_buf_alloc(4096 * 8, 128 * 4096 * 8, GED_LOG_BUF_TYPE_RINGBUFFER, "MALI", NULL);*/
+	_mtk_mali_ged_log = ged_log_buf_alloc(4096 * 8, 128 * 4096 * 8, GED_LOG_BUF_TYPE_RINGBUFFER, "MALI", NULL);
 
 	if (mtk_platform_init(pdev, kbdev))
 	{
@@ -3830,9 +3832,12 @@ out_bl_core_register:
 out_sysfs:
 	kbase_common_device_remove(kbdev);
 out_common_init:
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0))
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 19, 0)) \
+	&& (LINUX_VERSION_CODE <= KERNEL_VERSION(4, 3, 0))
 	of_free_opp_table(kbdev->dev);
 #endif
+
 #ifdef CONFIG_HAVE_CLK  // MTK
 	clk_disable_unprepare(kbdev->clock);
 #endif  /* CONFIG_HAVE_CLK */

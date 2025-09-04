@@ -1,7 +1,7 @@
 /*
-* Copyright (c) 2015 MediaTek Inc.
+* Copyright (c) 2016 MediaTek Inc.
 * Author: PC Chen <pc.chen@mediatek.com>
-*         Tiffany Lin <tiffany.lin@mediatek.com>
+*	Tiffany Lin <tiffany.lin@mediatek.com>
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
@@ -20,21 +20,26 @@
 #include <linux/dma-direction.h>
 
 struct mtk_vcodec_mem {
+	size_t length;
 	size_t size;
 	void *va;
 	dma_addr_t dma_addr;
+	struct dma_buf *dmabuf;
 };
+
+struct mtk_vcodec_ctx;
+struct mtk_vcodec_dev;
 
 extern int mtk_v4l2_dbg_level;
 extern bool mtk_vcodec_dbg;
 
-#define DEBUG 1
+#define DEBUG	1
 
 #if defined(DEBUG)
 
 #define mtk_v4l2_debug(level, fmt, args...)				 \
 	do {								 \
-		if (mtk_v4l2_dbg_level >= level)			 \
+		if ((mtk_v4l2_dbg_level & level) == level)			 \
 			pr_info("[MTK_V4L2] level=%d %s(),%d: " fmt "\n",\
 				level, __func__, __LINE__, ##args);	 \
 	} while (0)
@@ -44,23 +49,23 @@ extern bool mtk_vcodec_dbg;
 	       ##args)
 
 
-#define mtk_v4l2_debug_enter()  mtk_v4l2_debug(3, "+\n")
-#define mtk_v4l2_debug_leave()  mtk_v4l2_debug(3, "-\n")
+#define mtk_v4l2_debug_enter()  mtk_v4l2_debug(8, "+")
+#define mtk_v4l2_debug_leave()  mtk_v4l2_debug(8, "-")
 
 #define mtk_vcodec_debug(h, fmt, args...)				\
 	do {								\
 		if (mtk_vcodec_dbg)					\
 			pr_info("[MTK_VCODEC][%d]: %s() " fmt "\n",	\
-				((struct mtk_vcodec_ctx *)h->ctx)->idx, \
+				((struct mtk_vcodec_ctx *)h->ctx)->id, \
 				__func__, ##args);			\
 	} while (0)
 
 #define mtk_vcodec_err(h, fmt, args...)					\
 	pr_err("[MTK_VCODEC][ERROR][%d]: %s() " fmt "\n",		\
-	       ((struct mtk_vcodec_ctx *)h->ctx)->idx, __func__, ##args)
+	       ((struct mtk_vcodec_ctx *)h->ctx)->id, __func__, ##args)
 
-#define mtk_vcodec_debug_enter(h)  mtk_vcodec_debug(h, "+\n")
-#define mtk_vcodec_debug_leave(h)  mtk_vcodec_debug(h, "-\n")
+#define mtk_vcodec_debug_enter(h)  mtk_vcodec_debug(h, "+")
+#define mtk_vcodec_debug_leave(h)  mtk_vcodec_debug(h, "-")
 
 #else
 
@@ -76,10 +81,14 @@ extern bool mtk_vcodec_dbg;
 
 #endif
 
-void __iomem *mtk_vcodec_get_reg_addr(void *data, unsigned int reg_idx);
-int mtk_vcodec_mem_alloc(void *data, struct mtk_vcodec_mem *mem);
-void mtk_vcodec_mem_free(void *data, struct mtk_vcodec_mem *mem);
-int mtk_vcodec_get_ctx_id(void *data);
-struct platform_device *mtk_vcodec_get_plat_dev(void *data);
-void mtk_vcodec_fmt2str(u32 fmt, char *str);
+void __iomem *mtk_vcodec_get_reg_addr(struct mtk_vcodec_ctx *data,
+				unsigned int reg_idx);
+int mtk_vcodec_mem_alloc(struct mtk_vcodec_ctx *data,
+				struct mtk_vcodec_mem *mem);
+void mtk_vcodec_mem_free(struct mtk_vcodec_ctx *data,
+				struct mtk_vcodec_mem *mem);
+void mtk_vcodec_set_curr_ctx(struct mtk_vcodec_dev *dev,
+	struct mtk_vcodec_ctx *ctx);
+struct mtk_vcodec_ctx *mtk_vcodec_get_curr_ctx(struct mtk_vcodec_dev *dev);
+
 #endif /* _MTK_VCODEC_UTIL_H_ */

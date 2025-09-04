@@ -34,13 +34,13 @@ struct mt_gpio_vbase gpio_vbase;
 
 int mt6306_set_gpio_out(unsigned long pin, unsigned long output)
 {
-	GPIOERR("denali not support\n");
+	GPIOERR("MT6735 not support\n");
 	return 0;
 }
 
 int mt6306_set_gpio_dir(unsigned long pin, unsigned long dir)
 {
-	GPIOERR("denali not support\n");
+	GPIOERR("MT6735 not support\n");
 	return 0;
 }
 

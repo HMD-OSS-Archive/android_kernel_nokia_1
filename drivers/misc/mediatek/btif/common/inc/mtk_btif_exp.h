@@ -16,25 +16,21 @@
 
 /*--------------marco defination---------------*/
 #define BTIF_MAX_LEN_PER_PKT 2048
-#ifdef CONFIG_MTK_BTIF
 #define BTIF_RXD_BE_BLOCKED_DETECT 1
-#else
-#define BTIF_RXD_BE_BLOCKED_DETECT 0
-#endif
 /*--------------Enum Defination---------------*/
-typedef enum _ENUM_BTIF_DPIDLE_ {
+enum _ENUM_BTIF_DPIDLE_ {
 	BTIF_DPIDLE_DISABLE = 0,
 	BTIF_DPIDLE_ENABLE = BTIF_DPIDLE_DISABLE + 1,
 	BTIF_DPIDLE_MAX,
-} ENUM_BTIF_DPIDLE_CTRL;
+};
 
-typedef enum _ENUM_BTIF_LPBK_MODE_ {
+enum _ENUM_BTIF_LPBK_MODE_ {
 	BTIF_LPBK_DISABLE = 0,
 	BTIF_LPBK_ENABLE = BTIF_LPBK_DISABLE + 1,
 	BTIF_LPBK_MAX,
-} ENUM_BTIF_LPBK_MODE;
+};
 
-typedef enum _ENUM_BTIF_DBG_ID_ {
+enum _ENUM_BTIF_DBG_ID_ {
 	BTIF_DISABLE_LOGGER = 0,
 	BTIF_ENABLE_LOGGER = BTIF_DISABLE_LOGGER + 1,
 	BTIF_DUMP_LOG = BTIF_ENABLE_LOGGER + 1,
@@ -44,9 +40,9 @@ typedef enum _ENUM_BTIF_DBG_ID_ {
 	BTIF_DISABLE_RT_LOG = BTIF_ENABLE_RT_LOG + 1,
 	BTIF_DUMP_BTIF_IRQ = BTIF_DISABLE_RT_LOG + 1,
 	BTIF_DBG_MAX,
-} ENUM_BTIF_DBG_ID;
+};
 
-typedef enum _ENUM_BTIF_OP_ERROR_CODE_ {
+enum _ENUM_BTIF_OP_ERROR_CODE_ {
 	E_BTIF_AGAIN = 0,
 	E_BTIF_FAIL = -1,
 	E_BTIF_BAD_POINTER = -2,
@@ -56,7 +52,7 @@ typedef enum _ENUM_BTIF_OP_ERROR_CODE_ {
 	E_BTIF_ALREADY_OPEN = -6,
 	E_BTIF_NOT_OPEN = -7,
 	E_BTIF_INVAL_STATE = -8,
-} ENUM_BTIF_OP_ERROR_CODE;
+};
 
 /*--------------End of Enum Defination---------------*/
 
@@ -169,11 +165,12 @@ int mtk_wcn_btif_read(unsigned long u_id,
 *  control if BTIF module allow system enter deepidle state or not
 * PARAMETERS
 *  p_btif      [IN] pointer returned by mtk_wcn_btif_open
-*  en_flag    [IN] one of ENUM_BTIF_DPIDLE_CTRL
+*  en_flag    [IN] one of enum _ENUM_BTIF_DPIDLE_
 * RETURNS
 *  int          always return 0
 *****************************************************************************/
-int mtk_wcn_btif_dpidle_ctrl(unsigned long u_id, ENUM_BTIF_DPIDLE_CTRL en_flag);
+int mtk_wcn_btif_dpidle_ctrl(unsigned long u_id,
+			     enum _ENUM_BTIF_DPIDLE_ en_flag);
 
 /*****************************************************************************
 * FUNCTION
@@ -220,12 +217,13 @@ int mtk_wcn_btif_wakeup_consys(unsigned long u_id);
 * PARAMETERS
 *  p_btif      [IN] pointer returned by mtk_wcn_btif_open
 *  enable     [IN] loopback mode control flag, enable or disable,
-*  shou be one of ENUM_BTIF_LPBK_MODE
+*  shou be one of enum _ENUM_BTIF_LPBK_MODE_
 * RETURNS
 *  int          0 = succeed;
 *  others = fail, for detailed information, please see ENUM_BTIF_OP_ERROR_CODE
 *****************************************************************************/
-int mtk_wcn_btif_loopback_ctrl(unsigned long u_id, ENUM_BTIF_LPBK_MODE enable);
+int mtk_wcn_btif_loopback_ctrl(unsigned long u_id,
+			       enum _ENUM_BTIF_LPBK_MODE_ enable);
 
 /*****************************************************************************
 * FUNCTION
@@ -234,7 +232,7 @@ int mtk_wcn_btif_loopback_ctrl(unsigned long u_id, ENUM_BTIF_LPBK_MODE enable);
 *  control BTIF logger function's behavior
 * PARAMETERS
 *  p_btif      [IN] pointer returned by mtk_wcn_btif_open
-*  flag         [IN] should be one of ENUM_BTIF_DBG_ID
+*  flag         [IN] should be one of enum _ENUM_BTIF_DBG_ID_
 *                      BTIF_DISABLE_LOGGER  - disable btif logger
 *                      BTIF_ENABLE_LOGGER   - enable btif logger
 *                      BTIF_DUMP_LOG           - dump log logged by btif
@@ -246,7 +244,7 @@ int mtk_wcn_btif_loopback_ctrl(unsigned long u_id, ENUM_BTIF_LPBK_MODE enable);
 *        others = fail, for detailed information,
 *        please see ENUM_BTIF_OP_ERROR_CODE
 *****************************************************************************/
-int mtk_wcn_btif_dbg_ctrl(unsigned long u_id, ENUM_BTIF_DBG_ID flag);
+int mtk_wcn_btif_dbg_ctrl(unsigned long u_id, enum _ENUM_BTIF_DBG_ID_ flag);
 /*-----------End of Debug Purpose API declearation------------*/
 
 /*****************************************************************************
@@ -320,5 +318,5 @@ int mtk_btif_exp_clock_ctrl(int en);
 #if BTIF_RXD_BE_BLOCKED_DETECT
 int mtk_btif_rxd_be_blocked_flag_get(void);
 #endif
-
+void mtk_btif_read_cpu_sw_rst_debug_exp(void);
 #endif /*_MTK_BTIF_EXP_H_*/

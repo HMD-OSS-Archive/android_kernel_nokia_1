@@ -84,8 +84,10 @@ struct wmt_stats {
 
 #define NR_TS_SENSORS		4
 static int (*ts_get_temp_wrap[4]) (void) = {
-	mtk_wcn_cmb_stub_query_ctrl,	/* 0 is for WMT sensor */
-mtkts_get_ts1_temp, mtkts_get_ts2_temp, mtkts_get_ts3_temp};
+	mtk_wcn_cmb_stub_query_ctrl /* 0 is for WMT sensor */
+	, get_immediate_ts1_wrap
+	, get_immediate_ts2_wrap
+	, get_immediate_ts3_wrap};
 
 static struct timer_list wmt_stats_timer;
 static struct wmt_stats wmt_stats_info;
@@ -161,12 +163,12 @@ wmt_tm_t *pg_wmt_tm = &g_wmt_tm;
 
 static int wmt_thz_bind(struct thermal_zone_device *, struct thermal_cooling_device *);
 static int wmt_thz_unbind(struct thermal_zone_device *, struct thermal_cooling_device *);
-static int wmt_thz_get_temp(struct thermal_zone_device *, unsigned long *);
+static int wmt_thz_get_temp(struct thermal_zone_device *, int *);
 static int wmt_thz_get_mode(struct thermal_zone_device *, enum thermal_device_mode *);
 static int wmt_thz_set_mode(struct thermal_zone_device *, enum thermal_device_mode);
 static int wmt_thz_get_trip_type(struct thermal_zone_device *, int, enum thermal_trip_type *);
-static int wmt_thz_get_trip_temp(struct thermal_zone_device *, int, unsigned long *);
-static int wmt_thz_get_crit_temp(struct thermal_zone_device *, unsigned long *);
+static int wmt_thz_get_trip_temp(struct thermal_zone_device *, int, int *);
+static int wmt_thz_get_crit_temp(struct thermal_zone_device *, int *);
 static int wmt_cl_get_max_state(struct thermal_cooling_device *, unsigned long *);
 static int wmt_cl_get_cur_state(struct thermal_cooling_device *, unsigned long *);
 static int wmt_cl_set_cur_state(struct thermal_cooling_device *, unsigned long);
@@ -583,7 +585,7 @@ static int wmt_thz_unbind(struct thermal_zone_device *thz_dev,
 	return 0;
 }
 
-static int wmt_thz_get_temp(struct thermal_zone_device *thz_dev, unsigned long *pv)
+static int wmt_thz_get_temp(struct thermal_zone_device *thz_dev, int *pv)
 {
 
 	/* struct wmt_thermal_ctrl_ops *p_des; */
@@ -685,14 +687,14 @@ static int wmt_thz_get_trip_type(struct thermal_zone_device *thz_dev, int trip,
 	return 0;
 }
 
-static int wmt_thz_get_trip_temp(struct thermal_zone_device *thz_dev, int trip, unsigned long *pv)
+static int wmt_thz_get_trip_temp(struct thermal_zone_device *thz_dev, int trip, int *pv)
 {
 	wmt_tm_dprintk("[mtktspa_get_trip_temp] %d\n", trip);
 	*pv = g_trip_temp[trip];
 	return 0;
 }
 
-static int wmt_thz_get_crit_temp(struct thermal_zone_device *thz_dev, unsigned long *pv)
+static int wmt_thz_get_crit_temp(struct thermal_zone_device *thz_dev, int *pv)
 {
 	wmt_tm_dprintk("[%s]\n", __func__);
 #define WMT_TM_TEMP_CRIT 85000	/* 85.000 degree Celsius */
@@ -724,8 +726,7 @@ static int wmt_cl_set_cur_state(struct thermal_cooling_device *cool_dev, unsigne
 	if (cl_dev_state == 1) {
 		wmt_tm_printk("wmt_cl_set_cur_state = 1\n");
 		/* the temperature is over than the critical, system reboot. */
-/* BUG(); */
-		*(unsigned int *)0x0 = 0xdead;	/* To trigger data abort to reset the system for thermal protection. */
+		BUG();
 	}
 
 	return 0;
@@ -1616,14 +1617,14 @@ void mtkts_wmt_start_thermal_timer(void)
 	if (!isTimerCancelled)
 		return;
 
+	isTimerCancelled = 0;
+
 	if (down_trylock(&sem_mutex))
 		return;
 
-	if (p_linux_if->thz_dev != NULL && p_linux_if->interval != 0) {
+	if (p_linux_if->thz_dev != NULL && p_linux_if->interval != 0)
 		mod_delayed_work(system_freezable_wq, &(p_linux_if->thz_dev->poll_queue),
-			round_jiffies(msecs_to_jiffies(2000)));
-		isTimerCancelled = 0;
-	}
+				 round_jiffies(msecs_to_jiffies(2000)));
 
 	up(&sem_mutex);
 }

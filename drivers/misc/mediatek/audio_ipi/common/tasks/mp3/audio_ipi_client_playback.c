@@ -1,15 +1,15 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
-* This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License version 2 as
-* published by the Free Software Foundation.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-* See http://www.gnu.org/licenses/gpl-2.0.html for more details.
-*/
+ * Copyright (C) 2016 MediaTek Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ */
 
 #include "audio_ipi_client_playback.h"
 
@@ -53,37 +53,37 @@
 #define DUMP_DSP_PCM_DATA_PATH "/sdcard/mtklog"
 static struct wake_lock playback_pcm_dump_wake_lock;
 
-typedef enum {
+enum { /* dump_data_t */
 	DUMP_DECODE = 0,
 	NUM_DUMP_DATA = 1,
-} dump_data_t;
+};
 
 
 
-typedef struct {
+struct dump_work_t {
 	struct work_struct work;
 	char *dma_addr;
-} dump_work_t;
+};
 
 
-typedef struct {
-	dump_data_t dump_data_type;
+struct dump_package_t {
+	uint8_t dump_data_type; /* dump_data_t */
 	char *data_addr;
-} dump_package_t;
+};
 
 
-typedef struct {
-	dump_package_t dump_package[256];
+struct dump_queue_t {
+	struct dump_package_t dump_package[256];
 	uint8_t idx_r;
 	uint8_t idx_w;
-} dump_queue_t;
+};
 
 
-static dump_queue_t *dump_queue;
+static struct dump_queue_t *dump_queue;
 static DEFINE_SPINLOCK(dump_queue_lock);
 
 
-static dump_work_t dump_work[NUM_DUMP_DATA];
+static struct dump_work_t dump_work[NUM_DUMP_DATA];
 static struct workqueue_struct *dump_workqueue[NUM_DUMP_DATA];
 
 struct task_struct *playback_dump_task;
@@ -100,11 +100,11 @@ static int datasize;
 #define FRAME_BUF_SIZE   (4608)
 #define MP3_PCMDUMP_OK (24)
 
-typedef struct pcm_dump_t {
+struct pcm_dump_t {
 	char decode_pcm[FRAME_BUF_SIZE];
-} pcm_dump_t;
+};
 
-static audio_resv_dram_t *p_resv_dram;
+static struct audio_resv_dram_t *p_resv_dram;
 
 struct file *file_decode_pcm;
 
@@ -135,20 +135,22 @@ void playback_open_dump_file(void)
 
 	file_decode_pcm = filp_open(path_decode_pcm, O_CREAT | O_WRONLY, 0);
 	if (IS_ERR(file_decode_pcm)) {
-		AUD_LOG_W("file_decode_pcm < 0,path_decode_pcm = %s\n", path_decode_pcm);
+		pr_info("file_decode_pcm < 0,path_decode_pcm = %s\n",
+			path_decode_pcm);
 		return;
 	}
 
 	if (dump_queue == NULL) {
-		dump_queue = kmalloc(sizeof(dump_queue_t), GFP_KERNEL);
+		dump_queue = kmalloc(sizeof(struct dump_queue_t), GFP_KERNEL);
 		if (dump_queue != NULL)
-			memset_io(dump_queue, 0, sizeof(dump_queue_t));
+			memset_io(dump_queue, 0, sizeof(struct dump_queue_t));
 	}
 
 	if (!playback_dump_task) {
-		playback_dump_task = kthread_create(dump_kthread, NULL, "dump_kthread");
+		playback_dump_task = kthread_create(dump_kthread, NULL,
+						    "dump_kthread");
 		if (IS_ERR(playback_dump_task))
-			AUD_LOG_E("can not create playback_dump_task kthread\n");
+			pr_notice("can not create playback_dump_task kthread\n");
 
 		b_enable_dump = true;
 		wake_up_process(playback_dump_task);
@@ -166,13 +168,13 @@ void playback_close_dump_file(void)
 
 	b_enable_dump = false;
 
-	AUD_LOG_D("pass: %d\n", dump_data_routine_cnt_pass);
+	pr_debug("pass: %d\n", dump_data_routine_cnt_pass);
 
 	if (playback_dump_task) {
 		kthread_stop(playback_dump_task);
 		playback_dump_task = NULL;
 	}
-	AUD_LOG_D("dump_queue = %p\n", dump_queue);
+	pr_debug("dump_queue = %p\n", dump_queue);
 	kfree(dump_queue);
 	dump_queue = NULL;
 
@@ -185,27 +187,24 @@ void playback_close_dump_file(void)
 
 static void dump_data_routine(struct work_struct *ws)
 {
+	struct dump_work_t *dump_work = NULL;
 	char *data_addr = NULL;
 	unsigned long flags = 0;
 
-	if (dump_data_routine_cnt_pass) {
-		int offset = datasize * dump_data_routine_cnt_pass;
+	dump_work = container_of(ws, struct dump_work_t, work);
+	data_addr = get_resv_dram_vir_addr(dump_work->dma_addr);
+	pr_notice("data %p, dma %p, vp %p, pp %p\n",
+		  data_addr, dump_work->dma_addr,
+		  p_resv_dram->vir_addr, p_resv_dram->phy_addr);
 
-		data_addr = get_resv_dram_vir_addr(dump_work[0].dma_addr - offset);
-	} else
-		data_addr = get_resv_dram_vir_addr(dump_work[0].dma_addr);
-	if (dump_queue != NULL) {
-		spin_lock_irqsave(&dump_queue_lock, flags);
-		dump_queue->dump_package[dump_queue->idx_w].dump_data_type = DUMP_DECODE;
-		dump_queue->dump_package[dump_queue->idx_w].data_addr = data_addr;
-		dump_queue->idx_w++;
-		if (dump_queue->idx_w == 256)
-			dump_queue->idx_w = 0;
-		if (dump_queue->idx_w == dump_queue->idx_r)
-			AUD_LOG_D("%s Buffer Full\n", __func__);
-		spin_unlock_irqrestore(&dump_queue_lock, flags);
-		wake_up_interruptible(&wq_dump_pcm);
-	}
+	spin_lock_irqsave(&dump_queue_lock, flags);
+	dump_queue->dump_package[dump_queue->idx_w].dump_data_type =
+		DUMP_DECODE;
+	dump_queue->dump_package[dump_queue->idx_w].data_addr = data_addr;
+	dump_queue->idx_w++;
+	spin_unlock_irqrestore(&dump_queue_lock, flags);
+
+	wake_up_interruptible(&wq_dump_pcm);
 }
 
 
@@ -213,7 +212,7 @@ void playback_dump_message(struct ipi_msg_t *ipi_msg)
 {
 	int ret = 0;
 
-	dump_data_t idx = 0;
+	uint8_t idx = 0; /* dump_data_t */
 
 	datasize = 0;
 
@@ -233,14 +232,16 @@ static int dump_kthread(void *data)
 	int size = 0, writedata = 0;
 	uint8_t current_idx = 0;
 
-	pcm_dump_t *pcm_dump = NULL;
+	struct pcm_dump_t *pcm_dump = NULL;
+	struct dump_package_t *dump_package = NULL;
 
-	struct sched_param param = {.sched_priority = 85 }; /* RTPM_PRIO_AUDIO_PLAYBACK */
+	/* RTPM_PRIO_AUDIO_PLAYBACK */
+	struct sched_param param = {.sched_priority = 85 };
 
 	sched_setscheduler(current, SCHED_RR, &param);
 
 
-	AUD_LOG_D("dump_queue = %p\n", dump_queue);
+	pr_debug("dump_queue = %p\n", dump_queue);
 
 	while (b_enable_dump && !kthread_should_stop()) {
 		spin_lock_irqsave(&dump_queue_lock, flags);
@@ -252,7 +253,8 @@ static int dump_kthread(void *data)
 			spin_unlock_irqrestore(&dump_queue_lock, flags);
 			ret = wait_event_interruptible(
 				      wq_dump_pcm,
-				      (dump_queue->idx_r != dump_queue->idx_w) || b_enable_dump == false);
+				      (dump_queue->idx_r != dump_queue->idx_w)
+				      || b_enable_dump == false);
 			if (ret == -ERESTARTSYS) {
 				ret = -EINTR;
 				break;
@@ -264,41 +266,48 @@ static int dump_kthread(void *data)
 			dump_queue->idx_r++;
 		}
 
-		AUD_LOG_D("current_idx = %d\n", current_idx);
-		switch (dump_queue->dump_package[current_idx].dump_data_type) {
+		pr_debug("current_idx = %d\n", current_idx);
+
+		dump_package = &dump_queue->dump_package[current_idx];
+
+		switch (dump_package->dump_data_type) {
 		case DUMP_DECODE: {
 			size = datasize;
 			writedata = FRAME_BUF_SIZE;
 			pcm_dump =
-				(pcm_dump_t *)dump_queue->dump_package[current_idx].data_addr;
-			AUD_LOG_D("pcm_dump = %p datasize = %d\n", pcm_dump, datasize);
+				(struct pcm_dump_t *)dump_package->data_addr;
+			pr_debug("pcm_dump = %p datasize = %d\n",
+				 pcm_dump, datasize);
 
 			while (size > 0) {
 				if (size < FRAME_BUF_SIZE)
 					writedata = size;
-				AUD_LOG_D("pcm_dump = %p writedata = %d\n", pcm_dump, writedata);
+				pr_debug("pcm_dump = %p writedata = %d\n",
+					 pcm_dump, writedata);
 				if (!IS_ERR(file_decode_pcm)) {
 					ret = file_decode_pcm->f_op->write(
 						      file_decode_pcm,
 						      pcm_dump->decode_pcm,
 						      writedata,
 						      &file_decode_pcm->f_pos);
+					size -= writedata;
+					pcm_dump++;
 				}
-				size -= FRAME_BUF_SIZE;
-				pcm_dump++;
+
 			}
 			break;
 		}
 		default: {
-			AUD_LOG_W("current_idx = %d, idx_r = %d, idx_w = %d, type = %d\n",
-				  current_idx, dump_queue->idx_r, dump_queue->idx_w,
-				  dump_queue->dump_package[current_idx].dump_data_type);
+			pr_info("current_idx = %d, idx_r = %d, idx_w = %d, type = %d\n",
+				current_idx,
+				dump_queue->idx_r, dump_queue->idx_w,
+				dump_package->dump_data_type);
 			break;
 		}
 		}
 	}
 
-	AUD_LOG_D("dump_kthread exit\n");
+	pr_debug("dump_kthread exit\n");
 	return 0;
 }
 
@@ -308,7 +317,8 @@ void audio_ipi_client_playback_init(void)
 		       "playback_pcm_dump_wake_lock");
 	dump_workqueue[DUMP_DECODE] = create_workqueue("dump_decode_pcm");
 	if (dump_workqueue[DUMP_DECODE] == NULL)
-		AUD_LOG_E("dump_workqueue[DUMP_DECODE] = %p\n", dump_workqueue[DUMP_DECODE]);
+		pr_notice("dump_workqueue[DUMP_DECODE] = %p\n",
+			  dump_workqueue[DUMP_DECODE]);
 	AUD_ASSERT(dump_workqueue[DUMP_DECODE] != NULL);
 
 	INIT_WORK(&dump_work[DUMP_DECODE].work, dump_data_routine);

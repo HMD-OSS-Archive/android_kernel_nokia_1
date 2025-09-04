@@ -1,15 +1,14 @@
 /*
- * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2018 MediaTek Inc.
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -137,9 +136,11 @@ int hps_cpu_init(void)
 	/* c. 4L */
 	/* cpulist_parse("0-3", &hps_ctxt.little_cpumask); */
 
-	cpulist_scnprintf(str1, sizeof(str1), &hps_ctxt.little_cpumask);
+	/* cpulist_scnprintf(str1, sizeof(str1), &hps_ctxt.little_cpumask); */
+	scnprintf(str1, sizeof(str1), "%*pbl", cpumask_pr_args(&hps_ctxt.little_cpumask));
 	hps_warn("hps_ctxt.little_cpumask: %s\n", str1);
-	cpulist_scnprintf(str1, sizeof(str1), &hps_ctxt.big_cpumask);
+	/* cpulist_scnprintf(str1, sizeof(str1), &hps_ctxt.big_cpumask); */
+	scnprintf(str1, sizeof(str1), "%*pbl", cpumask_pr_args(&hps_ctxt.big_cpumask));
 	hps_warn("hps_ctxt.big_cpumask: %s\n", str1);
 	if (cpumask_weight(&hps_ctxt.little_cpumask) == 0) {
 		cpumask_copy(&hps_ctxt.little_cpumask, &hps_ctxt.big_cpumask);

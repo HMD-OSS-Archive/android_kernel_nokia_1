@@ -18,9 +18,11 @@
 #include <linux/debugfs.h>
 #include <linux/reboot.h>
 #include <linux/suspend.h>
+#include <linux/cpufreq.h>
 
 #include "public/mc_user.h"
 #include "public/mc_admin.h"	/* MC_ADMIN_DEVNODE */
+#include "public/mc_linux_api.h"
 
 #include "platform.h"		/* MC_PM_RUNTIME */
 #include "main.h"
@@ -212,7 +214,7 @@ static inline int device_user_init(void)
 	mc_user_init(&main_ctx.user_cdev);
 	ret = cdev_add(&main_ctx.user_cdev, main_ctx.user_dev, 1);
 	if (ret) {
-		mc_dev_err("user cdev_add failed\n");
+		mc_dev_notice("user cdev_add failed\n");
 		return ret;
 	}
 
@@ -221,7 +223,7 @@ static inline int device_user_init(void)
 			    MC_USER_DEVNODE);
 	if (IS_ERR(dev)) {
 		cdev_del(&main_ctx.user_cdev);
-		mc_dev_err("user device_create failed\n");
+		mc_dev_notice("user device_create failed\n");
 		return PTR_ERR(dev);
 	}
 
@@ -298,25 +300,25 @@ static int mobicore_start(void)
 
 	ret = mc_logging_start();
 	if (ret) {
-		mc_dev_err("Log start failed\n");
+		mc_dev_notice("Log start failed\n");
 		goto err_log;
 	}
 
 	ret = mcp_start();
 	if (ret) {
-		mc_dev_err("TEE start failed\n");
+		mc_dev_notice("TEE start failed\n");
 		goto err_mcp;
 	}
 
 	ret = mc_scheduler_start();
 	if (ret) {
-		mc_dev_err("Scheduler start failed\n");
+		mc_dev_notice("Scheduler start failed\n");
 		goto err_sched;
 	}
 
 	ret = mc_pm_start();
 	if (ret) {
-		mc_dev_err("Power Management start failed\n");
+		mc_dev_notice("Power Management start failed\n");
 		goto err_pm;
 	}
 
@@ -349,13 +351,13 @@ static int mobicore_start(void)
 		    COUNT_OF_CPUS);
 
 	if (MC_VERSION_MAJOR(version_info.version_mci) > 1) {
-		mc_dev_err("MCI too recent for this driver");
+		mc_dev_notice("MCI too recent for this driver");
 		goto err_version;
 	}
 
 	if ((MC_VERSION_MAJOR(version_info.version_mci) == 0) &&
 	    (MC_VERSION_MINOR(version_info.version_mci) < 6)) {
-		mc_dev_err("MCI too old for this driver");
+		mc_dev_notice("MCI too old for this driver");
 		goto err_version;
 	}
 
@@ -397,7 +399,7 @@ static int mobicore_start(void)
 	main_ctx.reboot_notifier.notifier_call = reboot_notifier;
 	ret = register_reboot_notifier(&main_ctx.reboot_notifier);
 	if (ret) {
-		mc_dev_err("reboot notifier register failed\n");
+		mc_dev_notice("reboot notifier register failed\n");
 		goto err_pm_notif;
 	}
 
@@ -405,7 +407,7 @@ static int mobicore_start(void)
 	ret = register_pm_notifier(&main_ctx.pm_notifier);
 	if (ret) {
 		unregister_reboot_notifier(&main_ctx.reboot_notifier);
-		mc_dev_err("PM notifier register failed\n");
+		mc_dev_notice("PM notifier register failed\n");
 		goto err_pm_notif;
 	}
 #endif
@@ -413,6 +415,28 @@ static int mobicore_start(void)
 	ret = device_user_init();
 	if (ret)
 		goto err_create_dev_user;
+
+#ifdef TBASE_CORE_SWITCHER
+	int core;
+	unsigned int freq = 0, max_freq = 0;
+
+	for (core = 0; core < COUNT_OF_CPUS; ++core) {
+		freq = cpufreq_quick_get(core);
+		if (freq > max_freq)
+			max_freq = freq;
+		else if (freq < max_freq)
+			break;
+	}
+
+	--core;
+	if (mc_active_core() != core) {
+		mc_dev_info("Switch to core %d (%u Hz)\n", core, freq);
+		ret = mc_switch_core(core);
+		if (ret)
+			mc_dev_info("Switch to core %d (%u Hz) failed: %d\n",
+				core, freq, ret);
+	}
+#endif
 
 	return 0;
 
@@ -481,13 +505,13 @@ static inline int device_admin_init(void)
 
 	ret = alloc_chrdev_region(&main_ctx.device, 0, 2, "trustonic_tee");
 	if (ret) {
-		mc_dev_err("alloc_chrdev_region failed\n");
+		mc_dev_notice("alloc_chrdev_region failed\n");
 		return ret;
 	}
 
 	main_ctx.class = class_create(THIS_MODULE, "trustonic_tee");
 	if (IS_ERR(main_ctx.class)) {
-		mc_dev_err("class_create failed\n");
+		mc_dev_notice("class_create failed\n");
 		ret = PTR_ERR(main_ctx.class);
 		goto err_class;
 	}
@@ -500,7 +524,7 @@ static inline int device_admin_init(void)
 
 	ret = cdev_add(&main_ctx.admin_cdev, main_ctx.device, 1);
 	if (ret) {
-		mc_dev_err("admin cdev_add failed\n");
+		mc_dev_notice("admin cdev_add failed\n");
 		goto err_cdev;
 	}
 
@@ -508,7 +532,7 @@ static inline int device_admin_init(void)
 	dev = device_create(main_ctx.class, NULL, main_ctx.device, NULL,
 			    MC_ADMIN_DEVNODE);
 	if (IS_ERR(dev)) {
-		mc_dev_err("admin device_create failed\n");
+		mc_dev_notice("admin device_create failed\n");
 		ret = PTR_ERR(dev);
 		goto err_device;
 	}
@@ -557,13 +581,13 @@ static int mobicore_probe(struct platform_device *pdev)
 #endif
 	/* Hardware does not support ARM TrustZone -> Cannot continue! */
 	if (!has_security_extensions()) {
-		mc_dev_err("Hardware doesn't support ARM TrustZone!\n");
+		mc_dev_notice("Hardware doesn't support ARM TrustZone!\n");
 		return -ENODEV;
 	}
 
 	/* Running in secure mode -> Cannot load the driver! */
 	if (is_secure_mode()) {
-		mc_dev_err("Running in secure MODE!\n");
+		mc_dev_notice("Running in secure MODE!\n");
 		return -ENODEV;
 	}
 
@@ -588,25 +612,25 @@ static int mobicore_probe(struct platform_device *pdev)
 	/* Initialize plenty of nice features */
 	err = mc_fastcall_init();
 	if (err) {
-		mc_dev_err("Fastcall support init failed!\n");
+		mc_dev_notice("Fastcall support init failed!\n");
 		goto fail_fastcall_init;
 	}
 
 	err = mcp_init();
 	if (err) {
-		mc_dev_err("MCP init failed!\n");
+		mc_dev_notice("MCP init failed!\n");
 		goto fail_mcp_init;
 	}
 
 	err = mc_logging_init();
 	if (err) {
-		mc_dev_err("Log init failed!\n");
+		mc_dev_notice("Log init failed!\n");
 		goto fail_log_init;
 	}
 
 	err = mc_scheduler_init();
 	if (err) {
-		mc_dev_err("Scheduler init failed!\n");
+		mc_dev_notice("Scheduler init failed!\n");
 		goto fail_mc_device_sched_init;
 	}
 

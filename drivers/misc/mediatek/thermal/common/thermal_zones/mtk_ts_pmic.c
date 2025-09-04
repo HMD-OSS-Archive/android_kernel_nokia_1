@@ -76,7 +76,7 @@ static long int mtktspmic_start_temp;
 static long int mtktspmic_end_temp;
 /*=============================================================*/
 
-static int mtktspmic_get_temp(struct thermal_zone_device *thermal, unsigned long *t)
+static int mtktspmic_get_temp(struct thermal_zone_device *thermal, int *t)
 {
 	*t = mtktspmic_get_hw_temp();
 	mtktspmic_cur_temp = *t;
@@ -205,13 +205,13 @@ static int mtktspmic_get_trip_type(struct thermal_zone_device *thermal, int trip
 }
 
 static int mtktspmic_get_trip_temp(struct thermal_zone_device *thermal, int trip,
-				   unsigned long *temp)
+				   int *temp)
 {
 	*temp = trip_temp[trip];
 	return 0;
 }
 
-static int mtktspmic_get_crit_temp(struct thermal_zone_device *thermal, unsigned long *temperature)
+static int mtktspmic_get_crit_temp(struct thermal_zone_device *thermal, int *temperature)
 {
 	*temperature = mtktspmic_TEMP_CRIT;
 	return 0;
@@ -250,9 +250,11 @@ static int tspmic_sysrst_set_cur_state(struct thermal_cooling_device *cdev, unsi
 		mtktspmic_info("*****************************************");
 		mtktspmic_info("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 
-/* BUG(); */
-		*(unsigned int *)0x0 = 0xdead;	/* To trigger data abort to reset the system for thermal protection. */
-		/* arch_reset(0,NULL); */
+		/* To trigger data abort to reset the system
+		 * for thermal protection.
+		 */
+		BUG();
+
 	}
 	return 0;
 }
@@ -426,14 +428,13 @@ void mtkts_pmic_start_thermal_timer(void)
 	if (!isTimerCancelled)
 		return;
 
+	isTimerCancelled = 0;
+
 	if (down_trylock(&sem_mutex))
 		return;
 
-	if (thz_dev != NULL && interval != 0) {
-		mod_delayed_work(system_freezable_wq, &(thz_dev->poll_queue),
-			round_jiffies(msecs_to_jiffies(1000)));
-		isTimerCancelled = 0;
-	}
+	if (thz_dev != NULL && interval != 0)
+		mod_delayed_work(system_freezable_wq, &(thz_dev->poll_queue), round_jiffies(msecs_to_jiffies(1000)));
 
 	up(&sem_mutex);
 }

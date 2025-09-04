@@ -30,6 +30,10 @@
 #define RCU_TRACE(stmt)
 #endif /* #else #ifdef CONFIG_RCU_TRACE */
 
+#ifdef CONFIG_MTK_SCHED_MONITOR
+#include "mtk_sched_mon.h"
+#endif
+
 /*
  * Process-level increment to ->dynticks_nesting field.  This allows for
  * architectures that use half-interrupts and half-exceptions from
@@ -115,7 +119,13 @@ static inline bool __rcu_reclaim(const char *rn, struct rcu_head *head)
 		return true;
 	} else {
 		RCU_TRACE(trace_rcu_invoke_callback(rn, head));
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_RCU_SoftIRQ_start(head->func);
+#endif
 		head->func(head);
+#ifdef CONFIG_MTK_SCHED_MONITOR
+		mt_trace_RCU_SoftIRQ_end();
+#endif
 		rcu_lock_release(&rcu_callback_map);
 		return false;
 	}
@@ -134,5 +144,14 @@ int rcu_jiffies_till_stall_check(void);
  * translate the string address pointers to actual text.
  */
 #define TPS(x)  tracepoint_string(x)
+
+void rcu_early_boot_tests(void);
+void rcu_test_sync_prims(void);
+
+/*
+ * This function really isn't for public consumption, but RCU is special in
+ * that context switches can allow the state machine to make progress.
+ */
+extern void resched_cpu(int cpu);
 
 #endif /* __LINUX_RCU_H */

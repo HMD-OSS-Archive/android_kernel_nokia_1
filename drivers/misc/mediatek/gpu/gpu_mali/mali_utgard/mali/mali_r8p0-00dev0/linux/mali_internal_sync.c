@@ -29,45 +29,9 @@
 #include "mali_timeline.h"
 #endif
 
-struct mali_internal_sync_merge_data {
-        s32   fd;
-        char    name[32];
-        s32   fence;
-};
-
-struct mali_internal_sync_pt_info {
-	u32	len;
-	char	obj_name[32];
-	char	driver_name[32];
-	int	status;
-	u64	timestamp_ns;
-	u8	driver_data[0];
-};
-
-struct mali_internal_sync_info_data {
-	u32 len;
-	char name[32];
-	int status;
-	u8 sync_pt_info[0];
-};
-
-/**
- * Define the ioctl constant for sync fence wait.
- */
-#define MALI_INTERNAL_SYNC_IOC_WAIT           _IOW('>', 0, s32)
-
-/**
- * Define the ioctl constant for sync fence merge.
- */
-#define MALI_INTERNAL_SYNC_IOC_MERGE          _IOWR('>', 1, struct mali_internal_sync_merge_data)
-
-/**
- * Define the ioctl constant for sync fence info.
- */
- #define MALI_INTERNAL_SYNC_IOC_FENCE_INFO          _IOWR('>', 2, struct mali_internal_sync_info_data)
 
 static const struct fence_ops fence_ops;
-static const struct file_operations sync_fence_fops;
+
 
 static struct mali_internal_sync_point *mali_internal_fence_to_sync_pt(struct fence *fence)
 {
@@ -95,46 +59,20 @@ static void mali_internal_sync_timeline_free(struct kref *kref_count)
 	kfree(sync_timeline);
 }
 
-static struct mali_internal_sync_fence *mali_internal_sync_fence_alloc(int size)
-{
-	struct mali_internal_sync_fence *sync_fence = NULL;
-
-	sync_fence = kzalloc(size, GFP_KERNEL);
-	if (NULL == sync_fence) {
-		MALI_PRINT_ERROR(("Mali internal sync: Failed to allocate buffer  for the mali internal sync fence.\n"));
-		goto err;
-	}
-
-	sync_fence->file = anon_inode_getfile("mali_sync_fence", &sync_fence_fops, sync_fence, 0);
-	if (IS_ERR(sync_fence->file)) {
-		MALI_PRINT_ERROR(("Mali internal sync: Failed to get file  for the mali internal sync fence: err %d.\n", IS_ERR(sync_fence->file)));
-		goto err;
-	}
-
-	kref_init(&sync_fence->kref_count);
-	init_waitqueue_head(&sync_fence->wq);
-
-	return sync_fence;
-
-err:
-	if (NULL != sync_fence) {
-		kfree(sync_fence);
-	}
-	return NULL;
-}
 
 static void mali_internal_fence_check_cb_func(struct fence *fence, struct fence_cb *cb)
 {
 	struct mali_internal_sync_fence_cb *check;
 	struct mali_internal_sync_fence *sync_fence;
-
+	int ret;
 	MALI_DEBUG_ASSERT_POINTER(cb);
 	MALI_IGNORE(fence);
 
 	check = container_of(cb, struct mali_internal_sync_fence_cb, cb);
-	sync_fence = check->sync_fence;
+	sync_fence = check->sync_file;
 
-	if (atomic_dec_and_test(&sync_fence->status))
+	ret = atomic_dec_and_test(&sync_fence->status);
+	if (ret)
 		wake_up_all(&sync_fence->wq);
 }
 
@@ -144,14 +82,14 @@ static void mali_internal_sync_fence_add_fence(struct mali_internal_sync_fence *
 	MALI_DEBUG_ASSERT_POINTER(sync_fence);
 	MALI_DEBUG_ASSERT_POINTER(sync_pt);
 
-	fence_num = atomic_read(&sync_fence->num_fences);
-	
-	sync_fence->cbs[fence_num].base = sync_pt;
-	sync_fence->cbs[fence_num].sync_fence = sync_fence;
+	fence_num = sync_fence->num_fences;
+
+	sync_fence->cbs[fence_num].fence = sync_pt;
+	sync_fence->cbs[fence_num].sync_file = sync_fence;
 
 	if (!fence_add_callback(sync_pt, &sync_fence->cbs[fence_num].cb, mali_internal_fence_check_cb_func)) {
 		fence_get(sync_pt);
-		atomic_inc(&sync_fence->num_fences);
+		sync_fence->num_fences++;
 		atomic_inc(&sync_fence->status);
 	}
 }
@@ -266,30 +204,6 @@ err:
 	return NULL;
 }
 
-struct mali_internal_sync_fence *mali_internal_sync_fence_create(struct mali_internal_sync_point *sync_pt)
-{
-	struct mali_internal_sync_fence *sync_fence = NULL;
-	
-	MALI_DEBUG_ASSERT_POINTER(sync_pt);
-
-	sync_fence = mali_internal_sync_fence_alloc(offsetof(struct mali_internal_sync_fence, cbs[1]));
-	if (NULL == sync_fence) {
-		MALI_PRINT_ERROR(("Mali internal sync:Failed to  create the mali internal sync fence.\n"));
-		return NULL;
-	}
-
-	atomic_set(&sync_fence->num_fences, 1);
-	atomic_set(&sync_fence->status, 1);
-
-	sync_fence->cbs[0].base = &sync_pt->base;
-	sync_fence->cbs[0].sync_fence = sync_fence;
-	if (fence_add_callback(&sync_pt->base, &sync_fence->cbs[0].cb,
-			       mali_internal_fence_check_cb_func))
-		atomic_dec(&sync_fence->status);
-
-	return sync_fence;
-}
-
 struct mali_internal_sync_fence *mali_internal_sync_fence_fdget(int fd)
 {
 	struct file *file = fget(fd);
@@ -306,24 +220,37 @@ struct mali_internal_sync_fence *mali_internal_sync_fence_merge(
 {
 	struct mali_internal_sync_fence *new_sync_fence;
 	int i, j, num_fence1, num_fence2, total_fences;
-	
+	struct fence *fence0 = NULL;
+
 	MALI_DEBUG_ASSERT_POINTER(sync_fence1);
 	MALI_DEBUG_ASSERT_POINTER(sync_fence2);
 
-	num_fence1 = atomic_read(&sync_fence1->num_fences);
-	num_fence2= atomic_read(&sync_fence2->num_fences);
+	num_fence1 = sync_fence1->num_fences;
+	num_fence2 = sync_fence2->num_fences;
 
 	total_fences = num_fence1 + num_fence2;
 
-	new_sync_fence = mali_internal_sync_fence_alloc(offsetof(struct mali_internal_sync_fence, cbs[total_fences]));
+	i =0;
+	j = 0;
+	
+	if (num_fence1 > 0) {
+		fence0 = sync_fence1->cbs[i].fence;
+		i = 1;
+	}
+	else if(num_fence2 > 0) {
+		fence0 = sync_fence2->cbs[i].fence;
+		j =1;
+	}
+		
+	new_sync_fence = (struct mali_internal_sync_fence *)sync_file_create(fence0);
 	if (NULL == new_sync_fence) {
 		MALI_PRINT_ERROR(("Mali internal sync:Failed to  create the mali internal sync fence when merging sync fence.\n"));
 		return NULL;
 	}
 
-	for (i = j = 0; i < num_fence1 && j < num_fence2; ) {
-		struct fence *fence1 = sync_fence1->cbs[i].base;
-		struct fence *fence2 = sync_fence2->cbs[j].base;
+	for (; i < num_fence1 && j < num_fence2;) {
+		struct fence *fence1 = sync_fence1->cbs[i].fence;
+		struct fence *fence2 = sync_fence2->cbs[j].fence;
 
 		if (fence1->context < fence2->context) {
 			mali_internal_sync_fence_add_fence(new_sync_fence, fence1);
@@ -344,10 +271,10 @@ struct mali_internal_sync_fence *mali_internal_sync_fence_merge(
 	}
 
 	for (; i < num_fence1; i++)
-		mali_internal_sync_fence_add_fence(new_sync_fence, sync_fence1->cbs[i].base);
+		mali_internal_sync_fence_add_fence(new_sync_fence, sync_fence1->cbs[i].fence);
 
 	for (; j < num_fence2; j++)
-		mali_internal_sync_fence_add_fence(new_sync_fence, sync_fence2->cbs[j].base);
+		mali_internal_sync_fence_add_fence(new_sync_fence, sync_fence2->cbs[j].fence);
 
 	return new_sync_fence;
 }
@@ -413,68 +340,6 @@ int mali_internal_sync_fence_cancel_async(struct mali_internal_sync_fence *sync_
 	return ret;
 }
 
-#if defined(DEBUG)
-static void mali_internal_sync_timeline_show(void)
-{
-	struct mali_session_data *session, *tmp;
-	u32 session_seq = 1;
-	MALI_DEBUG_PRINT(2, ("timeline system info: \n=================\n\n"));
-
-	mali_session_lock();
-	MALI_SESSION_FOREACH(session, tmp, link) {
-		MALI_DEBUG_PRINT(2, ("session %d <%p> start:\n", session_seq, session));
-		mali_timeline_debug_print_system(session->timeline_system, NULL);
-		MALI_DEBUG_PRINT(2, ("session %d end\n\n\n", session_seq++));
-	}
-	mali_session_unlock();
-}
-#endif
-static int mali_internal_sync_fence_wait(struct mali_internal_sync_fence *sync_fence, long timeout)
-{
-	long ret;
-	MALI_DEBUG_ASSERT_POINTER(sync_fence);
-	
-	if (0 > timeout)
-		timeout = MAX_SCHEDULE_TIMEOUT;
-	else
-		timeout = msecs_to_jiffies(timeout);
-
-	ret = wait_event_interruptible_timeout(sync_fence->wq,
-		atomic_read(&sync_fence->status) <= 0, timeout);
-
-	if (0  > ret) {
-		return ret;
-	} else if (ret == 0) {
-		if (timeout) {
-			int i;
-			MALI_DEBUG_PRINT(2, ("Mali internal sync:fence timeout on [%p] after %dms\n",
-				sync_fence, jiffies_to_msecs(timeout)));
-
-			for (i = 0; i < atomic_read(&sync_fence->num_fences); ++i) {
-				sync_fence->cbs[i].base->ops->fence_value_str(sync_fence->cbs[i].base, NULL, 0);
-			}
-
-#if defined(DEBUG)
-			mali_internal_sync_timeline_show();
-#endif
-
-		}
-		return -ETIME;
-	}
-
-	ret = atomic_read(&sync_fence->status);
-	if (ret) {
-		int i;
-		MALI_DEBUG_PRINT(2, ("fence error %ld on [%p]\n", ret, sync_fence));
-		for (i = 0; i < atomic_read(&sync_fence->num_fences); ++i) {
-				sync_fence->cbs[i].base->ops->fence_value_str(sync_fence->cbs[i].base, NULL, 0);
-			}
-#if defined(DEBUG)
-		mali_internal_sync_timeline_show();
-#endif
-	}
-	return ret;
-}
 
 static const char *mali_internal_fence_get_driver_name(struct fence *fence)
 {
@@ -584,230 +449,5 @@ static const struct fence_ops fence_ops = {
 	.wait = fence_default_wait,
 	.release = mali_internal_fence_release,
 	.fence_value_str = mali_internal_fence_value_str,
-};
-
-static void mali_internal_sync_fence_free(struct kref *kref_count)
-{
-	struct mali_internal_sync_fence *sync_fence;
-	int i, num_fences;
-	
-	MALI_DEBUG_ASSERT_POINTER(kref_count);
-
-	sync_fence = container_of(kref_count, struct mali_internal_sync_fence, kref_count);
-	num_fences = atomic_read(&sync_fence->num_fences);
-
-	for (i = 0; i <num_fences; ++i) {
-		fence_remove_callback(sync_fence->cbs[i].base, &sync_fence->cbs[i].cb);
-		fence_put(sync_fence->cbs[i].base);
-	}
-
-	kfree(sync_fence);
-}
-
-static int mali_internal_sync_fence_release(struct inode *inode, struct file *file)
-{
-	struct mali_internal_sync_fence *sync_fence;
-	MALI_IGNORE(inode);
-	MALI_DEBUG_ASSERT_POINTER(file);
-	sync_fence = file->private_data;
-	kref_put(&sync_fence->kref_count, mali_internal_sync_fence_free);
-	return 0;
-}
-
-static unsigned int mali_internal_sync_fence_poll(struct file *file, poll_table *wait)
-{
-	int status;
-	struct mali_internal_sync_fence *sync_fence;
-
-	MALI_DEBUG_ASSERT_POINTER(file);
-	MALI_DEBUG_ASSERT_POINTER(wait);
-
-	sync_fence = file->private_data;
-	poll_wait(file, &sync_fence->wq, wait);
-	status = atomic_read(&sync_fence->status);
-
-	if (!status)
-		return POLLIN;
-	else if (status < 0)
-		return POLLERR;
-	return 0;
-}
-
-static long mali_internal_sync_fence_ioctl_wait(struct mali_internal_sync_fence *sync_fence, unsigned long arg)
-{
-	s32 value;
-	MALI_DEBUG_ASSERT_POINTER(sync_fence);
-
-	if (copy_from_user(&value, (void __user *)arg, sizeof(value))) {
-		MALI_PRINT_ERROR(("Mali internal sync:Failed to copy from user when sync fence ioctl wait.\n"));
-		return -EFAULT;
-	}
-	return mali_internal_sync_fence_wait(sync_fence, value);
-}
-
-static long mali_internal_sync_fence_ioctl_merge(struct mali_internal_sync_fence *old_sync_fence1, unsigned long arg)
-{
-	int err;
-	struct mali_internal_sync_fence *old_sync_fence2, *new_sync_fence;
-	struct mali_internal_sync_merge_data data;
-	int fd;
-	
-	MALI_DEBUG_ASSERT_POINTER(old_sync_fence1);
-
-	fd = get_unused_fd_flags(O_CLOEXEC);
-
-	if (0 > fd) {
-		MALI_PRINT_ERROR(("Mali internal sync:Invaid fd when sync fence ioctl merge.\n"));
-		return fd;
-	}
-	if (copy_from_user(&data, (void __user *)arg, sizeof(data))) {
-		MALI_PRINT_ERROR(("Mali internal sync:Failed to copy from user when sync fence ioctl merge.\n"));
-		err = -EFAULT;
-		goto copy_from_user_failed;
-	}
-
-	old_sync_fence2 = mali_internal_sync_fence_fdget(data.fd);
-	if (NULL == old_sync_fence2) {
-		MALI_PRINT_ERROR(("Mali internal sync:Failed to sync fence fdget when sync fence ioctl merge.\n"));
-		err = -ENOENT;
-		goto sync_fence_fdget_failed;
-	}
-
-	new_sync_fence = mali_internal_sync_fence_merge(old_sync_fence1, old_sync_fence2);
-	if (NULL == new_sync_fence) {
-		MALI_PRINT_ERROR(("Mali internal sync:Failed to sync fence merge when sync fence ioctl merge.\n"));
-		err = -ENOMEM;
-		goto sync_fence_merge_failed;
-	}
-
-	data.fence = fd;
-	if (copy_to_user((void __user *)arg, &data, sizeof(data))) {
-		MALI_PRINT_ERROR(("Mali internal sync:Failed to copy to user when sync fence ioctl merge.\n"));
-		err = -EFAULT;
-		goto copy_to_user_failed;
-	}
-
-	fd_install(fd, new_sync_fence->file);
-	fput(old_sync_fence2->file);
-	return 0;
-
-copy_to_user_failed:
-	fput(new_sync_fence->file);
-sync_fence_merge_failed:
-	fput(old_sync_fence2->file);
-sync_fence_fdget_failed:
-copy_from_user_failed:
-	put_unused_fd(fd);
-	return err;
-}
-
-static long mali_internal_sync_fence_ioctl_fence_info(struct mali_internal_sync_fence *sync_fence, unsigned long arg)
-{
-	struct mali_internal_sync_info_data *sync_info_data;
-	u32 size;
-	char name[32]  = "mali_internal_fence";
-	u32 len = sizeof(struct mali_internal_sync_info_data);
-	int num_fences, err, i;
-
-	if (copy_from_user(&size, (void __user *)arg, sizeof(size))) {
-		MALI_PRINT_ERROR(("Mali internal sync:Failed to copy from user when sync fence ioctl fence data info.\n"));
-		err = -EFAULT;
-		goto copy_from_user_failed;
-	}
-
-	if (size < sizeof(struct mali_internal_sync_info_data)) {
-		MALI_PRINT_ERROR(("Mali internal sync:Failed to data size check when sync fence ioctl fence data info.\n"));
-		err=  -EINVAL;
-		goto data_size_check_failed;
-	}
-
-	if (size > 4096)
-		size = 4096;
-
-	sync_info_data = kzalloc(size, GFP_KERNEL);
-	if (sync_info_data  == NULL) {
-		MALI_PRINT_ERROR(("Mali internal sync:Failed to allocate buffer  when sync fence ioctl fence data info.\n"));
-		err = -ENOMEM;
-		goto allocate_buffer_failed;
-	}
-
-	strlcpy(sync_info_data->name, name, sizeof(sync_info_data->name));
-
-	sync_info_data->status = atomic_read(&sync_fence->status);
-	if (sync_info_data->status >= 0)
-		sync_info_data->status = !sync_info_data->status;
-
-	num_fences = atomic_read(&sync_fence->num_fences);
-
-	for (i = 0; i < num_fences; ++i) {
-		struct mali_internal_sync_pt_info *sync_pt_info = NULL;
-		struct fence *base = sync_fence->cbs[i].base;
-
-		if ((size - len) < sizeof(struct mali_internal_sync_pt_info)) {
-			MALI_PRINT_ERROR(("Mali internal sync:Failed to fence size check  when sync fence ioctl fence data info.\n"));
-			err = -ENOMEM;
-			goto fence_size_check_failed;
-			
-		}
-
-		sync_pt_info = (struct mali_internal_sync_pt_info *)((u8 *)sync_info_data + len);
-		sync_pt_info->len = sizeof(struct mali_internal_sync_pt_info);
-
-		strlcpy(sync_pt_info->obj_name, base->ops->get_timeline_name(base), sizeof(sync_pt_info->obj_name));
-		strlcpy(sync_pt_info->driver_name, base->ops->get_driver_name(base), sizeof(sync_pt_info->driver_name));
-		
-		if (fence_is_signaled(base))
-			sync_pt_info->status = base->status >= 0 ? 1 : base->status;
-		else
-			sync_pt_info->status = 0;
-		
-		sync_pt_info->timestamp_ns = ktime_to_ns(base->timestamp);
-
-		len += sync_pt_info->len;
-	}
-
-	sync_info_data->len = len;
-
-	if (copy_to_user((void __user *)arg, sync_info_data, len)) {
-		MALI_PRINT_ERROR(("Mali internal sync:Failed to copy to user when sync fence ioctl fence data info.\n"));
-		err = -EFAULT;
-		goto copy_to_user_failed;
-	}
-
-	err = 0;
-
-copy_to_user_failed:
-fence_size_check_failed:
-	kfree(sync_info_data);
-allocate_buffer_failed:
-data_size_check_failed:
-copy_from_user_failed:
-	return err;
-}
-
-static long mali_internal_sync_fence_ioctl(struct file *file, unsigned int cmd,
-			     unsigned long arg)
-{
-	struct mali_internal_sync_fence *sync_fence = file->private_data;
-
-	switch (cmd) {
-	case MALI_INTERNAL_SYNC_IOC_WAIT:
-		return mali_internal_sync_fence_ioctl_wait(sync_fence, arg);
-
-	case MALI_INTERNAL_SYNC_IOC_MERGE:
-		return mali_internal_sync_fence_ioctl_merge(sync_fence, arg);
-
-	case MALI_INTERNAL_SYNC_IOC_FENCE_INFO:
-		return mali_internal_sync_fence_ioctl_fence_info(sync_fence, arg);
-	default:
-		return -ENOTTY;
-	}
-}
-
-static const struct file_operations sync_fence_fops = {
-	.release = mali_internal_sync_fence_release,
-	.poll = mali_internal_sync_fence_poll,
-	.unlocked_ioctl = mali_internal_sync_fence_ioctl,
-	.compat_ioctl = mali_internal_sync_fence_ioctl,
 };
 #endif

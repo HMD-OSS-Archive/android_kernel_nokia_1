@@ -89,7 +89,7 @@ static void __iomem *devapc_pd_base;
 
 static unsigned int enable_dynamic_one_core_violation_debug;
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 
 static struct DEVICE_INFO devapc_devices[] = {
 	/*0*/
@@ -236,7 +236,7 @@ static struct DEVICE_INFO devapc_devices[] = {
 
 };
 
-#elif defined(CONFIG_ARCH_MT6735M)
+#elif defined(CONFIG_MACH_MT6735M)
 
 static struct DEVICE_INFO devapc_devices[] = {
 	/* Slave */
@@ -372,7 +372,7 @@ static struct DEVICE_INFO devapc_devices[] = {
 
 };
 
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 
 static struct DOMAIN_INFO domain_settings[] = {
 	{"AP"},
@@ -609,16 +609,16 @@ int mt_devapc_set_permission(unsigned int module, E_MASK_DOM domain_num, APC_ATT
 		base = DEVAPC0_D2_APC_0 + (module / 16) * 4;
 	else if (DEVAPC_DOMAIN_MD32 == domain_num)
 		base = DEVAPC0_D3_APC_0 + (module / 16) * 4;
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 	else if (DEVAPC_DOMAIN_MM == domain_num)
 		base = DEVAPC0_D4_APC_0 + (module / 16) * 4;
 	else if (DEVAPC_DOMAIN_MD3 == domain_num)
 		base = DEVAPC0_D5_APC_0 + (module / 16) * 4;
 	else if (DEVAPC_DOMAIN_MFG == domain_num)
 		base = DEVAPC0_D6_APC_0 + (module / 16) * 4;
-#elif defined(CONFIG_ARCH_MT6735M)
+#elif defined(CONFIG_MACH_MT6735M)
 	/* blank intentionally */
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 	else if (DEVAPC_DOMAIN_MM == domain_num)
 		base = DEVAPC0_D4_APC_0 + (module / 16) * 4;
 	else if (DEVAPC_DOMAIN_MD3 == domain_num)
@@ -679,7 +679,7 @@ static int devapc_pm_restore_noirq(struct device *device)
 }
 #endif
 
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 static int check_vio_status(unsigned int module)
 {
 	unsigned int apc_index = 0;
@@ -792,8 +792,8 @@ static irqreturn_t devapc_violation_irq(int irq, void *dev_id)
 	domain_id = dbg0 & VIO_DBG_DMNID;
 	r_w_violation = dbg0 & VIO_DBG_RW;
 
-#if defined(CONFIG_ARCH_MT6753)
-	/* violation information improvement for Denali-3 */
+#if defined(CONFIG_MACH_MT6753)
+	/* violation information improvement for MT6753 */
 	if ((domain_id >= 0) && (domain_id < ARRAY_SIZE(domain_settings))) {
 		if (1 == r_w_violation) {
 			pr_err("[DEVAPC] Device Access Permission Write Violation - Process:%s PID:%i Vio Addr:0x%x , Bus ID:0x%x, Dom ID:0x%x (%s), VIO_DBG0:0x%x\n",
@@ -829,7 +829,7 @@ static irqreturn_t devapc_violation_irq(int irq, void *dev_id)
 
 	for (i = 0; i < (ARRAY_SIZE(devapc_devices)); i++) {
 
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 		/* violation information improvement */
 
 		if (check_vio_status(i))

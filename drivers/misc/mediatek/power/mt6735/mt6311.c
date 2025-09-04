@@ -28,8 +28,7 @@
 #include <linux/spinlock.h>
 #include <linux/mutex.h>
 #include <linux/kthread.h>
-#include <linux/wakelock.h>
-
+#include <linux/pm_wakeup.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 
@@ -6899,13 +6898,13 @@ unsigned int g_cust_eint_mt_pmic_mt6311_debounce_en = 1;
 
 static DEFINE_MUTEX(pmic_mutex_mt6311);
 static struct task_struct *pmic_6311_thread_handle;
-struct wake_lock pmicThread_lock_mt6311;
+struct wakeup_source pmicThread_lock_mt6311;
 
 void wake_up_pmic_mt6311(void)
 {
 	PMICLOG1("[wake_up_pmic_mt6311]\n");
 	wake_up_process(pmic_6311_thread_handle);
-	wake_lock(&pmicThread_lock_mt6311);
+    __pm_stay_awake(&pmicThread_lock_mt6311);
 }
 EXPORT_SYMBOL(wake_up_pmic_mt6311);
 
@@ -7074,7 +7073,7 @@ static int pmic_thread_kthread_mt6311(void *x)
 	PMICLOG1("[MT6311_INT] enter\n");
 
 	/* Run on a process content */
-	while (1) {
+	while (!kthread_should_stop()) {
 		mutex_lock(&pmic_mutex_mt6311);
 
 		mt6311_int_handler();
@@ -7091,7 +7090,7 @@ static int pmic_thread_kthread_mt6311(void *x)
 		mdelay(1);
 
 		mutex_unlock(&pmic_mutex_mt6311);
-		wake_unlock(&pmicThread_lock_mt6311);
+		__pm_relax(&pmicThread_lock_mt6311);
 
 		set_current_state(TASK_INTERRUPTIBLE);
 
@@ -7219,8 +7218,7 @@ static int mt6311_driver_probe(struct i2c_client *client, const struct i2c_devic
 	if (g_mt6311_hw_exist == 1) {
 		mt6311_hw_init();
 		mt6311_dump_register();
-		wake_lock_init(&pmicThread_lock_mt6311, WAKE_LOCK_SUSPEND,
-			       "pmicThread_lock_mt6311 wakelock");
+        wakeup_source_init(&pmicThread_lock_mt6311, "pmicThread_lock_mt6311 wakelock");
 		mt6311_eint_init();
 
 	}
@@ -7229,7 +7227,7 @@ static int mt6311_driver_probe(struct i2c_client *client, const struct i2c_devic
 	PMICLOG1("[mt6311_driver_probe] g_mt6311_hw_exist=%d, g_mt6311_driver_ready=%d\n",
 		 g_mt6311_hw_exist, g_mt6311_driver_ready);
 /*
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	PMIC_INIT_SETTING_V1();
 #else
 #endif
@@ -7248,7 +7246,7 @@ static int mt6311_driver_probe(struct i2c_client *client, const struct i2c_devic
 exit:
 	PMICLOG1("[mt6311_driver_probe] exit: return err\n");
 /*
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	PMIC_INIT_SETTING_V1();
 #else
 #endif
@@ -7442,7 +7440,7 @@ static int __init mt6311_init(void)
 	PMICLOG1("[mt6311_init] g_mt6311_hw_exist=%d, g_mt6311_driver_ready=%d\n",
 		 g_mt6311_hw_exist, g_mt6311_driver_ready);
 /*
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	PMIC_INIT_SETTING_V1();
 #else
 #endif
@@ -7450,7 +7448,7 @@ static int __init mt6311_init(void)
 #endif
 
 exit:
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	PMIC_INIT_SETTING_V1();
 #else
 #endif

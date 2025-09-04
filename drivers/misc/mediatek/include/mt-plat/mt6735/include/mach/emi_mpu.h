@@ -106,7 +106,7 @@ enum {
 	MST_ID_APMCU_3, MST_ID_APMCU_4, MST_ID_APMCU_5,
 	MST_ID_APMCU_6, MST_ID_APMCU_7, MST_ID_APMCU_8,
 	MST_ID_APMCU_9, MST_ID_APMCU_10,
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	MST_ID_APMCU_11, MST_ID_APMCU_12, MST_ID_APMCU_13,
 	MST_ID_APMCU_14, MST_ID_APMCU_15, MST_ID_APMCU_16,
 	MST_ID_APMCU_17, MST_ID_APMCU_18, MST_ID_APMCU_19,
@@ -194,7 +194,7 @@ struct basic_dram_setting {
 
 typedef void (*emi_mpu_notifier)(u32 addr, int wr_vio);
 
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6753)
 #define SET_ACCESS_PERMISSON(d7, d6, d5, d4, d3, d2, d1, d0) \
 ((((d3) << 9) | ((d2) << 6) | ((d1) << 3) | (d0)) |  \
 ((((d7) << 9) | ((d6) << 6) | ((d5) << 3) | (d4)) << 16))

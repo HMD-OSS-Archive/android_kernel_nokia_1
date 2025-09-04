@@ -23,13 +23,13 @@
  * (Please note it may trigger PRINTK too much)  */
 #define DEVAPC_ENABLE_ONE_CORE_VIOLATION_DEBUG	0
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 	/*For EMI API DEVAPC0_D0_VIO_STA_3, idx:124*/
 	#define ABORT_EMI                0x10000000
-#elif defined(CONFIG_ARCH_MT6735M)
+#elif defined(CONFIG_MACH_MT6735M)
 	/*For EMI API DEVAPC0_D0_VIO_STA_3, idx:115*/
 	#define ABORT_EMI                0x80000
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 	/*For EMI API DEVAPC0_D0_VIO_STA_3, idx:125*/
 	#define ABORT_EMI                0x20000000
 #else
@@ -48,7 +48,7 @@
 #define DEVAPC_DOMAIN_CONN      2
 #define DEVAPC_DOMAIN_MD32      3
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 
 #define DEVAPC_DOMAIN_MM        4
 #define DEVAPC_DOMAIN_MD3       5
@@ -59,14 +59,14 @@
 #define VIO_DBG_RW    0x3000000
 #define VIO_DBG_CLR   0x80000000
 
-#elif defined(CONFIG_ARCH_MT6735M)
+#elif defined(CONFIG_MACH_MT6735M)
 
 #define VIO_DBG_MSTID 0x0003FFF
 #define VIO_DBG_DMNID 0x000C000
 #define VIO_DBG_RW    0x3000000
 #define VIO_DBG_CLR   0x80000000
 
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 
 #define DEVAPC_DOMAIN_MM        4
 #define DEVAPC_DOMAIN_MD3       5
@@ -92,16 +92,16 @@
 #define DEVAPC0_D2_APC_0            (devapc_ao_base+0x0200)
 #define DEVAPC0_D3_APC_0            (devapc_ao_base+0x0300)
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 
 #define DEVAPC0_D4_APC_0            (devapc_ao_base+0x0400)
 #define DEVAPC0_D5_APC_0            (devapc_ao_base+0x0500)
 #define DEVAPC0_D6_APC_0            (devapc_ao_base+0x0600)
 #define DEVAPC0_D7_APC_0            (devapc_ao_base+0x0700)
 
-#elif defined(CONFIG_ARCH_MT6735M)
+#elif defined(CONFIG_MACH_MT6735M)
 
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 
 #define DEVAPC0_D4_APC_0            (devapc_ao_base+0x0400)
 #define DEVAPC0_D5_APC_0            (devapc_ao_base+0x0500)

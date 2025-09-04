@@ -26,7 +26,7 @@
 #include <linux/cred.h>
 #include <linux/rcupdate.h>
 #include <linux/seq_file.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/version.h>
 
 
@@ -98,15 +98,18 @@
 #define B_HIGH              (1 << 1)
 
 #define P_FMT_SIZE          (P_RSS | P_RSWAP)
-#define P_FMT_COUNT         (P_SWPIN | P_SWPOUT | P_FMFAULT | P_MINFAULT | P_MAJFAULT)
+#define P_FMT_COUNT         (P_SWPIN | P_SWPOUT | P_FMFAULT | P_MINFAULT \
+				| P_MAJFAULT)
 
 #define M_FILTER_ALL        (M_MEMFREE | M_SWAPFREE | M_CACHED \
 				| M_KERNEL | M_PAGE_TABLE | M_SLAB \
-				| M_GPUUSE | M_GPU_PAGE_CACHE | M_MLOCK | M_ZRAM \
-				| M_ACTIVE | M_INACTIVE | M_SHMEM | M_ION)
+				| M_GPUUSE | M_GPU_PAGE_CACHE | M_MLOCK \
+				| M_ZRAM | M_ACTIVE | M_INACTIVE \
+				| M_SHMEM | M_ION)
 
 #define V_FILTER_ALL        (V_PSWPIN | V_PSWPOUT | V_PGFMFAULT)
-#define P_FILTER_ALL        (P_ADJ | P_RSS | P_RSWAP | P_SWPIN | P_SWPOUT | P_FMFAULT)
+#define P_FILTER_ALL        (P_ADJ | P_RSS | P_RSWAP | P_SWPIN \
+				| P_SWPOUT | P_FMFAULT)
 #define B_FILTER_ALL        (B_NORMAL | B_HIGH)
 
 #define MLOG_TRIGGER_TIMER  0
@@ -122,8 +125,8 @@ static DEFINE_SPINLOCK(mlogbuf_lock);
 DECLARE_WAIT_QUEUE_HEAD(mlog_wait);
 static long mlog_buffer[MLOG_BUF_LEN];
 static int mlog_buf_len = MLOG_BUF_LEN;
-static unsigned mlog_start;
-static unsigned mlog_end;
+static unsigned int mlog_start;
+static unsigned int mlog_end;
 
 static int min_adj = -1000;
 static int max_adj = 1000;
@@ -148,20 +151,19 @@ static const char pname_str[] = ", %s";
 static const char adj_str[] = ", %5ld";
 
 /*
-buddyinfo
-Node 0, zone   Normal    486    297    143     59     30     16      7      0      2      1     54
-Node 0, zone  HighMem     74     18      7     65    161     67     23     10      0      1     21
-*/
-				      /* 0    1     2    3    4     5    6    7    8     9    10 */
+ * buddyinfo
+ * Node 0, zone   Normal    486    297    143     59     30     16      7      0      2      1     54
+ * Node 0, zone  HighMem     74     18      7     65    161     67     23     10      0      1     21
+ */
 static const char order_start_str[] = ", [%6lu";
 static const char order_middle_str[] = ", %6lu";
 static const char order_end_str[] = ", %6lu]";
 
 /*
-active & inactive
-Active:           211748 kB
-Inactive:         257988 kB
-*/
+ * active & inactive
+ * Active:           211748 kB
+ * Inactive:         257988 kB
+ */
 struct mlog_header {
 	char *buffer;
 	size_t index;
@@ -169,8 +171,8 @@ struct mlog_header {
 };
 
 struct mlog_session {
-	unsigned start;
-	unsigned end;
+	unsigned int start;
+	unsigned int end;
 	int fmt_idx;
 	bool is_header_dump;
 	struct mlog_header header;
@@ -184,21 +186,6 @@ static void mlog_emit_32(long v)
 	if (mlog_end - mlog_start > mlog_buf_len)
 		mlog_start = mlog_end - mlog_buf_len;
 }
-
-/*
-static void mlog_emit_32_ex(long v)
-{
-    spin_lock_bh(&mlogbuf_lock);
-    mlog_emit_32(v);
-    spin_unlock_bh(&mlogbuf_lock);
-}
-
-static void mlog_emit_64(long long v)
-{
-    mlog_emit_32(v >> BITS_PER_LONG);
-    mlog_emit_32(v & ULONG_MAX);
-}
-*/
 
 static void mlog_reset_format(void)
 {
@@ -236,7 +223,10 @@ static void mlog_reset_format(void)
 		kfree(strfmt_list);
 		strfmt_list = kmalloc_array(len, sizeof(char *), GFP_ATOMIC);
 		strfmt_len = len;
-		BUG_ON(!strfmt_list);
+
+		//if (!strfmt_list)
+		//	aee_kernel_exception("mlog",
+		//	"unaligned strfmt variable and len\n");
 	}
 
 	/* setup str format */
@@ -290,7 +280,6 @@ static void mlog_reset_format(void)
 	}
 	strfmt_idx = 0;
 
-	BUG_ON(len != strfmt_len);
 	spin_unlock_bh(&mlogbuf_lock);
 
 	MLOG_PRINTK("[mlog] reset format %d", strfmt_len);
@@ -497,18 +486,22 @@ static void mlog_meminfo(void)
 	unsigned long shmem;
 	unsigned long ion = 0;
 
-	memfree = P2K(global_page_state(NR_FREE_PAGES) + mtkpasr_show_page_reserved());
+	memfree = P2K(global_page_state(NR_FREE_PAGES) +
+			mtkpasr_show_page_reserved());
 	swapfree = P2K(atomic_long_read(&nr_swap_pages));
-	cached = P2K(global_page_state(NR_FILE_PAGES) - total_swapcache_pages());
+	cached = P2K(global_node_page_state(NR_FILE_PAGES) -
+			total_swapcache_pages());
 	/*
-	use following code if kernel version is under 3.10.
-	swapfree = P2K(nr_swap_pages);
-	cached = P2K(global_page_state(NR_FILE_PAGES) - total_swapcache_pages);
-	*/
+	 * use following code if kernel version is under 3.10.
+	 * swapfree = P2K(nr_swap_pages);
+	 * cached = P2K(global_page_state(NR_FILE_PAGES) -
+	 * total_swapcache_pages);
+	 */
 
-	kernel_stack = global_page_state(NR_KERNEL_STACK) * THREAD_SIZE / 1024;
+	kernel_stack = global_page_state(NR_KERNEL_STACK_KB);
 	page_table   = P2K(global_page_state(NR_PAGETABLE));
-	slab         = P2K(global_page_state(NR_SLAB_UNRECLAIMABLE) + global_page_state(NR_SLAB_RECLAIMABLE));
+	slab         = P2K(global_page_state(NR_SLAB_UNRECLAIMABLE) +
+			global_page_state(NR_SLAB_RECLAIMABLE));
 
 #ifdef COLLECT_GPU_MEMINFO
 	if (mtk_get_gpu_memory_usage(&gpuuse))
@@ -524,10 +517,12 @@ static void mlog_meminfo(void)
 	zram = 0;
 #endif
 
-	active = P2K(global_page_state(NR_ACTIVE_ANON) + global_page_state(NR_ACTIVE_FILE));
-	inactive = P2K(global_page_state(NR_INACTIVE_ANON) + global_page_state(NR_INACTIVE_FILE));
+	active = P2K(global_node_page_state(NR_ACTIVE_ANON) +
+			global_node_page_state(NR_ACTIVE_FILE));
+	inactive = P2K(global_node_page_state(NR_INACTIVE_ANON) +
+			global_node_page_state(NR_INACTIVE_FILE));
 	/* MLOG_PRINTK("active: %lu, inactive: %lu\n", active, inactive); */
-	shmem = P2K(global_page_state(NR_SHMEM));
+	shmem = P2K(global_node_page_state(NR_SHMEM));
 
 #ifdef CONFIG_MTK_ION
 	ion = B2K((unsigned long)ion_mm_heap_total_memory());
@@ -595,7 +590,8 @@ void mlog_buddyinfo(void)
 		node_zones = pgdat->node_zones;
 
 		/* MAX_NR_ZONES 3 */
-		for (zone = node_zones; zone - node_zones < MAX_NR_ZONES; ++zone) {
+		for (zone = node_zones; zone - node_zones < MAX_NR_ZONES;
+				++zone) {
 			if (!populated_zone(zone))
 				continue;
 
@@ -605,9 +601,11 @@ void mlog_buddyinfo(void)
 
 			for (order = 0; order < MAX_ORDER; ++order) {
 				if (zone_nr == 1)
-					normal_nr_free[order] = zone->free_area[order].nr_free;
+					normal_nr_free[order] =
+						zone->free_area[order].nr_free;
 				if (zone_nr == 2)
-					high_nr_free[order] = zone->free_area[order].nr_free;
+					high_nr_free[order] =
+						zone->free_area[order].nr_free;
 			}
 			spin_unlock_irqrestore(&zone->lock, flags);
 		}
@@ -620,7 +618,8 @@ void mlog_buddyinfo(void)
 	}
 #ifdef CONFIG_MTKPASR
 	if (zone_nr == 2)
-		high_nr_free[MAX_ORDER - 1] += (mtkpasr_show_page_reserved() >> (MAX_ORDER - 1));
+		high_nr_free[MAX_ORDER - 1] +=
+			(mtkpasr_show_page_reserved() >> (MAX_ORDER - 1));
 
 #endif
 
@@ -773,7 +772,6 @@ void mlog(int type)
 #ifdef PROFILE_MLOG_OVERHEAD
 	unsigned long long t1 = t;
 #endif
-	/* MLOG_PRINTK("[mlog] log %d %d %d\n", meminfo_filter, vmstat_filter, proc_filter); */
 
 	/* time stamp */
 	microsec_rem = do_div(t, 1000000000);
@@ -799,8 +797,9 @@ void mlog(int type)
 	if (proc_filter)
 		mlog_procinfo();
 
-	/* spin_unlock_irqrestore(&mlogbuf_lock, flag); */
-
+	/*
+	 * mlog buffer have something to dump
+	 */
 	if (waitqueue_active(&mlog_wait))
 		wake_up_interruptible(&mlog_wait);
 
@@ -822,7 +821,8 @@ int mlog_unread(void)
 	return mlog_end - mlog_start;
 }
 
-static int _doread(char __user *buf, size_t len, unsigned *start, unsigned *end, int *fmt_idx)
+static int _doread(char __user *buf, size_t len, unsigned int *start,
+		unsigned int *end, int *fmt_idx)
 {
 	int size = 0;
 	long v;
@@ -890,7 +890,8 @@ int mlog_doread(char __user *buf, size_t len)
 		return error;
 
 	while (len - size > MLOG_STR_LEN) {
-		ret = _doread(buf + size, len - size, &mlog_start, &mlog_end, &strfmt_idx);
+		ret = _doread(buf + size, len - size, &mlog_start,
+				&mlog_end, &strfmt_idx);
 
 		if (ret == 0)
 			break;
@@ -928,7 +929,8 @@ int dmlog_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-ssize_t dmlog_read(struct file *file, char __user *buf, size_t len, loff_t *ppos)
+ssize_t dmlog_read(struct file *file, char __user *buf, size_t len,
+		loff_t *ppos)
 {
 	size_t size = 0;
 	size_t ret;
@@ -950,7 +952,8 @@ ssize_t dmlog_read(struct file *file, char __user *buf, size_t len, loff_t *ppos
 	}
 
 	while (len - size > MLOG_STR_LEN) {
-		ret = _doread(buf + size, len - size, &session->start, &session->end, &session->fmt_idx);
+		ret = _doread(buf + size, len - size, &session->start,
+				&session->end, &session->fmt_idx);
 
 		/* start go reach end */
 		if (ret == 0)
@@ -965,7 +968,7 @@ ssize_t dmlog_read(struct file *file, char __user *buf, size_t len, loff_t *ppos
 /* Get mlog_buffer & its offset */
 void mlog_get_buffer(char **ptr, int *size)
 {
-#ifdef CONFIG_MT_ENG_BUILD
+#ifdef CONFIG_MTK_ENG_BUILD
 #define MLOG_MSG_LENGTH	(3072)
 #define MLOG_PRINT(args...)	do {\
 					v = MLOG_BUF(start++);\
@@ -975,7 +978,7 @@ void mlog_get_buffer(char **ptr, int *size)
 				} while (0)
 
 	static char mlog_msg[MLOG_MSG_LENGTH];
-	unsigned start, end;
+	unsigned int start, end;
 	long v;
 	char *msg_pos;
 	int msg_stored = 0, offset, i;
@@ -1061,9 +1064,9 @@ static void __exit mlog_exit(void)
 	mlog_exit_logger();
 }
 
-module_param(min_adj, int, S_IRUGO | S_IWUSR);
-module_param(max_adj, int, S_IRUGO | S_IWUSR);
-module_param(limit_pid, int, S_IRUGO | S_IWUSR);
+module_param(min_adj, int, 0644);
+module_param(max_adj, int, 0644);
+module_param(limit_pid, int, 0644);
 
 static int do_filter_handler(const char *val, const struct kernel_param *kp)
 {
@@ -1080,7 +1083,8 @@ static const struct kernel_param_ops param_ops_change_filter = {
 	.free = NULL,
 };
 
-static int do_time_intval_handler(const char *val, const struct kernel_param *kp)
+static int do_time_intval_handler(const char *val,
+		const struct kernel_param *kp)
 {
 	const int ret = param_set_uint(val, kp);
 
@@ -1095,19 +1099,22 @@ static const struct kernel_param_ops param_ops_change_time_intval = {
 };
 
 param_check_uint(meminfo_filter, &meminfo_filter);
-module_param_cb(meminfo_filter, &param_ops_change_filter, &meminfo_filter, S_IRUGO | S_IWUSR);
+module_param_cb(meminfo_filter, &param_ops_change_filter,
+		&meminfo_filter, 0644);
 __MODULE_PARM_TYPE(meminfo_filter, uint);
 
 param_check_uint(vmstat_filter, &vmstat_filter);
-module_param_cb(vmstat_filter, &param_ops_change_filter, &vmstat_filter, S_IRUGO | S_IWUSR);
+module_param_cb(vmstat_filter, &param_ops_change_filter,
+		&vmstat_filter, 0644);
 __MODULE_PARM_TYPE(vmstat_filter, uint);
 
 param_check_uint(proc_filter, &proc_filter);
-module_param_cb(proc_filter, &param_ops_change_filter, &proc_filter, S_IRUGO | S_IWUSR);
+module_param_cb(proc_filter, &param_ops_change_filter, &proc_filter, 0644);
 __MODULE_PARM_TYPE(proc_filter, uint);
 
 param_check_ulong(timer_intval, &timer_intval);
-module_param_cb(timer_intval, &param_ops_change_time_intval, &timer_intval, S_IRUGO | S_IWUSR);
+module_param_cb(timer_intval, &param_ops_change_time_intval,
+		&timer_intval, 0644);
 __MODULE_PARM_TYPE(timer_intval, ulong);
 
 static uint do_mlog;
@@ -1128,7 +1135,7 @@ static const struct kernel_param_ops param_ops_do_mlog = {
 };
 
 param_check_uint(do_mlog, &do_mlog);
-module_param_cb(do_mlog, &param_ops_do_mlog, &do_mlog, S_IRUGO | S_IWUSR);
+module_param_cb(do_mlog, &param_ops_do_mlog, &do_mlog, 0644);
 __MODULE_PARM_TYPE(do_mlog, uint);
 
 module_init(mlog_init);

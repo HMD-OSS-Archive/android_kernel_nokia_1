@@ -101,9 +101,9 @@ static int ut_smc_call(void *buff)
 		.data = buff,
 	};
 
-	if (!queue_kthread_work(&ut_fastcall_worker, &usc_work.work))
+	if (!kthread_queue_work(&ut_fastcall_worker, &usc_work.work))
 		return -1;
-	flush_kthread_work(&usc_work.work);
+	kthread_flush_work(&usc_work.work);
 	return 0;
 }
 
@@ -124,6 +124,7 @@ static int check_work_type(int work_type)
 	case LOCK_PM_MUTEX:
 	case UNLOCK_PM_MUTEX:
 	case SWITCH_CORE:
+	case MOVE_CORE:
 	case NT_DUMP_T:
 #ifdef TUI_SUPPORT
 	case POWER_DOWN_CALL:
@@ -412,6 +413,9 @@ static void switch_fn(struct kthread_work *work)
 #endif
 	case SWITCH_CORE:
 		handle_switch_core((int)(switch_ent->buff_addr));
+		break;
+	case MOVE_CORE:
+		handle_move_core((int)(switch_ent->buff_addr));
 		break;
 	case NT_DUMP_T:
 		retVal = handle_dump_call((void *)(switch_ent->buff_addr));

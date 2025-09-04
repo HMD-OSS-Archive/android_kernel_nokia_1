@@ -117,6 +117,7 @@ tconInfoAlloc(void)
 		++ret_buf->tc_count;
 		INIT_LIST_HEAD(&ret_buf->openFileList);
 		INIT_LIST_HEAD(&ret_buf->tcon_list);
+		spin_lock_init(&ret_buf->open_file_lock);
 #ifdef CONFIG_CIFS_STATS
 		spin_lock_init(&ret_buf->stat_lock);
 #endif
@@ -304,7 +305,7 @@ check_smb_hdr(struct smb_hdr *smb)
 }
 
 int
-checkSMB(char *buf, unsigned int total_read)
+checkSMB(char *buf, unsigned int total_read, struct TCP_Server_Info *server)
 {
 	struct smb_hdr *smb = (struct smb_hdr *)buf;
 	__u32 rfclen = be32_to_cpu(smb->smb_buf_length);
@@ -405,9 +406,17 @@ is_valid_oplock_break(char *buffer, struct TCP_Server_Info *srv)
 			(struct smb_com_transaction_change_notify_rsp *)buf;
 		struct file_notify_information *pnotify;
 		__u32 data_offset = 0;
+		size_t len = srv->total_read - sizeof(pSMBr->hdr.smb_buf_length);
+
 		if (get_bcc(buf) > sizeof(struct file_notify_information)) {
 			data_offset = le32_to_cpu(pSMBr->DataOffset);
 
+			if (data_offset >
+			    len - sizeof(struct file_notify_information)) {
+				cifs_dbg(FYI, "invalid data_offset %u\n",
+					 data_offset);
+				return true;
+			}
 			pnotify = (struct file_notify_information *)
 				((char *)&pSMBr->hdr.Protocol + data_offset);
 			cifs_dbg(FYI, "dnotify on %s Action: 0x%x\n",
@@ -459,7 +468,7 @@ is_valid_oplock_break(char *buffer, struct TCP_Server_Info *srv)
 				continue;
 
 			cifs_stats_inc(&tcon->stats.cifs_stats.num_oplock_brks);
-			spin_lock(&cifs_file_list_lock);
+			spin_lock(&tcon->open_file_lock);
 			list_for_each(tmp2, &tcon->openFileList) {
 				netfile = list_entry(tmp2, struct cifsFileInfo,
 						     tlist);
@@ -467,7 +476,7 @@ is_valid_oplock_break(char *buffer, struct TCP_Server_Info *srv)
 					continue;
 
 				cifs_dbg(FYI, "file id match, oplock break\n");
-				pCifsInode = CIFS_I(netfile->dentry->d_inode);
+				pCifsInode = CIFS_I(d_inode(netfile->dentry));
 
 				set_bit(CIFS_INODE_PENDING_OPLOCK_BREAK,
 					&pCifsInode->flags);
@@ -485,15 +494,14 @@ is_valid_oplock_break(char *buffer, struct TCP_Server_Info *srv)
 					   CIFS_INODE_DOWNGRADE_OPLOCK_TO_L2,
 					   &pCifsInode->flags);
 
-				queue_work(cifsiod_wq,
-					   &netfile->oplock_break);
+				cifs_queue_oplock_break(netfile);
 				netfile->oplock_break_cancelled = false;
 
-				spin_unlock(&cifs_file_list_lock);
+				spin_unlock(&tcon->open_file_lock);
 				spin_unlock(&cifs_tcp_ses_lock);
 				return true;
 			}
-			spin_unlock(&cifs_file_list_lock);
+			spin_unlock(&tcon->open_file_lock);
 			spin_unlock(&cifs_tcp_ses_lock);
 			cifs_dbg(FYI, "No matching file for oplock break\n");
 			return true;
@@ -583,6 +591,28 @@ void cifs_put_writer(struct cifsInodeInfo *cinode)
 	spin_unlock(&cinode->writers_lock);
 }
 
+/**
+ * cifs_queue_oplock_break - queue the oplock break handler for cfile
+ *
+ * This function is called from the demultiplex thread when it
+ * receives an oplock break for @cfile.
+ *
+ * Assumes the tcon->open_file_lock is held.
+ * Assumes cfile->file_info_lock is NOT held.
+ */
+void cifs_queue_oplock_break(struct cifsFileInfo *cfile)
+{
+	/*
+	 * Bump the handle refcount now while we hold the
+	 * open_file_lock to enforce the validity of it for the oplock
+	 * break handler. The matching put is done at the end of the
+	 * handler.
+	 */
+	cifsFileInfo_get(cfile);
+
+	queue_work(cifsoplockd_wq, &cfile->oplock_break);
+}
+
 void cifs_done_oplock_break(struct cifsInodeInfo *cinode)
 {
 	clear_bit(CIFS_INODE_PENDING_OPLOCK_BREAK, &cinode->flags);
@@ -607,9 +637,9 @@ backup_cred(struct cifs_sb_info *cifs_sb)
 void
 cifs_del_pending_open(struct cifs_pending_open *open)
 {
-	spin_lock(&cifs_file_list_lock);
+	spin_lock(&tlink_tcon(open->tlink)->open_file_lock);
 	list_del(&open->olist);
-	spin_unlock(&cifs_file_list_lock);
+	spin_unlock(&tlink_tcon(open->tlink)->open_file_lock);
 }
 
 void
@@ -629,7 +659,7 @@ void
 cifs_add_pending_open(struct cifs_fid *fid, struct tcon_link *tlink,
 		      struct cifs_pending_open *open)
 {
-	spin_lock(&cifs_file_list_lock);
+	spin_lock(&tlink_tcon(tlink)->open_file_lock);
 	cifs_add_pending_open_locked(fid, tlink, open);
-	spin_unlock(&cifs_file_list_lock);
+	spin_unlock(&tlink_tcon(open->tlink)->open_file_lock);
 }

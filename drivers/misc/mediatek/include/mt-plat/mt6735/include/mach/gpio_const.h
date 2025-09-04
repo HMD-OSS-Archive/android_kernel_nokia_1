@@ -48,7 +48,7 @@ extern struct mt_gpio_vbase gpio_vbase;
 /******************************************************************************
 * Enumeration for GPIO pin
 ******************************************************************************/
-#ifdef CONFIG_ARCH_MT6735M
+#ifdef CONFIG_MACH_MT6735M
 /* Denali2 */
 typedef enum GPIO_PIN {
 	GPIO_UNSUPPORTED = -1,
@@ -81,7 +81,7 @@ typedef enum GPIO_PIN {
 } GPIO_PIN;
 
 
-/* #elif defined(CONFIG_ARCH_MT6753) */
+/* #elif defined(CONFIG_MACH_MT6753) */
 /* Denali3 */
 
 #else

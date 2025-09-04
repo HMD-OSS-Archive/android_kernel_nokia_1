@@ -22,7 +22,13 @@
 #include <linux/of_fdt.h>
 #include <asm/setup.h>
 #include <linux/lockdep.h>
+
+#if 0
 #include <linux/irqchip/mt-gic.h>
+#else
+#include <linux/irqchip/mtk-gic-extend.h>
+#endif
+
 #include <mt-plat/mt_cirq.h>
 #include "mt_spm_sleep.h"
 #include "mach/mt_clkmgr.h"
@@ -33,7 +39,7 @@
 #include <mt-plat/mt_ccci_common.h>
 #include "mt_cpufreq.h"
 #include "mt_power_gs-v1.h"
-#if defined(CONFIG_ARCH_MT6570)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 #include <mach/mt_clkbuf_ctl.h>
 #include <mt-plat/upmu_common.h>
 #endif
@@ -45,7 +51,7 @@
 /* #include <mt_i2c.h> */
 
 #include "mt_spm_internal.h"
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 #include "pwrap_hal.h"
 #include "mt_vcore_dvfs.h"
 /* #include <mach/mt_dramc.h> */
@@ -59,10 +65,10 @@
 #endif
 
 #ifdef CONFIG_MTK_USB2JTAG_SUPPORT
-#include <mt-plat/mt_usb2jtag.h>
+#include <mt-plat/mtk_usb2jtag.h>
 #endif
 
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 #define DISABLE_DLPT_FEATURE
 #endif
 /**************************************
@@ -92,7 +98,7 @@ u32 log_wakesta_index = 0;
 u8 spm_snapshot_golden_setting = 0;
 
 struct wake_status spm_wakesta;	/* record last wakesta */
-#if defined(CONFIG_ARCH_MT6580)
+#if 0
 
 static const u32 suspend_binary[] = {
 	0xa1d58407, 0x81f68407, 0x803a0400, 0x1b80001f, 0x20000000, 0x80300400,
@@ -224,7 +230,9 @@ static struct pcm_desc suspend_pcm = {
 	.vec2 = EVENT_VEC(30, 1, 0, 90),	/* FUNC_APSRC_WAKEUP */
 	.vec3 = EVENT_VEC(31, 1, 0, 199),	/* FUNC_APSRC_SLEEP */
 };
-#elif defined(CONFIG_ARCH_MT6570)
+#endif
+
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 
 static const u32 suspend_binary[] = {
 	0xa1d58407, 0x81f68407, 0x803a0400, 0x1b80001f, 0x20000000, 0x80300400,
@@ -375,7 +383,7 @@ static struct pcm_desc suspend_pcm = {
 
 #define SPM_WAKE_PERIOD         600	/* sec */
 
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 
 #define WAKE_SRC_FOR_SUSPEND \
 	(WAKE_SRC_KP | WAKE_SRC_EINT |  WAKE_SRC_CONN_WDT  |  WAKE_SRC_CCIF0_MD | WAKE_SRC_CONN2AP | \
@@ -525,7 +533,7 @@ extern void mtk_uart_restore(void);
 extern void dump_uart_reg(void);
 */
 
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 
 static struct pwr_ctrl suspend_ctrl = {
 	.wake_src = WAKE_SRC_FOR_SUSPEND,
@@ -642,7 +650,7 @@ int __attribute__ ((weak)) mt_cpu_dormant(unsigned long flags)
 #endif
 
 struct spm_lp_scen __spm_suspend = {
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	.pcmdesc = &suspend_pcm,
 #endif
 	.pwrctrl = &suspend_ctrl,
@@ -740,7 +748,7 @@ static bool spm_set_suspend_pcm_ver(u32 *suspend_flags)
 }
 */
 
-#if defined(CONFIG_ARCH_MT6570)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 static void spm_suspend_pre_process(struct pwr_ctrl *pwrctrl)
 {
 	unsigned int temp;
@@ -918,7 +926,7 @@ static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct 
 	}
 #endif
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 #ifdef CONFIG_MTK_CCCI_DEVICES
 	if (wakesta->r13 & 0x18) {
 		spm_warn("dump ID_DUMP_MD_SLEEP_MODE");
@@ -1060,7 +1068,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	int wd_ret;
 	/* struct wake_status wakesta; */
 	unsigned long flags;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6735M)
 	unsigned long temp_a, temp_b;
 #endif
 #if 0
@@ -1087,7 +1095,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	return last_wr;
     }
 */
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	pcmdesc = __spm_suspend.pcmdesc;
 	pwrctrl = __spm_suspend.pwrctrl;
 #else
@@ -1110,6 +1118,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	if (!wd_ret)
 		wd_api->wd_suspend_notify();
 
+	/* todo: quick fix build error */
 	mt_power_gs_dump_suspend();
 #if 0
 	/* snapshot golden setting */
@@ -1119,7 +1128,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	}
 #endif
 
-#if defined(CONFIG_ARCH_MT6570)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	spm_suspend_pre_process(pwrctrl);
 #endif
 	lockdep_off();
@@ -1132,7 +1141,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 
 	spm_set_sysclk_settle();
 
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	__spm_enable_i2c4_clk();
 
 	if (vcorefs_get_curr_voltage() == VCORE_1_P_25_UV)
@@ -1161,7 +1170,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 
 	__spm_set_wakeup_event(pwrctrl);
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	mt_cpufreq_set_pmic_phase(PMIC_WRAP_PHASE_SUSPEND);
 #endif
 #if 0
@@ -1172,17 +1181,17 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	temp_b = spm_read(PMIC_WRAP_DVFS_WDATA2);
 	spm_write(SPM_PCM_PASR_DPD_2, (temp_a << 16) | temp_b);
 #endif
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 	temp_a = spm_read(PMIC_WRAP_DVFS_WDATA2);
 	temp_b = spm_read(PMIC_WRAP_DVFS_WDATA3);
 	spm_write(SPM_PCM_PASR_DPD_3, (temp_b << 16) | temp_a);
 
-#elif defined(CONFIG_ARCH_MT6735M)
+#elif defined(CONFIG_MACH_MT6735M)
 	temp_a = spm_read(PMIC_WRAP_DVFS_WDATA2);
 	temp_b = spm_read(PMIC_WRAP_DVFS_WDATA3);
 	spm_write(SPM_PCM_PASR_DPD_3, (temp_b << 16) | temp_a);
 
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 	spm_write(PMIC_WRAP_DVFS_ADR10, 0x454);
 	spm_write(PMIC_WRAP_DVFS_WDATA10, 0x3E62);
 	spm_write(PMIC_WRAP_DVFS_ADR11, 0x454);
@@ -1196,15 +1205,15 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	aee_rr_rec_spm_suspend_val(aee_rr_curr_spm_suspend_val() | (1 << SPM_SUSPEND_ENTER_WFI));
 #endif
 
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	gic_set_primask();
 #endif
 	spm_trigger_wfi_for_sleep(pwrctrl);
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	gic_clear_primask();
 #endif
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	mt_cpufreq_set_pmic_phase(PMIC_WRAP_PHASE_NORMAL);
 #endif
 
@@ -1230,7 +1239,7 @@ wake_reason_t spm_go_to_sleep(u32 spm_flags, u32 spm_data)
 	spm_crit2("VRF18_0 = 0x%x\n", temp_c);
 #endif
 
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	if (vcorefs_get_curr_voltage() == VCORE_1_P_25_UV)
 		vcorefs_list_kicker_request();
 
@@ -1244,7 +1253,7 @@ RESTORE_IRQ:
 	mt_irq_mask_restore(&mask);
 	spin_unlock_irqrestore(&__spm_lock, flags);
 	lockdep_on();
-#if defined(CONFIG_ARCH_MT6570)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	spm_suspend_post_process(pwrctrl);
 #endif
 
@@ -1253,12 +1262,12 @@ RESTORE_IRQ:
 
 #ifdef CONFIG_MTK_USB2JTAG_SUPPORT
 	if (usb2jtag_mode())
-		mt_usb2jtag_resume();
+		mtk_usb2jtag_resume();
 #endif
 #if SPM_AEE_RR_REC
 	aee_rr_rec_spm_suspend_val(aee_rr_curr_spm_suspend_val() | (1 << SPM_SUSPEND_LEAVE));
 #endif
-#if defined(CONFIG_ARCH_MT6570)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	clk_buf_ctrl(CLK_BUF_AUDIO, 1); /* this turn-on is to simualate FW behavior */
 	clk_buf_ctrl(CLK_BUF_AUDIO, 0);
 #endif
@@ -1421,13 +1430,15 @@ u32 spm_get_last_wakeup_src(void)
 {
 	return spm_wakesta.r12;
 }
+EXPORT_SYMBOL(spm_get_last_wakeup_src);
 
 u32 spm_get_last_wakeup_misc(void)
 {
 	return spm_wakesta.wake_misc;
 }
+EXPORT_SYMBOL(spm_get_last_wakeup_misc);
 
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 uint32_t get_suspend_debug_flag(void)
 {
 	uint32_t value = 0;

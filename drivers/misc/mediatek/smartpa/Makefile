@@ -1,2 +1,1 @@
-obj-$(CONFIG_ARCH_MT6595) += $(subst ",,$(CONFIG_MTK_PLATFORM))/
-obj-$(CONFIG_ARCH_MT6755) += mt6755/
+obj-$(CONFIG_MTK_SMARTPA_SOUND) += auddrv_nxp.o

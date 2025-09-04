@@ -16,8 +16,10 @@
 
 #include <linux/platform_device.h>
 
+#ifdef ENABLE_COMMON_DVFS
 /* MTK */
-#include "mt_gpufreq.h"
+#include "mtk_gpufreq.h"
+#endif
 
 int mtk_platform_init(struct platform_device *pdev, struct kbase_device *kbdev);
 

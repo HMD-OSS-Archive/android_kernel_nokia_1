@@ -178,10 +178,18 @@ static void mt_power_pef_transfer_work(void)
 	/*Get EMI*/
 	if (fliper_debug == 1) {
 		t1 = sched_clock();
+#ifdef CONFIG_MTK_EMI_MBW
 		emi_bw = get_mem_bw();
+#else
+		emi_bw = 100;
+#endif
 		t2 = sched_clock();
 	} else
+#ifdef CONFIG_MTK_EMI_MBW
 		emi_bw = get_mem_bw();
+#else
+		emi_bw = 100;
+#endif
 
 	if (emi_bw > bw_threshold)
 		perf_mode = 1;
@@ -383,7 +391,9 @@ static const struct file_operations mt_perf_fops = {
 static int __init init_fliper(void)
 {
 	struct proc_dir_entry *pe, *fliperfs_dir, *perf_dir;
+#ifdef CONFIG_PM_AUTOSLEEP
 	int ret = 0;
+#endif
 
 	pr_debug("init fliper driver start\n");
 	fliperfs_dir = proc_mkdir("fliperfs", NULL);

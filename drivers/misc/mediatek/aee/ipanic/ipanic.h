@@ -19,7 +19,6 @@
 #include <linux/kmsg_dump.h>
 /* #include "staging/android/logger.h" */
 #include <mt-plat/aee.h>
-#include "ipanic_version.h"
 
 #define AEE_IPANIC_PLABEL "expdb"
 #ifdef CONFIG_MTK_GPT_SCHEME_SUPPORT
@@ -76,12 +75,17 @@ struct ipanic_data_header {
 struct ipanic_header {
 	/* The magic/version field cannot be moved or resize */
 	u32 magic;
-	u32 version;		/* ipanic version */
-	u32 size;		/* ipanic_header size */
-	u32 datas;		/* bitmap of data sections dumped */
-	u32 dhblk;		/* data header blk size, 0 if no dup data headers */
+	/* ipanic version */
+	u32 version;
+	/* ipanic_header size */
+	u32 size;
+	/* bitmap of data sections dumped */
+	u32 datas;
+	/* data header blk size, 0 if no dup data headers */
+	u32 dhblk;
 	u32 blksize;
-	u32 partsize;		/* expdb partition total size */
+	/* expdb partition total size */
+	u32 partsize;
 	u32 bufsize;
 	u64 buf;
 	struct ipanic_data_header data_hdr[IPANIC_NR_SECTIONS];
@@ -100,7 +104,9 @@ void register_ipanic_ops(struct ipanic_ops *op);
 struct aee_oops *ipanic_oops_copy(void);
 void ipanic_oops_free(struct aee_oops *oops, int erase);
 void ipanic_block_scramble(u8 *buf, int buflen);
-/* for WDT timeout case : dump timer/schedule/irq/softirq etc... debug information */
+/* for WDT timeout case : dump timer/schedule/irq/softirq etc...
+ * debug information
+ */
 extern void aee_wdt_dump_info(void);
 void aee_disable_api(void);
 int panic_dump_android_log(char *buf, size_t size, int type);
@@ -112,9 +118,9 @@ extern char NativeInfo[MAX_NATIVEINFO];	/* check that 32k is enought?? */
 extern unsigned long User_Stack[MAX_NATIVEHEAP];	/* 8K Heap */
 int DumpNativeInfo(void);
 /*
-* Since ipanic_detail and usersapce info size is not known
-* until run time, we do a guess here
-*/
+ * Since ipanic_detail and usersapce info size is not known
+ * until run time, we do a guess here
+ */
 #define IPANIC_DETAIL_USERSPACE_SIZE    (100 * 1024)
 
 #if 1
@@ -142,7 +148,6 @@ enum IPANIC_DT {
 	IPANIC_DT_ATF_LOG,
 	IPANIC_DT_DISP_LOG,
 	IPANIC_DT_MODULES_INFO = 17,
-	IPANIC_DT_HANG_DETECT,
 	IPANIC_DT_RAM_DUMP = 28,
 	IPANIC_DT_SHUTDOWN_LOG = 30,
 	IPANIC_DT_RESERVED31 = 31,
@@ -170,6 +175,45 @@ struct ipanic_atf_log_rec {
 #define ipanic_dt_encrypt(x)		((IPANIC_DT_ENCRYPT >> x) & 1)
 #define ipanic_dt_active(x)		((IPANIC_DT_DUMP >> x) & 1)
 
+/* copy from kernel/drivers/staging/android/logger.h */
+/*
+ * SMP porting, we double the android buffer
+ * and kernel buffer size for dual core
+ */
+#ifdef CONFIG_SMP
+#ifndef __MAIN_BUF_SIZE
+#define __MAIN_BUF_SIZE (256 * 1024)
+#endif
+
+#ifndef __EVENTS_BUF_SIZE
+#define __EVENTS_BUF_SIZE (256 * 1024)
+#endif
+
+#ifndef __RADIO_BUF_SIZE
+#define __RADIO_BUF_SIZE (256 * 1024)
+#endif
+
+#ifndef __SYSTEM_BUF_SIZE
+#define __SYSTEM_BUF_SIZE (256 * 1024)
+#endif
+#else
+#ifndef __MAIN_BUF_SIZE
+#define __MAIN_BUF_SIZE (256 * 1024)
+#endif
+
+#ifndef __EVENTS_BUF_SIZE
+#define __EVENTS_BUF_SIZE (256 * 1024)
+#endif
+
+#ifndef __RADIO_BUF_SIZE
+#define __RADIO_BUF_SIZE (64 * 1024)
+#endif
+
+#ifndef __SYSTEM_BUF_SIZE
+#define __SYSTEM_BUF_SIZE (64 * 1024)
+#endif
+#endif
+
 #ifndef __LOG_BUF_LEN
 #define __LOG_BUF_LEN	(1 << CONFIG_LOG_BUF_SHIFT)
 #endif
@@ -191,40 +235,41 @@ int ipanic_msdc_info(struct ipanic_header *iheader);
 void ipanic_log_temp_init(void);
 void ipanic_klog_region(struct kmsg_dumper *dumper);
 int ipanic_klog_buffer(void *data, unsigned char *buffer, size_t sz_buf);
-extern int ipanic_atflog_buffer(void *data, unsigned char *buffer, size_t sz_buf);
-extern void get_hang_detect_buffer(unsigned long *addr, unsigned long *size, unsigned long *start);
-extern int panic_dump_disp_log(void *data, unsigned char *buffer, size_t sz_buf);
-
-int ipanic_mem_write(void *buf, int off, int len, int encrypt);
-void *ipanic_data_from_sd(struct ipanic_data_header *dheader, int encrypt);
-struct ipanic_header *ipanic_header_from_sd(unsigned int offset, unsigned int magic);
+extern int ipanic_atflog_buffer(void *data, unsigned char *buffer,
+		size_t sz_buf);
+extern int panic_dump_disp_log(void *data, unsigned char *buffer,
+		size_t sz_buf);
 #endif
-extern int card_dump_func_read(unsigned char *buf, unsigned int len, unsigned long long offset,
-			       int dev);
-extern int card_dump_func_write(unsigned char *buf, unsigned int len, unsigned long long offset,
-				int dev);
-extern unsigned int reset_boot_up_device(int type);	/* force to re-initialize the emmc host controller */
-/*#ifdef CONFIG_MTK_MMPROFILE_SUPPORT*/
-#ifdef CONFIG_MMPROFILE
-extern unsigned int MMProfileGetDumpSize(void);
-extern void MMProfileGetDumpBuffer(unsigned int Start, unsigned long *pAddr, unsigned int *pSize);
-#endif
-extern void mrdump_mini_per_cpu_regs(int cpu, struct pt_regs *regs, struct task_struct *tsk);
+extern void mrdump_mini_per_cpu_regs(int cpu, struct pt_regs *regs,
+		struct task_struct *tsk);
 extern void mrdump_mini_ke_cpu_regs(struct pt_regs *regs);
-extern void mrdump_mini_add_misc(unsigned long addr, unsigned long size, unsigned long start,
-				 char *name);
+extern void mrdump_mini_add_misc(unsigned long addr, unsigned long size,
+		unsigned long start, char *name);
 extern void mrdump_mini_ipanic_done(void);
 extern int mrdump_task_info(unsigned char *buffer, size_t sz_buf);
 extern int mrdump_modules_info(unsigned char *buffer, size_t sz_buf);
+#ifdef CONFIG_MTK_RAM_CONSOLE
 extern void aee_rr_rec_exp_type(unsigned int type);
 extern unsigned int aee_rr_curr_exp_type(void);
 extern void aee_rr_rec_scp(void);
+extern void aee_rr_rec_fiq_step(u8 step);
+extern void aee_rr_rec_kaslr_offset(u64 value64);
+#else
+__weak unsigned int aee_rr_curr_exp_type(void)
+{
+	return -1;
+}
+#endif
 #ifdef CONFIG_SCHED_DEBUG
-extern int sysrq_sched_debug_show_at_AEE(void);
+extern void sysrq_sched_debug_show_at_AEE(void);
 #endif
 #ifdef CONFIG_MTK_WQ_DEBUG
 extern void wq_debug_dump(void);
 #endif
-extern void __disable_dcache__inner_flush_dcache_L1__inner_flush_dcache_L2(void);
+extern void dis_D_inner_fL1L2(void);
+extern int console_trylock(void);
+
+/* dedicated reboot flow for exception */
+extern void aee_exception_reboot(void);
 
 #endif

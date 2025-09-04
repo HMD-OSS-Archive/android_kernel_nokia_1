@@ -104,7 +104,7 @@
  *     bit 7 - 15: reserved bits
  */
 
-u16 rtc_spare_reg[][3] = {
+u16 rtc_spare_reg[RTC_SPAR_NUM][3] = {
 	{RTC_AL_HOU, 0x7f, 8},
 	{RTC_PDN1, 0xf, 0},
 	{RTC_PDN1, 0x3, 4},
@@ -120,6 +120,7 @@ u16 rtc_spare_reg[][3] = {
 	{RTC_SPAR0, 0x1, 6},
 	{RTC_SPAR0, 0x1, 7},
 
+#if 0
 	/*Begin, for reboot command, 20190104*/
 	{RTC_SPAR0, 0x1, 14},	//FTM
 	{RTC_SPAR0, 0x1, 15},	//META
@@ -127,6 +128,7 @@ u16 rtc_spare_reg[][3] = {
 	{RTC_SPAR0, 0x1, 11},	//RAMTEST
 	{RTC_AL_DOM, 0x7f, 8}	//add for vbat
 	/*End, for reboot command, 20190104*/
+#endif
 };
 
 void hal_rtc_set_abb_32k(u16 enable)

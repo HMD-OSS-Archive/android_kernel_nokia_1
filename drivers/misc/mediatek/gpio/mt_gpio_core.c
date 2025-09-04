@@ -623,7 +623,8 @@ static int mt_gpio_probe(struct platform_device *dev)
 	if (dev->dev.of_node) {
 		/* Setup IO addresses */
 		get_gpio_vbase(dev->dev.of_node);
-	}
+	} else
+		GPIOERR("does not Setup GPIO IO addresses\n");
 
 	get_io_cfg_vbase();
 #endif
@@ -661,7 +662,7 @@ static int mt_gpio_remove(struct platform_device *dev)
 	if (err)
 		GPIOERR("delete attr\n");
 
-	err = misc_deregister(obj->misc);
+	misc_deregister(obj->misc);
 	if (err)
 		GPIOERR("deregister gpio\n");
 

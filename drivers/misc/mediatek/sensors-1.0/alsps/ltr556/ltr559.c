@@ -70,8 +70,10 @@ struct platform_device *alspsPltFmDev;
 static int ltr559_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id);
 static int ltr559_i2c_remove(struct i2c_client *client);
 static int ltr559_i2c_detect(struct i2c_client *client, struct i2c_board_info *info);
+#if 0
 static int ltr559_i2c_suspend(struct i2c_client *client, pm_message_t msg);
 static int ltr559_i2c_resume(struct i2c_client *client);
+#endif
 
 //static int ps_gainrange;
 static int als_gainrange;
@@ -175,8 +177,10 @@ static struct i2c_driver ltr559_i2c_driver = {
 	.probe      = ltr559_i2c_probe,
 	.remove     = ltr559_i2c_remove,
 	.detect     = ltr559_i2c_detect,
+#if 0
 	.suspend    = ltr559_i2c_suspend,
 	.resume     = ltr559_i2c_resume,
+#endif
 	.id_table   = ltr559_i2c_id,
 	.driver = {
 		.name           = LTR559_DEV_NAME,
@@ -2543,11 +2547,16 @@ static int ltr559_i2c_remove(struct i2c_client *client)
 		APS_ERR("ltr559_delete_attr fail: %d\n", err);
 	}
 
+#if 0
 	err = misc_deregister(&ltr559_device);
 	if(err)
 	{
 		APS_ERR("misc_deregister fail: %d\n", err);
 	}
+#else
+	misc_deregister(&ltr559_device);
+#endif
+	
 
 	ltr559_i2c_client = NULL;
 	i2c_unregister_device(client);
@@ -2562,6 +2571,7 @@ static int ltr559_i2c_detect(struct i2c_client *client, struct i2c_board_info *i
 	return 0;
 }
 
+#if 0
 static int ltr559_i2c_suspend(struct i2c_client *client, pm_message_t msg)
 {
 	struct ltr559_priv *obj = i2c_get_clientdata(client);
@@ -2634,6 +2644,7 @@ static int ltr559_i2c_resume(struct i2c_client *client)
 #endif
 	return 0;
 }
+#endif
 /*----------------------------------------------------------------------------*/
 
 /*----------------------------------------------------------------------------*/

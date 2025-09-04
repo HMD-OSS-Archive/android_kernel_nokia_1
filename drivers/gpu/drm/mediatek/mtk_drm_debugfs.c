@@ -20,41 +20,58 @@
 #include "mtk_drm_plane.h"
 #include "mtk_drm_crtc.h"
 #include "mtk_drm_drv.h"
+#include "mtk_drm_debugfs.h"
 
 struct mtk_drm_debugfs_table {
-	int comp_id;
 	char name[8];
 	unsigned int offset[2];
 	unsigned int length[2];
-	unsigned int reg_base;
+	unsigned long reg_base;
 };
 
 /* ------------------------------------------------------------------------- */
 /* External variable declarations */
 /* ------------------------------------------------------------------------- */
-void __iomem *gdrm_disp_base[9];
-void __iomem *gdrm_hdmi_base[6];
-struct mtk_drm_debugfs_table gdrm_disp_table[9] = {
-	{ DDP_COMPONENT_OVL0, "OVL0 ", {0, 0xf40}, {0x260, 0x80} },
-	{ DDP_COMPONENT_COLOR0, "COLOR0 ", {0x400, 0xc00}, {0x100, 0x100} },
-	{ DDP_COMPONENT_AAL, "AAL ", {0, 0}, {0x100, 0} },
-	{ DDP_COMPONENT_OD, "OD ", {0, 0}, {0x100, 0} },
-	{ DDP_COMPONENT_RDMA0, "RDMA0 ", {0, 0}, {0x100, 0} },
-	{ DDP_COMPONENT_UFOE, "UFOE ", {0, 0}, {0x100, 0} },
-	{ DDP_COMPONENT_BLS, "BLS ", {0, 0}, {0x100, 0} },
-	{ -1, "CONFIG ", {0, 0}, {0x120, 0} },
-	{ -1, "MUTEX ", {0, 0}, {0x100, 0} }
+static void __iomem *gdrm_disp1_base[7];
+static void __iomem *gdrm_disp2_base[7];
+static struct mtk_drm_debugfs_table gdrm_disp1_reg_range[7] = {
+	{ "OVL0 ", {0, 0xf40}, {0x260, 0x80} },
+	{ "COLOR0 ", {0x400, 0xc00}, {0x400, 0x100} },
+	{ "AAL0 ", {0, 0}, {0x100, 0} },
+	{ "OD0 ", {0, 0}, {0x100, 0} },
+	{ "RDMA0 ", {0, 0}, {0x100, 0} },
+	{ "CONFIG ", {0, 0}, {0x120, 0} },
+	{ "MUTEX ", {0, 0}, {0x100, 0} }
 };
 
-struct mtk_drm_debugfs_table gdrm_hdmi_table[6] = {
-	{ DDP_COMPONENT_OVL1, "OVL1 ", {0, 0xf40}, {0x260, 0x80} },
-	{ DDP_COMPONENT_COLOR1, "COLOR1 ", {0x400, 0xc00}, {0x100, 0x100} },
-	{ DDP_COMPONENT_GAMMA, "GAMMA ", {0, 0}, {0x100, 0} },
-	{ DDP_COMPONENT_RDMA1, "RDMA1 ", {0, 0}, {0x100, 0} },
-	{ -1, "CONFIG ", {0, 0}, {0x120, 0} },
-	{ -1, "MUTEX ", {0, 0}, {0x100, 0} }
+static struct mtk_drm_debugfs_table gdrm_disp2_reg_range[7] = {
+	{ "OVL1 ", {0, 0xf40}, {0x260, 0x80} },
+	{ "COLOR1 ", {0x400, 0xc00}, {0x100, 0x100} },
+	{ "AAL1 ", {0, 0}, {0x100, 0} },
+	{ "OD1 ", {0, 0}, {0x100, 0} },
+	{ "RDMA1 ", {0, 0}, {0x100, 0} },
+	{ "CONFIG ", {0, 0}, {0x120, 0} },
+	{ "MUTEX ", {0, 0}, {0x100, 0} }
 };
 static bool dbgfs_alpha;
+
+static void mtk_read_reg(unsigned long addr)
+{
+	void __iomem *reg_va = 0;
+
+	reg_va = ioremap_nocache(addr, sizeof(reg_va));
+	pr_info("r:0x%8lx = 0x%08x\n", addr, readl(reg_va));
+	iounmap(reg_va);
+}
+
+static void mtk_write_reg(unsigned long addr, unsigned long val)
+{
+	void __iomem *reg_va = 0;
+
+	reg_va = ioremap_nocache(addr, sizeof(reg_va));
+	writel(val, reg_va);
+	iounmap(reg_va);
+}
 
 /* ------------------------------------------------------------------------- */
 /* Debug Options */
@@ -78,125 +95,135 @@ static char STR_HELP[] =
 /* ------------------------------------------------------------------------- */
 /* Command Processor */
 /* ------------------------------------------------------------------------- */
-static void process_dbg_opt(const char *opt)
+static void process_dbg_opt(char *opt)
 {
 	if (strncmp(opt, "regw:", 5) == 0) {
 		char *p = (char *)opt + 5;
 		char *np;
 		unsigned long addr, val;
-		int i;
+		u64 i;
 
 		np = strsep(&p, "=");
-		if (kstrtoul(np, 16, &addr))
+		if (kstrtoul(np, 16, &addr) != 0)
 			goto error;
 
 		if (p == NULL)
 			goto error;
 
 		np = strsep(&p, "=");
-		if (kstrtoul(np, 16, &val))
+		if (kstrtoul(np, 16, &val) != 0)
 			goto error;
 
-		for (i = 0; i < ARRAY_SIZE(gdrm_disp_table); i++) {
-			if (addr > gdrm_disp_table[i].reg_base &&
-			    addr < gdrm_disp_table[i].reg_base + 0x1000) {
-				writel(val, gdrm_disp_base[i] + addr -
-					gdrm_disp_table[i].reg_base);
+		for (i = 0; i < ARRAY_SIZE(gdrm_disp1_reg_range); i++) {
+			if (addr > gdrm_disp1_reg_range[i].reg_base &&
+			    addr < gdrm_disp1_reg_range[i].reg_base +
+			    0x1000UL) {
+				writel(val, gdrm_disp1_base[i] + addr -
+					gdrm_disp1_reg_range[i].reg_base);
 				break;
 			}
 		}
 
-		for (i = 0; i < ARRAY_SIZE(gdrm_hdmi_table); i++) {
-			if (addr > gdrm_hdmi_table[i].reg_base &&
-			addr < gdrm_hdmi_table[i].reg_base + 0x1000) {
-				writel(val, gdrm_hdmi_base[i] + addr -
-					gdrm_hdmi_table[i].reg_base);
+		for (i = 0; i < ARRAY_SIZE(gdrm_disp2_reg_range); i++) {
+			if (addr > gdrm_disp2_reg_range[i].reg_base &&
+			    addr < gdrm_disp2_reg_range[i].reg_base +
+			    0x1000UL) {
+				writel(val, gdrm_disp2_base[i] + addr -
+					gdrm_disp2_reg_range[i].reg_base);
 				break;
 			}
 		}
+
 	} else if (strncmp(opt, "regr:", 5) == 0) {
 		char *p = (char *)opt + 5;
 		unsigned long addr;
-		int i;
+		u64 i;
 
-		if (kstrtoul(p, 16, &addr))
+		if (kstrtoul(p, 16, &addr) != 0)
 			goto error;
 
-		for (i = 0; i < ARRAY_SIZE(gdrm_disp_table); i++) {
-			if (addr >= gdrm_disp_table[i].reg_base &&
-			addr < gdrm_disp_table[i].reg_base + 0x1000) {
+		for (i = 0; i < ARRAY_SIZE(gdrm_disp1_reg_range); i++) {
+			if (addr >= gdrm_disp1_reg_range[i].reg_base &&
+			    addr < gdrm_disp1_reg_range[i].reg_base +
+			    0x1000UL) {
 				DRM_INFO("%8s Read register 0x%08lX: 0x%08X\n",
-					gdrm_disp_table[i].name, addr,
-					readl(gdrm_disp_base[i] + addr -
-						gdrm_disp_table[i].reg_base));
+					 gdrm_disp1_reg_range[i].name, addr,
+					 readl(gdrm_disp1_base[i] + addr -
+				gdrm_disp1_reg_range[i].reg_base));
 				break;
 			}
 		}
 
-		for (i = 0; i < ARRAY_SIZE(gdrm_hdmi_table); i++) {
-			if (addr >= gdrm_hdmi_table[i].reg_base &&
-			addr < gdrm_hdmi_table[i].reg_base + 0x1000) {
+		for (i = 0; i < ARRAY_SIZE(gdrm_disp2_reg_range); i++) {
+			if (addr >= gdrm_disp2_reg_range[i].reg_base &&
+			    addr < gdrm_disp2_reg_range[i].reg_base +
+			    0x1000UL) {
 				DRM_INFO("%8s Read register 0x%08lX: 0x%08X\n",
-					gdrm_hdmi_table[i].name, addr,
-					readl(gdrm_hdmi_base[i] + addr -
-						gdrm_hdmi_table[i].reg_base));
+					 gdrm_disp2_reg_range[i].name, addr,
+					 readl(gdrm_disp2_base[i] + addr -
+				gdrm_disp2_reg_range[i].reg_base));
 				break;
 			}
 		}
+
+	} else if (strncmp(opt, "autoregr:", 9) == 0) {
+		DRM_INFO("Set the register addr for Auto-test\n");
 	} else if (strncmp(opt, "dump:", 5) == 0) {
-		int i, j;
+		u64 i;
+		u32 j;
 
-		for (i = 0; i < ARRAY_SIZE(gdrm_disp_table); i++) {
-			if (gdrm_disp_base[i] == NULL)
+		for (i = 0; i < ARRAY_SIZE(gdrm_disp1_reg_range); i++) {
+			if (gdrm_disp1_base[i] == NULL)
 				continue;
-			for (j = gdrm_disp_table[i].offset[0];
-			     j < gdrm_disp_table[i].offset[0] +
-			     gdrm_disp_table[i].length[0]; j += 16)
-				DRM_INFO("%8s 0x%08X: %08X %08X %08X %08X\n",
-					gdrm_disp_table[i].name,
-					gdrm_disp_table[i].reg_base + j,
-					readl(gdrm_disp_base[i] + j),
-					readl(gdrm_disp_base[i] + j + 0x4),
-					readl(gdrm_disp_base[i] + j + 0x8),
-					readl(gdrm_disp_base[i] + j + 0xc));
+			for (j = gdrm_disp1_reg_range[i].offset[0];
+			     j < gdrm_disp1_reg_range[i].offset[0] +
+			     gdrm_disp1_reg_range[i].length[0]; j += 16UL)
+				DRM_INFO("%8s 0x%08lX: %08X %08X %08X %08X\n",
+					gdrm_disp1_reg_range[i].name,
+					gdrm_disp1_reg_range[i].reg_base + j,
+					readl(gdrm_disp1_base[i] + j),
+					readl(gdrm_disp1_base[i] + j + 0x4),
+					readl(gdrm_disp1_base[i] + j + 0x8),
+					readl(gdrm_disp1_base[i] + j + 0xc));
 
-			for (j = gdrm_disp_table[i].offset[1];
-			     j < gdrm_disp_table[i].offset[1] +
-			     gdrm_disp_table[i].length[1]; j += 16)
-				DRM_INFO("%8s 0x%08X: %08X %08X %08X %08X\n",
-					gdrm_disp_table[i].name,
-					gdrm_disp_table[i].reg_base + j,
-					readl(gdrm_disp_base[i] + j),
-					readl(gdrm_disp_base[i] + j + 0x4),
-					readl(gdrm_disp_base[i] + j + 0x8),
-					readl(gdrm_disp_base[i] + j + 0xc));
+			for (j = gdrm_disp1_reg_range[i].offset[1];
+			     j < gdrm_disp1_reg_range[i].offset[1] +
+			     gdrm_disp1_reg_range[i].length[1]; j += 16UL)
+				DRM_INFO("%8s 0x%08lX: %08X %08X %08X %08X\n",
+					gdrm_disp1_reg_range[i].name,
+					gdrm_disp1_reg_range[i].reg_base + j,
+					readl(gdrm_disp1_base[i] + j),
+					readl(gdrm_disp1_base[i] + j + 0x4),
+					readl(gdrm_disp1_base[i] + j + 0x8),
+					readl(gdrm_disp1_base[i] + j + 0xc));
 		}
+		for (i = 0; i < ARRAY_SIZE(gdrm_disp2_reg_range); i++) {
+			if (gdrm_disp2_base[i] == NULL)
+				continue;
+			for (j = gdrm_disp2_reg_range[i].offset[0];
+			     j < gdrm_disp2_reg_range[i].offset[0] +
+			     gdrm_disp2_reg_range[i].length[0]; j += 16)
+				DRM_INFO("%8s 0x%08lX: %08X %08X %08X %08X\n",
+					gdrm_disp2_reg_range[i].name,
+					gdrm_disp2_reg_range[i].reg_base + j,
+					readl(gdrm_disp2_base[i] + j),
+					readl(gdrm_disp2_base[i] + j + 0x4),
+					readl(gdrm_disp2_base[i] + j + 0x8),
+					readl(gdrm_disp2_base[i] + j + 0xc));
+
+			for (j = gdrm_disp2_reg_range[i].offset[1];
+			     j < gdrm_disp2_reg_range[i].offset[1] +
+			     gdrm_disp2_reg_range[i].length[1]; j += 16)
+				DRM_INFO("%8s 0x%08lX: %08X %08X %08X %08X\n",
+					gdrm_disp2_reg_range[i].name,
+					gdrm_disp2_reg_range[i].reg_base + j,
+					readl(gdrm_disp2_base[i] + j),
+					readl(gdrm_disp2_base[i] + j + 0x4),
+					readl(gdrm_disp2_base[i] + j + 0x8),
+					readl(gdrm_disp2_base[i] + j + 0xc));
+		}
+
 	} else if (strncmp(opt, "hdmi:", 5) == 0) {
-		int i, j;
-
-		for (i = 0; i < ARRAY_SIZE(gdrm_hdmi_table); i++) {
-			for (j = gdrm_hdmi_table[i].offset[0];
-			     j < gdrm_hdmi_table[i].offset[0] +
-			     gdrm_hdmi_table[i].length[0]; j += 16)
-				DRM_INFO("%8s 0x%08X: %08X %08X %08X %08X\n",
-					gdrm_hdmi_table[i].name,
-					gdrm_hdmi_table[i].reg_base + j,
-					readl(gdrm_hdmi_base[i] + j),
-					readl(gdrm_hdmi_base[i] + j + 0x4),
-					readl(gdrm_hdmi_base[i] + j + 0x8),
-					readl(gdrm_hdmi_base[i] + j + 0xc));
-
-			for (j = gdrm_hdmi_table[i].offset[1];
-			     j < gdrm_hdmi_table[i].offset[1] +
-			     gdrm_hdmi_table[i].length[1]; j += 16)
-				DRM_INFO("%8s 0x%08X: %08X %08X %08X %08X\n",
-					gdrm_hdmi_table[i].name,
-					gdrm_hdmi_table[i].reg_base + j,
-					readl(gdrm_hdmi_base[i] + j),
-					readl(gdrm_hdmi_base[i] + j + 0x4),
-					readl(gdrm_hdmi_base[i] + j + 0x8),
-					readl(gdrm_hdmi_base[i] + j + 0xc));
-		}
 	} else if (strncmp(opt, "alpha", 5) == 0) {
 		if (dbgfs_alpha) {
 			DRM_INFO("set src alpha to src alpha\n");
@@ -205,8 +232,33 @@ static void process_dbg_opt(const char *opt)
 			DRM_INFO("set src alpha to ONE\n");
 			dbgfs_alpha = true;
 		}
+	} else if (strncmp(opt, "r:", 2) == 0) {
+		char *p = (char *)opt + 2;
+		unsigned long addr;
+
+		if (kstrtoul(p, 16, &addr) != 0)
+			goto error;
+
+		mtk_read_reg(addr);
+	} else if (strncmp(opt, "w:", 2) == 0) {
+		char *p = (char *)opt + 2;
+		char *np;
+		unsigned long addr, val;
+
+		np = strsep(&p, "=");
+		if (kstrtoul(np, 16, &addr) != 0)
+			goto error;
+
+		if (p == NULL)
+			goto error;
+
+		np = strsep(&p, "=");
+		if (kstrtoul(np, 16, &val) != 0)
+			goto error;
+
+		mtk_write_reg(addr, val);
 	} else {
-	    goto error;
+		goto error;
 	}
 
 	return;
@@ -218,7 +270,6 @@ static void process_dbg_cmd(char *cmd)
 {
 	char *tok;
 
-	DRM_INFO("[mtkdrm_dbg] %s\n", cmd);
 	while ((tok = strsep(&cmd, " ")) != NULL)
 		process_dbg_opt(tok);
 }
@@ -232,36 +283,126 @@ static int debug_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static char dis_cmd_buf[512];
 static ssize_t debug_read(struct file *file, char __user *ubuf, size_t count,
 			  loff_t *ppos)
 {
-	return simple_read_from_buffer(ubuf, count, ppos, STR_HELP,
-				       strlen(STR_HELP));
+	if (strncmp(dis_cmd_buf, "regr:", 5) == 0) {
+		char read_buf[512] = {0};
+		char *p = (char *)dis_cmd_buf + 5;
+		unsigned long addr;
+		int ret;
+		u64 i;
+
+		if (kstrtoul(p, 16, &addr) != 0)
+			return 0;
+
+		for (i = 0; i < ARRAY_SIZE(gdrm_disp1_reg_range); i++) {
+			if (addr >= gdrm_disp1_reg_range[i].reg_base &&
+			    addr < gdrm_disp1_reg_range[i].reg_base +
+			    0x1000UL) {
+				ret = sprintf(read_buf,
+					"%8s Read register 0x%08lX: 0x%08X\n",
+					gdrm_disp1_reg_range[i].name, addr,
+					readl(gdrm_disp1_base[i] + addr -
+					gdrm_disp1_reg_range[i].reg_base));
+				if (ret <= 0L)
+					DRM_INFO("autoregr fail\n");
+				break;
+			}
+		}
+
+		for (i = 0; i < ARRAY_SIZE(gdrm_disp2_reg_range); i++) {
+			if (addr >= gdrm_disp2_reg_range[i].reg_base &&
+			    addr < gdrm_disp2_reg_range[i].reg_base +
+			    0x1000UL) {
+				ret = sprintf(read_buf,
+					"%8s Read register 0x%08lX: 0x%08X\n",
+					gdrm_disp2_reg_range[i].name, addr,
+					readl(gdrm_disp2_base[i] + addr -
+					gdrm_disp2_reg_range[i].reg_base));
+				if (ret <= 0L)
+					DRM_INFO("autoregr fail\n");
+				break;
+			}
+		}
+
+		return simple_read_from_buffer(ubuf, count, ppos, read_buf,
+						strlen(read_buf));
+	} else if (strncmp(dis_cmd_buf, "autoregr:", 9) == 0) {
+		char read_buf[512] = {0};
+		char read_buf2[512] = {0};
+		char *p = (char *)dis_cmd_buf + 9;
+		unsigned long addr;
+		unsigned long addr2;
+		int ret;
+		u64 i;
+
+		if (kstrtoul(p, 16, &addr) != 0)
+			return 0;
+
+		for (i = 0; i < ARRAY_SIZE(gdrm_disp1_reg_range); i++) {
+			if (addr >= gdrm_disp1_reg_range[i].reg_base &&
+			    addr < gdrm_disp1_reg_range[i].reg_base +
+			    0x1000UL) {
+				ret = sprintf(read_buf,
+					"%8s Read register 0x%08lX: 0x%08X\n",
+					gdrm_disp1_reg_range[i].name, addr,
+					readl(gdrm_disp1_base[i] + addr -
+					gdrm_disp1_reg_range[i].reg_base));
+				if (ret <= 0L)
+					DRM_INFO("autoregr fail\n");
+				break;
+			}
+		}
+		addr2 = addr + 0x1000ULL;
+		for (i = 0; i < ARRAY_SIZE(gdrm_disp2_reg_range); i++) {
+			if (addr2 >= gdrm_disp2_reg_range[i].reg_base &&
+			    addr2 < gdrm_disp2_reg_range[i].reg_base +
+			    0x1000UL) {
+				ret = sprintf(read_buf2,
+					"%8s Read register 0x%08lX: 0x%08X\n",
+					gdrm_disp2_reg_range[i].name, addr2,
+					readl(gdrm_disp2_base[i] + addr2 -
+					gdrm_disp2_reg_range[i].reg_base));
+				if (ret <= 0L)
+					DRM_INFO("autoregr fail\n");
+				break;
+			}
+		}
+		p = strcat(read_buf, read_buf2);
+		if (p == NULL)
+			DRM_INFO("autoregr strcat fail\n");
+		return simple_read_from_buffer(ubuf, count, ppos, read_buf,
+						strlen(read_buf));
+	} else {
+		return simple_read_from_buffer(ubuf, count, ppos, STR_HELP,
+						strlen(STR_HELP));
+	}
 }
 
-static char dis_cmd_buf[512];
 static ssize_t debug_write(struct file *file, const char __user *ubuf,
 	size_t count, loff_t *ppos)
 {
-	const int debug_bufmax = sizeof(dis_cmd_buf) - 1;
-	size_t ret;
+	const u64 debug_bufmax = sizeof(dis_cmd_buf) - 1ULL;
+	ssize_t ret;
 
-	ret = count;
+	ret = (ssize_t)count;
 
 	if (count > debug_bufmax)
 		count = debug_bufmax;
 
-	if (copy_from_user(&dis_cmd_buf, ubuf, count))
+	if (copy_from_user(&dis_cmd_buf, ubuf, count) != 0ULL)
 		return -EFAULT;
 
-	dis_cmd_buf[count] = 0;
+	dis_cmd_buf[count] = '\0';
 
 	process_dbg_cmd(dis_cmd_buf);
 
 	return ret;
 }
 
-struct dentry *mtkdrm_dbgfs;
+static struct dentry *mtkdrm_dbgfs;
 static const struct file_operations debug_fops = {
 	.read = debug_read,
 	.write = debug_write,
@@ -277,37 +418,52 @@ void mtk_drm_debugfs_init(struct drm_device *dev,
 			  struct mtk_drm_private *priv)
 {
 	void __iomem *mutex_regs;
-	unsigned int mutex_phys;
+	unsigned long mutex_phys;
 	struct device_node *np;
 	struct resource res;
 	int i;
+	enum mtk_ddp_comp_id comp_id;
+	int ret;
 
 	DRM_DEBUG_DRIVER("%s\n", __func__);
-	mtkdrm_dbgfs = debugfs_create_file("mtkdrm", S_IFREG | S_IRUGO |
-			S_IWUSR | S_IWGRP, NULL, (void *)0, &debug_fops);
+	mtkdrm_dbgfs = debugfs_create_file("mtkdrm", 0644, NULL, (void *)0,
+					   &debug_fops);
 
-	for (i = 0; gdrm_disp_table[i].comp_id >= 0; i++) {
-		np = priv->comp_node[gdrm_disp_table[i].comp_id];
-		gdrm_disp_base[i] = of_iomap(np, 0);
-		of_address_to_resource(np, 0, &res);
-		gdrm_disp_table[i].reg_base = res.start;
+	for (i = 0; (comp_id = priv->data->main_path[i]) !=
+		     DDP_COMPONENT_DPI0 && comp_id !=
+		     DDP_COMPONENT_PWM0; i++) {
+		np = priv->comp_node[comp_id];
+		gdrm_disp1_base[i] = priv->ddp_comp[comp_id]->regs;
+		ret = of_address_to_resource(np, 0, &res);
+		if (ret < 0)
+			DRM_INFO("comp_node[%d] map address fail\n", i);
+		gdrm_disp1_reg_range[i].reg_base = res.start;
 	}
-	gdrm_disp_base[i++] = priv->config_regs;
+
+	gdrm_disp1_base[i] = priv->config_regs;
+	gdrm_disp1_reg_range[i++].reg_base = 0x14000000;
 	mutex_regs = of_iomap(priv->mutex_node, 0);
-	of_address_to_resource(priv->mutex_node, 0, &res);
+	ret = of_address_to_resource(priv->mutex_node, 0, &res);
+	if (ret < 0)
+		DRM_INFO("mutex_node map address fail\n");
 	mutex_phys = res.start;
-	gdrm_disp_base[i] = mutex_regs;
-	gdrm_disp_table[i++].reg_base = mutex_phys;
+	gdrm_disp1_base[i] = mutex_regs;
+	gdrm_disp1_reg_range[i++].reg_base = mutex_phys;
 
-	for (i = 0; gdrm_hdmi_table[i].comp_id >= 0; i++) {
-		np = priv->comp_node[gdrm_hdmi_table[i].comp_id];
-		gdrm_hdmi_base[i] = of_iomap(np, 0);
-		of_address_to_resource(np, 0, &res);
-		gdrm_hdmi_table[i].reg_base = res.start;
+	for (i = 0; (comp_id = priv->data->ext_path[i]) !=
+		     DDP_COMPONENT_DPI1 && comp_id !=
+		     DDP_COMPONENT_PWM1; i++) {
+		np = priv->comp_node[comp_id];
+		gdrm_disp2_base[i] = of_iomap(np, 0);
+		ret = of_address_to_resource(np, 0, &res);
+		if (ret < 0)
+			DRM_INFO("comp_node[%d] map address fail\n", i);
+		gdrm_disp2_reg_range[i].reg_base = res.start;
 	}
-	gdrm_hdmi_base[i++] = priv->config_regs;
-	gdrm_hdmi_base[i] = mutex_regs;
-	gdrm_disp_table[i].reg_base = mutex_phys;
+	gdrm_disp2_base[i] = priv->config_regs;
+	gdrm_disp2_reg_range[i++].reg_base = 0x14000000;
+	gdrm_disp2_base[i] = mutex_regs;
+	gdrm_disp2_reg_range[i].reg_base = mutex_phys;
 
 	DRM_DEBUG_DRIVER("%s..done\n", __func__);
 }

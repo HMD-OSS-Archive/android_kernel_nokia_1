@@ -1054,14 +1054,16 @@ static int decide_ttj(void)
 		if (ctm_on == 1) {
 			TARGET_TJ =
 				MIN(MAX_TARGET_TJ,
-				MAX(STEADY_TARGET_TJ, (COEF_AE - COEF_BE * curr_tpcb / 1000)));
+				MAX(STEADY_TARGET_TJ,
+					(COEF_AE - COEF_BE * (curr_tpcb / 1000))));
 		} else if (ctm_on == 2) {
 			/* +++ cATM+ +++ */
 				TARGET_TJ = ta_get_ttj();
 			/* --- cATM+ --- */
 		}
 		current_ETJ =
-		    MIN(MAX_EXIT_TJ, MAX(STEADY_EXIT_TJ, (COEF_AX - COEF_BX * curr_tpcb / 1000)));
+		    MIN(MAX_EXIT_TJ, MAX(STEADY_EXIT_TJ,
+					(COEF_AX - COEF_BX * (curr_tpcb / 1000))));
 		/* tscpu_printk("cttj %d cetj %d tpcb %d\n", TARGET_TJ, current_ETJ, curr_tpcb); */
 	}
 #endif
@@ -2014,13 +2016,6 @@ static int krtatm_thread(void *arg)
 			if (krtatm_prev_maxtj == 0)
 				krtatm_prev_maxtj = atm_prev_maxtj;
 			_adaptive_power_calc(krtatm_prev_maxtj, krtatm_curr_maxtj, (unsigned int) gpu_loading);
-
-			/* To confirm if krtatm kthread is really running. */
-			if (krtatm_curr_maxtj >= 100000 || (krtatm_curr_maxtj - krtatm_prev_maxtj >= 20000))
-				tscpu_warn("%s c %d p %d cl %d gl %d s %d\n", __func__,
-					krtatm_curr_maxtj, krtatm_prev_maxtj,
-					adaptive_cpu_power_limit, adaptive_gpu_power_limit,
-					cl_dev_adp_cpu_state_active);
 		}
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule();

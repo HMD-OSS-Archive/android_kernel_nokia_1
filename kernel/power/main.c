@@ -11,23 +11,12 @@
 #include <linux/export.h>
 #include <linux/kobject.h>
 #include <linux/string.h>
-#include <linux/resume-trace.h>
+#include <linux/pm-trace.h>
 #include <linux/workqueue.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 
 #include "power.h"
-
-#define HIB_PM_DEBUG 1
-#define _TAG_HIB_M "HIB/PM"
-#if (HIB_PM_DEBUG)
-#undef hib_log
-#define hib_log(fmt, ...)  pr_warn("[%s][%s]" fmt, _TAG_HIB_M, __func__, ##__VA_ARGS__)
-#else
-#define hib_log(fmt, ...)
-#endif
-#undef hib_warn
-#define hib_warn(fmt, ...) pr_warn("[%s][%s]" fmt, _TAG_HIB_M, __func__, ##__VA_ARGS__)
 
 DEFINE_MUTEX(pm_mutex);
 
@@ -290,12 +279,21 @@ static inline void pm_print_times_init(void)
 {
 	pm_print_times_enabled = !!initcall_debug;
 }
-#else /* !CONFIG_PP_SLEEP_DEBUG */
+
+static ssize_t pm_wakeup_irq_show(struct kobject *kobj,
+					struct kobj_attribute *attr,
+					char *buf)
+{
+	return pm_wakeup_irq ? sprintf(buf, "%u\n", pm_wakeup_irq) : -ENODATA;
+}
+
+power_attr_ro(pm_wakeup_irq);
+
+#else /* !CONFIG_PM_SLEEP_DEBUG */
 static inline void pm_print_times_init(void) {}
 #endif /* CONFIG_PM_SLEEP_DEBUG */
 
 struct kobject *power_kobj;
-EXPORT_SYMBOL_GPL(power_kobj);
 
 /**
  * state - control system sleep states.
@@ -360,11 +358,6 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 	suspend_state_t state;
 	int error;
 
-#ifdef CONFIG_MTK_HIBERNATION
-	char *p;
-	int len;
-#endif
-
 	error = pm_autosleep_lock();
 	if (error)
 		return error;
@@ -375,35 +368,12 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr,
 	}
 
 	state = decode_state(buf, n);
-
-#ifdef CONFIG_MTK_HIBERNATION
-	p = memchr(buf, '\n', n);
-	len = p ? p - buf : n;
-	if (len == 8 && !strncmp(buf, "hibabort", len)) {
-		hib_log("abort hibernation...\n");
-		error = mtk_hibernate_abort();
-		goto out;
-	}
-#endif
-
-	pr_warn("[%s]: state = (%d)\n", __func__, state);
-
-	if (state < PM_SUSPEND_MAX) {
+	if (state < PM_SUSPEND_MAX)
 		error = pm_suspend(state);
-		pr_warn("[%s]: pm_suspend() return (%d)\n", __func__, error);
-	} else if (state == PM_SUSPEND_MAX) {
-#ifdef CONFIG_MTK_HIBERNATION
-		hib_log("trigger hibernation...\n");
-		if (!pre_hibernate()) {
-			error = 0;
-			error = mtk_hibernate();
-		}
-#else /* !CONFIG_MTK_HIBERNATION */
+	else if (state == PM_SUSPEND_MAX)
 		error = hibernate();
-#endif /* CONFIG_MTK_HIBERNATION */
-	} else {
+	else
 		error = -EINVAL;
-	}
 
  out:
 	pm_autosleep_unlock();
@@ -595,14 +565,7 @@ static ssize_t pm_trace_dev_match_show(struct kobject *kobj,
 	return show_trace_dev_match(buf, PAGE_SIZE);
 }
 
-static ssize_t
-pm_trace_dev_match_store(struct kobject *kobj, struct kobj_attribute *attr,
-			 const char *buf, size_t n)
-{
-	return -EINVAL;
-}
-
-power_attr(pm_trace_dev_match);
+power_attr_ro(pm_trace_dev_match);
 
 #endif /* CONFIG_PM_TRACE */
 
@@ -651,6 +614,7 @@ static struct attribute * g[] = {
 #endif
 #ifdef CONFIG_PM_SLEEP_DEBUG
 	&pm_print_times_attr.attr,
+	&pm_wakeup_irq_attr.attr,
 #endif
 #endif
 #ifdef CONFIG_FREEZER
@@ -680,6 +644,7 @@ static int __init pm_init(void)
 		return error;
 	hibernate_image_size_init();
 	hibernate_reserved_size_init();
+	pm_states_init();
 	power_kobj = kobject_create_and_add("power", NULL);
 	if (!power_kobj)
 		return -ENOMEM;

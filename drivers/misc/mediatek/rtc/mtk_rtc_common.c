@@ -71,6 +71,8 @@
 /* #include <linux/printk.h> */
 #include <linux/reboot.h>
 #include <mt-plat/charging.h>
+#include <mtk_reboot.h>
+
 
 #define RTC_NAME	"mt-rtc"
 #define RTC_RELPWR_WHEN_XRST	1	/* BBPU = 0 when xreset_rstb goes low */
@@ -263,7 +265,7 @@ bool rtc_low_power_detected(void)
 }
 EXPORT_SYMBOL(rtc_low_power_detected);
 
-void rtc_gpio_enable_32k(rtc_gpio_user_t user)
+void rtc_gpio_enable_32k(enum rtc_gpio_user_t user)
 {
 	unsigned long flags;
 
@@ -278,7 +280,7 @@ void rtc_gpio_enable_32k(rtc_gpio_user_t user)
 }
 EXPORT_SYMBOL(rtc_gpio_enable_32k);
 
-void rtc_gpio_disable_32k(rtc_gpio_user_t user)
+void rtc_gpio_disable_32k(enum rtc_gpio_user_t user)
 {
 	unsigned long flags;
 
@@ -366,16 +368,17 @@ void rtc_mark_recovery(void)
 	spin_unlock_irqrestore(&rtc_lock, flags);
 }
 
-#if defined(CONFIG_MTK_KERNEL_POWER_OFF_CHARGING)
 void rtc_mark_kpoc(void)
 {
+#if defined(CONFIG_MTK_KERNEL_POWER_OFF_CHARGING)
 	unsigned long flags;
 
 	spin_lock_irqsave(&rtc_lock, flags);
 	hal_rtc_set_spare_register(RTC_KPOC, 0x1);
 	spin_unlock_irqrestore(&rtc_lock, flags);
-}
 #endif
+}
+
 void rtc_mark_fast(void)
 {
 	unsigned long flags;
@@ -385,7 +388,7 @@ void rtc_mark_fast(void)
 	hal_rtc_set_spare_register(RTC_FAST_BOOT, 0x1);
 	spin_unlock_irqrestore(&rtc_lock, flags);
 }
-
+#if 0
 /*Begin, for reboot command, 20190104*/
 void rtc_mark_ftm(void)
 {
@@ -449,7 +452,7 @@ int set_rtc_spare_vbat_value(int val)
         return 0;
 }
 /*End, for reboot command, 20190104*/
-
+#endif
 u16 rtc_rdwr_uart_bits(u16 *val)
 {
 	u16 ret = 0;
@@ -473,15 +476,14 @@ void rtc_bbpu_power_down(void)
 
 void mt_power_off(void)
 {
-#if !defined(CONFIG_POWER_EXT)
 	int count = 0;
-#endif
+
 	rtc_xinfo("mt_power_off\n");
 
 	/* pull PWRBB low */
 	rtc_bbpu_power_down();
 
-	while (1) {
+	while (count < INT_MAX) {
 #if defined(CONFIG_POWER_EXT)
 		/* EVB */
 		rtc_xinfo("EVB without charger\n");
@@ -490,9 +492,9 @@ void mt_power_off(void)
 		mdelay(100);
 		rtc_xinfo("Phone with charger\n");
 		if (pmic_chrdet_status() == KAL_TRUE || count > 10)
-			machine_restart("charger");
-		count++;
+			arch_reset(0, "charger");
 #endif
+		count++;
 	}
 }
 
@@ -566,7 +568,7 @@ static void rtc_handler(void)
 						tm.tm_min, tm.tm_sec);
 				} while (time <= now_time);
 				spin_unlock(&rtc_lock);
-				machine_restart("kpoc");
+				arch_reset(0, "kpoc");
 				return;
 			} else {
 				hal_rtc_save_pwron_alarm();
@@ -779,22 +781,6 @@ static int rtc_ops_ioctl(struct device *dev, unsigned int cmd, unsigned long arg
 {
 	/* dump_stack(); */
 	rtc_xinfo("rtc_ops_ioctl cmd=%d\n", cmd);
-	switch (cmd) {
-	case RTC_AUTOBOOT_ON:
-		{
-			hal_rtc_set_spare_register(RTC_AUTOBOOT, AUTOBOOT_ON);
-			rtc_xinfo("rtc_ops_ioctl cmd=RTC_AUTOBOOT_ON\n");
-			return 0;
-		}
-	case RTC_AUTOBOOT_OFF:	/* IPO shutdown */
-		{
-			hal_rtc_set_spare_register(RTC_AUTOBOOT, AUTOBOOT_OFF);
-			rtc_xinfo("rtc_ops_ioctl cmd=RTC_AUTOBOOT_OFF\n");
-			return 0;
-		}
-	default:
-		break;
-	}
 	return -ENOIOCTLCMD;
 }
 

@@ -13,6 +13,7 @@
 
 #ifndef BUILD_LK
 #include <linux/string.h>
+#include <linux/wait.h>
 #endif
 
 #include "lcm_drv.h"
@@ -37,7 +38,7 @@
 /* Local Variables */
 /* --------------------------------------------------------------------------- */
 
-static LCM_UTIL_FUNCS lcm_util = { 0 };
+static struct LCM_UTIL_FUNCS lcm_util = { 0 };
 
 #define SET_RESET_PIN(v)    (lcm_util.set_reset_pin((v)))
 
@@ -54,6 +55,7 @@ static LCM_UTIL_FUNCS lcm_util = { 0 };
 #define wrtie_cmd(cmd)					 lcm_util.dsi_write_cmd(cmd)
 #define write_regs(addr, pdata, byte_nums)		 lcm_util.dsi_write_regs(addr, pdata, byte_nums)
 #define read_reg					 lcm_util.dsi_read_reg()
+#define read_reg_v2(cmd, buffer, buffer_size)		 lcm_util.dsi_dcs_read_lcm_reg_v2(cmd, buffer, buffer_size)
 
 
 struct LCM_setting_table {
@@ -248,15 +250,15 @@ static void push_table(struct LCM_setting_table *table, unsigned int count,
 /* LCM Driver Implementations */
 /* --------------------------------------------------------------------------- */
 
-static void lcm_set_util_funcs(const LCM_UTIL_FUNCS *util)
+static void lcm_set_util_funcs(const struct LCM_UTIL_FUNCS *util)
 {
-	memcpy(&lcm_util, util, sizeof(LCM_UTIL_FUNCS));
+	memcpy(&lcm_util, util, sizeof(struct LCM_UTIL_FUNCS));
 }
 
 
-static void lcm_get_params(LCM_PARAMS *params)
+static void lcm_get_params(struct LCM_PARAMS *params)
 {
-	memset(params, 0, sizeof(LCM_PARAMS));
+	memset(params, 0, sizeof(struct LCM_PARAMS));
 
 	params->type = LCM_TYPE_DSI;
 	params->width = FRAME_WIDTH;
@@ -370,7 +372,7 @@ static void lcm_update(unsigned int x, unsigned int y, unsigned int width, unsig
 	data_array[5] = (y1_LSB);
 	data_array[6] = 0x002c3909;
 
-	dsi_set_cmdq(data_array, 7, 0);
+	dsi_set_cmdq((unsigned int *)&data_array, 7, 0);
 
 }
 
@@ -396,11 +398,47 @@ static void lcm_setbacklight(unsigned int level)
 		   sizeof(lcm_backlight_level_setting) / sizeof(struct LCM_setting_table), 1);
 }
 
-LCM_DRIVER hx8392a_dsi_cmd_fwvga_lcm_drv = {
+static unsigned int lcm_ata_check(unsigned char *buffer)
+{
+#ifndef BUILD_LK
+	int  array[4];
+	char buffer_data[2];
+	char id0 = 0;
+	char id1 = 0;
+
+	buffer_data[0] = 0xFF;
+	buffer_data[1] = 0xFF;
+
+	array[0] = 0x00033700;	/* read id return two byte,version and id */
+	dsi_set_cmdq(array, 1, 1);
+	read_reg_v2(0xDA, buffer_data, 1);
+
+	array[0] = 0x00033700;	/* read id return two byte,version and id */
+	dsi_set_cmdq(array, 1, 1);
+	read_reg_v2(0xDB, buffer_data + 1, 1);
+
+	id0 = buffer_data[0];	/* should be 0x00 */
+	id1 = buffer_data[1];	/* should be 0xaa */
+
+	pr_debug("Disp ATA check id0 = 0x%x, id1 = 0x%x\n", id0, id1);
+
+	if ((id0 != 0xFF) || (id1 != 0xFF)) {
+		pr_warn("DISP LCM ATA check Success\n");
+		return 1;
+	}
+
+	pr_debug("DISP LCM ATA check Fail\n");
+	return 0;
+#else
+	return 0;
+#endif
+}
+struct LCM_DRIVER hx8392a_dsi_cmd_fwvga_lcm_drv = {
 
 	.name = "hx8392a_dsi_cmd_fwvga",
 	.set_util_funcs = lcm_set_util_funcs,
 	.get_params = lcm_get_params,
+	.ata_check = lcm_ata_check,
 	.init = lcm_init,
 	.suspend = lcm_suspend,
 	.resume = lcm_resume,

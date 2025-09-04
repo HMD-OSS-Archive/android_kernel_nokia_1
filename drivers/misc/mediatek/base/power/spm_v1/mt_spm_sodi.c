@@ -23,7 +23,12 @@
 #include <linux/of_address.h>
 #endif
 
+#if 0
 #include <linux/irqchip/mt-gic.h>
+#else
+#include <linux/irqchip/mtk-gic-extend.h>
+#endif
+
 #include <mach/wd_api.h>
 #include <mt-plat/upmu_common.h>
 
@@ -69,7 +74,7 @@
 #if SODI_DVT_WAKEUP
 #define WAKE_SRC_FOR_SODI WAKE_SRC_EINT	/* WAKE_SRC_GPT | WAKE_SRC_EINT */
 #else
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 #if defined(CONFIG_MICROTRUST_TEE_SUPPORT)
 #define WAKE_SRC_FOR_SODI \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_CONN_WDT | \
@@ -85,7 +90,7 @@
 	WAKE_SRC_CIRQ | WAKE_SRC_MD1_VRF18_WAKE | WAKE_SRC_SYSPWREQ | \
 	WAKE_SRC_MD_WDT | WAKE_SRC_C2K_WDT | WAKE_SRC_CLDMA_MD)
 #endif
-#elif defined(CONFIG_ARCH_MT6735M)
+#elif defined(CONFIG_MACH_MT6735M)
 #if defined(CONFIG_MICROTRUST_TEE_SUPPORT)
 #define WAKE_SRC_FOR_SODI \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_CONN_WDT | \
@@ -101,7 +106,7 @@
 	WAKE_SRC_CIRQ | WAKE_SRC_MD1_VRF18_WAKE | WAKE_SRC_SYSPWREQ | \
 	WAKE_SRC_MD_WDT | WAKE_SRC_CLDMA_MD)
 #endif
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 #if defined(CONFIG_MICROTRUST_TEE_SUPPORT)
 #define WAKE_SRC_FOR_SODI \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_CONN_WDT | \
@@ -117,7 +122,7 @@
 	WAKE_SRC_CIRQ | WAKE_SRC_MD1_VRF18_WAKE | WAKE_SRC_SYSPWREQ | \
 	WAKE_SRC_MD_WDT | WAKE_SRC_C2K_WDT | WAKE_SRC_CLDMA_MD)
 #endif
-#elif defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#elif defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 #define WAKE_SRC_FOR_SODI \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_WDT | \
 	WAKE_SRC_CCIF0_MD | WAKE_SRC_CONN2AP | \
@@ -149,7 +154,7 @@ enum spm_sodi_step {
 };
 #endif
 
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 static const u32 sodi_binary[] = {
 	0x814e0001, 0xd8200465, 0x17c07c1f, 0x81491801, 0xd80001c5, 0x17c07c1f,
 	0x18c0001f, 0x102085cc, 0x1910001f, 0x102085cc, 0x813f8404, 0xe0c00004,
@@ -296,7 +301,7 @@ static struct pwr_ctrl sodi_ctrl = {
 	.mfg_req_mask		= 1,
 	.lte_mask			= 1,
 
-#if defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_MACH_MT6735M) || defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	.md2_req_mask		= 1,
 #endif
 
@@ -332,7 +337,7 @@ static struct pwr_ctrl sodi_ctrl = {
 };
 
 struct spm_lp_scen __spm_sodi = {
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	.pcmdesc = &sodi_pcm,
 #endif
 	.pwrctrl = &sodi_ctrl,
@@ -343,9 +348,6 @@ static bool gSpm_SODI_mempll_pwr_mode = 1;
 
 static bool gSpm_sodi_en;
 
-static int sodi_forbid_flag = -1;
-static unsigned long int sodi_forbid_time_ms;
-
 #if REDUCE_SODI_LOG
 static unsigned long int sodi_logout_prev_time;
 static int memPllCG_prev_status = 1;	/* 1:CG, 0:pwrdn */
@@ -353,7 +355,7 @@ static unsigned int sodi_cnt, timeout_cnt;
 static unsigned int refresh_cnt, not_refresh_cnt;
 static unsigned int by_cldma_cnt, by_conn2ap_count;
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 static const char *sodi_wakesrc_str[32] = {
 	[0] = "SPM_MERGE",
 	[1] = "LTE_PTP",
@@ -388,7 +390,7 @@ static const char *sodi_wakesrc_str[32] = {
 	[30] = "APSRC_WAKE",
 	[31] = "APSRC_SLEEP",
 };
-#else /* CONFIG_ARCH_MT6580 */
+#else /* CONFIG_MACH_MT6580 */
 static const char *sodi_wakesrc_str[32] = {
 	[0] = "SPM_MERGE",
 	[1] = "AUDIO_REQ",
@@ -464,6 +466,7 @@ void __attribute__ ((weak)) mt_cirq_disable(void)
 {
 }
 
+#if REDUCE_SODI_LOG
 static long int idle_get_current_time_ms(void)
 {
 	struct timeval t;
@@ -471,6 +474,8 @@ static long int idle_get_current_time_ms(void)
 	do_gettimeofday(&t);
 	return ((t.tv_sec & 0xFFF) * 1000000 + t.tv_usec) / 1000;
 }
+#endif
+
 
 static void spm_trigger_wfi_for_sodi(struct pwr_ctrl *pwrctrl)
 {
@@ -480,13 +485,13 @@ static void spm_trigger_wfi_for_sodi(struct pwr_ctrl *pwrctrl)
 		wfi_with_sync();
 }
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 static u32 vsram_vosel_on_lb;
 #endif
 
 static void spm_sodi_pre_process(void)
 {
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	/* set PMIC WRAP table for deepidle power control */
 	mt_cpufreq_set_pmic_phase(PMIC_WRAP_PHASE_DEEPIDLE);
 
@@ -496,7 +501,7 @@ static void spm_sodi_pre_process(void)
 
 static void spm_sodi_post_process(void)
 {
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	__spm_dpidle_sodi_restore_pmic_setting(vsram_vosel_on_lb);
 
 	/* set PMIC WRAP table for normal power control */
@@ -523,7 +528,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	aee_rr_rec_sodi_val(1 << SPM_SODI_ENTER);
 #endif
 
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	pcmdesc = __spm_sodi.pcmdesc;
 #else
 	if (dyna_load_pcm[DYNA_LOAD_PCM_SODI].ready)
@@ -532,7 +537,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 		BUG();
 #endif
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 #if defined(CONFIG_ARM_PSCI) || defined(CONFIG_MTK_PSCI)
 	spm_flags &= ~SPM_DISABLE_ATF_ABORT;
 #else
@@ -550,7 +555,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 #ifdef SPM_VCORE_EN
 	/* If Vcore DVFS is disable, force to disable SODI internal Vcore DVS */
 	if (pwrctrl->pcm_flags_cust == 0) {
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6735M)
 		if ((pwrctrl->pcm_flags & SPM_VCORE_DVFS_EN) == 0)
 			pwrctrl->pcm_flags |= SPM_VCORE_DVS_EVENT_DIS;
 #else
@@ -588,7 +593,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	mt_cirq_clone_gic();
 	mt_cirq_enable();
 
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	__spm_enable_i2c4_clk();
 #endif
 
@@ -596,7 +601,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	aee_rr_rec_sodi_val(aee_rr_curr_sodi_val()|(1<<SPM_SODI_ENTER_UART_SLEEP));
 #endif
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	if (request_uart_to_sleep()) {
 		wr = WR_UART_BUSY;
 		goto RESTORE_IRQ;
@@ -615,7 +620,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 
 	__spm_init_event_vector(pcmdesc);
 
-#if defined(CONFIG_ARCH_MT6735) ||  defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) ||  defined(CONFIG_MACH_MT6753)
 /* In MT6735M, do not set apsrc_req bit in SODI. */
 	/* Display set SPM_PCM_SRC_REQ[0]=1'b1 to force DRAM not enter self-refresh mode */
 	if ((spm_read(SPM_PCM_SRC_REQ) & 0x00000001))
@@ -640,11 +645,11 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 #if SPM_AEE_RR_REC
 	aee_rr_rec_sodi_val(aee_rr_curr_sodi_val() | (1 << SPM_SODI_ENTER_WFI));
 #endif
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	gic_set_primask();
 #endif
 	spm_trigger_wfi_for_sodi(pwrctrl);
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	gic_clear_primask();
 #endif
 
@@ -662,18 +667,9 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	aee_rr_rec_sodi_val(aee_rr_curr_sodi_val()|(1<<SPM_SODI_ENTER_UART_AWAKE));
 #endif
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	request_uart_to_wakeup();
 #endif
-
-	if ((((wakesta.r12 & WAKE_SRC_AFE) != 0) && (wakesta.timer_out < 100)) ||
-	(wakesta.timer_out < 10)) {
-		sodi_forbid_flag = 1;
-		sodi_forbid_time_ms = idle_get_current_time_ms();
-		sodi_debug("sodi_forbid_flag = 1\n");
-	} else {
-		sodi_forbid_flag = 0;
-	}
 
 #if REDUCE_SODI_LOG == 0
 	sodi_debug("emi-selfrefrsh cnt = %d, pcm_flag = 0x%x, SPM_PCM_RESERVE2 = 0x%x, %s\n",
@@ -695,7 +691,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 		need_log_out = 1;
 	} else if (wakesta.r12 == 0) {
 		need_log_out = 2;
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	} else if ((wakesta.r12 & (WAKE_SRC_GPT | WAKE_SRC_CONN2AP)) == 0) {
 #if defined(CONFIG_ARCH_MT6570)
 		if (((wakesta.r12 & WAKE_SRC_EINT) == 0) || (sodi_logout_curr_time - sodi_logout_prev_time) > 20)
@@ -818,7 +814,7 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 		if (spm_read(SPM_PCM_PASR_DPD_3) == 0)
 			not_refresh_cnt++;
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 		if (wakesta.r12 & WAKE_SRC_CLDMA_MD)
 			by_cldma_cnt++;
 #endif
@@ -833,11 +829,11 @@ void spm_go_to_sodi(u32 spm_flags, u32 spm_data)
 	aee_rr_rec_sodi_val(aee_rr_curr_sodi_val() | (1 << SPM_SODI_LEAVE_SPM_FLOW));
 #endif
 
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	__spm_disable_i2c4_clk();
 #endif
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 RESTORE_IRQ:
 #endif
 	mt_cirq_flush();
@@ -854,17 +850,6 @@ RESTORE_IRQ:
 	aee_rr_rec_sodi_val(0);
 #endif
 }
-
-int sodi_forbid_by_prev_wakeup_info(void)
-{
-	if (sodi_forbid_flag == 1) {
-		if ((idle_get_current_time_ms() - sodi_forbid_time_ms) < 200)
-			return 1;
-	}
-
-	return 0;
-}
-EXPORT_SYMBOL(sodi_forbid_by_prev_wakeup_info);
 
 void spm_sodi_mempll_pwr_mode(bool pwr_mode)
 {

@@ -20,9 +20,9 @@
 #include "disp_debug.h"
 #include "disp_drv_platform.h"
 
-#if defined(COMMON_DISP_LOG)
+/*#if defined(COMMON_DISP_LOG)*/
 #include "mtkfb_debug.h"
-#endif
+/*#endif*/
 
 /*
  * Display has 7 log level:
@@ -95,7 +95,7 @@
 	do {                                                           \
 		dprec_logger_pr(DPREC_LOGGER_DEBUG, fmt, ##args);      \
 		if ((g_mobilelog > 0) && (g_loglevel >= DEFAULT_LEVEL))  \
-			pr_debug("[DISP]"fmt, ##args);                 \
+			pr_info("[DISP]"fmt, ##args);                 \
 	} while (0)
 
 /*

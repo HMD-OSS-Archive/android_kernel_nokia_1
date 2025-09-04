@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 TRUSTONIC LIMITED
+ * Copyright (c) 2014-2017 TRUSTONIC LIMITED
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -55,7 +55,7 @@ static bool allocate_tui_memory_pool(struct tui_mempool *pool, size_t size)
 	if (!tui_mem_pool) {
 		return ret;
 	} else if (ksize(tui_mem_pool) < size) {
-		pr_err("TUI mem pool size too small: req'd=%zu alloc'd=%zu",
+		pr_notice("TUI mem pool size too small: req'd=%zu alloc'd=%zu",
 		       size, ksize(tui_mem_pool));
 		kfree(tui_mem_pool);
 	} else {
@@ -86,7 +86,7 @@ static void free_tui_memory_pool(struct tui_mempool *pool)
  * Return: must return 0 on success, or non-zero on error. If the function
  * returns an error, the module initialization will fail.
  */
-uint32_t hal_tui_init(void)
+u32 hal_tui_init(void)
 {
 	/* Allocate memory pool for the framebuffer
 	 */
@@ -135,11 +135,11 @@ void hal_tui_exit(void)
  * the physical address of the working buffer is at index 0 of the allocbuffer
  * table (allocbuffer[0].pa).
  */
-uint32_t hal_tui_alloc(
+u32 hal_tui_alloc(
 	struct tui_alloc_buffer_t allocbuffer[MAX_DCI_BUFFER_NUMBER],
-	size_t allocsize, uint32_t number)
+	size_t allocsize, u32 number)
 {
-	uint32_t ret = TUI_DCI_ERR_INTERNAL_ERROR;
+	u32 ret = TUI_DCI_ERR_INTERNAL_ERROR;
 
 	if (!allocbuffer) {
 		pr_debug("%s(%d): allocbuffer is null\n", __func__, __LINE__);
@@ -160,11 +160,11 @@ uint32_t hal_tui_alloc(
 		return TUI_DCI_ERR_INTERNAL_ERROR;
 	}
 
-	if ((size_t)(allocsize*number) <= g_tui_mem_pool.size) {
+	if ((size_t)(allocsize * number) <= g_tui_mem_pool.size) {
 		/* requested buffer fits in the memory pool */
-		allocbuffer[0].pa = (uint64_t)g_tui_mem_pool.pa;
-		allocbuffer[1].pa = (uint64_t)(g_tui_mem_pool.pa +
-					       g_tui_mem_pool.size/2);
+		allocbuffer[0].pa = (u64)g_tui_mem_pool.pa;
+		allocbuffer[1].pa = (u64)(g_tui_mem_pool.pa +
+					       g_tui_mem_pool.size / 2);
 		pr_debug("%s(%d): allocated at %llx\n", __func__, __LINE__,
 			 allocbuffer[0].pa);
 		pr_debug("%s(%d): allocated at %llx\n", __func__, __LINE__,
@@ -202,7 +202,7 @@ void hal_tui_free(void)
  *
  * Return: must return 0 on success, non-zero otherwise.
  */
-uint32_t hal_tui_deactivate(void)
+u32 hal_tui_deactivate(void)
 {
 	/* Set linux TUI flag */
 	trustedui_set_mask(TRUSTEDUI_MODE_TUI_SESSION);
@@ -213,7 +213,7 @@ uint32_t hal_tui_deactivate(void)
 	 * This can be done by calling the fb_blank(FB_BLANK_POWERDOWN) function
 	 * on the appropriate framebuffer device
 	 */
-	trustedui_set_mask(TRUSTEDUI_MODE_VIDEO_SECURED|
+	trustedui_set_mask(TRUSTEDUI_MODE_VIDEO_SECURED |
 			   TRUSTEDUI_MODE_INPUT_SECURED);
 
 	return TUI_DCI_OK;
@@ -229,10 +229,10 @@ uint32_t hal_tui_deactivate(void)
  *
  * Return: must return 0 on success, non-zero otherwise.
  */
-uint32_t hal_tui_activate(void)
+u32 hal_tui_activate(void)
 {
 	/* Protect NWd */
-	trustedui_clear_mask(TRUSTEDUI_MODE_VIDEO_SECURED|
+	trustedui_clear_mask(TRUSTEDUI_MODE_VIDEO_SECURED |
 			     TRUSTEDUI_MODE_INPUT_SECURED);
 	/*
 	 * Restart NWd display here.  TUI session has ended, and therefore the
@@ -246,14 +246,13 @@ uint32_t hal_tui_activate(void)
 }
 
 /* Do nothing it's only use for QC */
-uint32_t hal_tui_process_cmd(struct tui_hal_cmd_t *cmd,
-			     struct tui_hal_rsp_t *rsp)
+u32 hal_tui_process_cmd(struct tui_hal_cmd_t *cmd, struct tui_hal_rsp_t *rsp)
 {
 	return TUI_DCI_OK;
 }
 
 /* Do nothing it's only use for QC */
-uint32_t hal_tui_notif(void)
+u32 hal_tui_notif(void)
 {
 	return TUI_DCI_OK;
 }

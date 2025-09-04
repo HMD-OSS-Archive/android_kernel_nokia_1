@@ -42,7 +42,7 @@
 /* --------------------------------------------------------------------------- */
 /* Local Variables */
 /* --------------------------------------------------------------------------- */
-static LCM_UTIL_FUNCS lcm_util = { 0 };
+static struct LCM_UTIL_FUNCS lcm_util = { 0 };
 
 unsigned int GPIO_LCD_PWR;
 unsigned int GPIO_LCD_RST;
@@ -59,7 +59,7 @@ unsigned int GPIO_LCD_RST;
 /* Local Functions */
 /* --------------------------------------------------------------------------- */
 #define dsi_set_cmdq_V2(cmd, count, ppara, force_update) lcm_util.dsi_set_cmdq_V2(cmd, count, ppara, force_update)
-#define dsi_set_cmdq(pdata, queue_size, force_update)	 lcm_util.dsi_set_cmdq(pdata, queue_size, force_update)
+#define dsi_set_cmdq(pdata, queue_size, force_update) lcm_util.dsi_set_cmdq(pdata, queue_size, force_update)
 #define wrtie_cmd(cmd)							         lcm_util.dsi_write_cmd(cmd)
 #define write_regs(addr, pdata, byte_nums)				 lcm_util.dsi_write_regs(addr, pdata, byte_nums)
 #define read_reg							             lcm_util.dsi_read_reg()
@@ -333,14 +333,14 @@ static void lcm_set_gpio_output(unsigned int GPIO, unsigned int output)
 /* --------------------------------------------------------------------------- */
 /* LCM Driver Implementations */
 /* --------------------------------------------------------------------------- */
-static void lcm_set_util_funcs(const LCM_UTIL_FUNCS *util)
+static void lcm_set_util_funcs(const struct LCM_UTIL_FUNCS *util)
 {
-	memcpy(&lcm_util, util, sizeof(LCM_UTIL_FUNCS));
+	memcpy(&lcm_util, util, sizeof( struct LCM_UTIL_FUNCS));
 }
 
-static void lcm_get_params(LCM_PARAMS *params)
+static void lcm_get_params( struct LCM_PARAMS *params)
 {
-	memset(params, 0, sizeof(LCM_PARAMS));
+	memset(params, 0, sizeof( struct LCM_PARAMS));
 
 	params->type = LCM_TYPE_DSI;
 	params->width = FRAME_WIDTH;
@@ -368,7 +368,7 @@ static void lcm_get_params(LCM_PARAMS *params)
 	params->dsi.horizontal_frontporch = 52;
 	params->dsi.horizontal_active_pixel = FRAME_WIDTH;
 
-	params->dsi.PLL_CLOCK = 345;
+	params->dsi.PLL_CLOCK = 338;
 
 	params->dsi.cont_clock = 1;
 }
@@ -393,7 +393,7 @@ static void lcm_power_init(void)
 
 static void lcm_init(void)
 {
-	DSI_clk_HS_mode(DISP_MODULE_DSI0, NULL, 1);
+	DSI_clk_HS_mode( DISP_MODULE_DSI0, NULL, 1);
 
 #ifdef BUILD_LK
 	init_lcm_registers();
@@ -427,7 +427,7 @@ static void lcm_resume(void)
 	/*MDELAY(50); */
 	MDELAY(10);
 
-	DSI_clk_HS_mode(DISP_MODULE_DSI0, NULL, 1);
+	DSI_clk_HS_mode( DISP_MODULE_DSI0, NULL, 1);
 	init_lcm_registers();
 #endif
 }
@@ -466,7 +466,7 @@ static unsigned int lcm_compare_id(void)
 	return (LCM_ID == id) ? 1 : 0;
 }
 
-LCM_DRIVER hx8394c_wxga_dsi_vdo_lcm_drv = {
+struct LCM_DRIVER hx8394c_wxga_dsi_vdo_lcm_drv = {
 	.name = "hx8394c_wxga_dsi_vdo",
 	.set_util_funcs = lcm_set_util_funcs,
 	.get_params = lcm_get_params,

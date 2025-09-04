@@ -110,12 +110,13 @@ extern int mt_get_data_nommu(int data, unsigned long pva);
 extern void smp(void);
 extern void amp(void);
 extern void disable_dcache_safe(bool is_inner_off);
+extern void __enable_dcache(void);
 extern void cpu_wake_up_errata_802022(void);
 extern unsigned *copy_words(volatile unsigned *destination,
 			    volatile unsigned *source, unsigned num_words);
 extern void mt_save_banked_registers(unsigned int *container);
 extern void mt_restore_banked_registers(unsigned int *container);
-extern unsigned long *aee_rr_rec_cpu_dormant(void);
-extern unsigned long *aee_rr_rec_cpu_dormant_pa(void);
+extern unsigned long *aee_rr_rec_mtk_cpuidle_footprint_va(void);
+extern unsigned long *aee_rr_rec_mtk_cpuidle_footprint_pa(void);
 
 #endif

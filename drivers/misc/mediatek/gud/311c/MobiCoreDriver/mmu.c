@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 TRUSTONIC LIMITED
+ * Copyright (c) 2013-2017 TRUSTONIC LIMITED
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -21,6 +21,7 @@
 #include <linux/kthread.h>
 #include <linux/pagemap.h>
 #include <linux/device.h>
+#include <linux/version.h>
 
 #include "public/mc_user.h"
 
@@ -68,6 +69,54 @@
  * this must be exactly one page, we can hold up to 512 entries.
  */
 #define L1_ENTRIES_MAX	512
+
+#if KERNEL_VERSION(4, 6, 0) > LINUX_VERSION_CODE
+static inline long gup_local(struct mm_struct *mm, uintptr_t start,
+			     unsigned long nr_pages, int write,
+			     struct page **pages)
+{
+	return get_user_pages(NULL, mm, start, nr_pages, write, 0, pages, NULL);
+}
+#elif KERNEL_VERSION(4, 9, 0) > LINUX_VERSION_CODE
+static inline long gup_local(struct mm_struct *mm, uintptr_t start,
+			     unsigned long nr_pages, int write,
+			     struct page **pages)
+{
+	unsigned int flags = 0;
+
+	if (write)
+		flags |= FOLL_WRITE;
+
+	return get_user_pages_remote(NULL, mm, start, nr_pages, write, 0, pages,
+				     NULL);
+}
+#elif KERNEL_VERSION(4, 10, 0) > LINUX_VERSION_CODE
+static inline long gup_local(struct mm_struct *mm, uintptr_t start,
+			     unsigned long nr_pages, int write,
+			     struct page **pages)
+{
+	unsigned int flags = 0;
+
+	if (write)
+		flags |= FOLL_WRITE;
+
+	return get_user_pages_remote(NULL, mm, start, nr_pages, flags, pages,
+				     NULL);
+}
+#else
+static inline long gup_local(struct mm_struct *mm, uintptr_t start,
+			     unsigned long nr_pages, int write,
+			     struct page **pages)
+{
+	unsigned int flags = 0;
+
+	if (write)
+		flags |= FOLL_WRITE;
+
+	return get_user_pages_remote(NULL, mm, start, nr_pages, flags, pages,
+				     NULL, NULL);
+}
+#endif
 
 /*
  * Fake L1 MMU table.
@@ -176,11 +225,11 @@ static inline int map_buffer(struct task_struct *task, const void *data,
 	total_pages_nr = PAGE_ALIGN(mmu_table->offset + length) / PAGE_SIZE;
 	if (g_ctx.f_mem_ext)
 		l1_entries_max = L1_ENTRIES_MAX;
-	 else
+	else
 		l1_entries_max = 1;
 
 	if (total_pages_nr > (l1_entries_max * L2_ENTRIES_MAX)) {
-		mc_dev_err("data mapping exceeds %d pages",
+		mc_dev_notice("data mapping exceeds %d pages",
 			   l1_entries_max * L2_ENTRIES_MAX);
 		return -EINVAL;
 	}
@@ -259,20 +308,19 @@ static inline int map_buffer(struct task_struct *task, const void *data,
 
 			/* Buffer was allocated in user space */
 			down_read(&task->mm->mmap_sem);
-			gup_ret = get_user_pages(task, task->mm,
-						 (uintptr_t)reader, pages_nr,
-						 1, 0, pages, NULL);
+			gup_ret = gup_local(task->mm, (uintptr_t)reader,
+					    pages_nr, 1, pages);
 			up_read(&task->mm->mmap_sem);
 			if (gup_ret < 0) {
 				ret = gup_ret;
-				mc_dev_err("failed to get user pages @%p: %d\n",
+				mc_dev_notice("failed to get user pages @%p: %d\n",
 					   reader, ret);
 				goto end;
 			}
 
 			/* check if we could lock all pages. */
 			if (gup_ret != pages_nr) {
-				mc_dev_err("get_user_pages() failed, ret: %ld\n",
+				mc_dev_notice("get_user_pages() failed, ret: %ld\n",
 					   gup_ret);
 				release_pages(pages, gup_ret, 0);
 				ret = -EINVAL;
@@ -288,7 +336,7 @@ static inline int map_buffer(struct task_struct *task, const void *data,
 				struct page *page = vmalloc_to_page(reader);
 
 				if (!page) {
-					mc_dev_err("failed to map address");
+					mc_dev_notice("failed to map address");
 					ret = -EINVAL;
 					goto end;
 				}
@@ -330,7 +378,7 @@ static inline int map_buffer(struct task_struct *task, const void *data,
 				unsigned long phys = page_to_phys(*page_ptr);
 #if defined CONFIG_ARM64
 				if (phys & 0xffffffff00000000UL) {
-					mc_dev_err("64-bit pointer: 0x%16lx\n",
+					mc_dev_notice("64-bit pointer: 0x%16lx\n",
 						   phys);
 					ret = -EFAULT;
 					goto end;
@@ -360,30 +408,38 @@ static inline void unmap_buffer(struct tee_mmu *mmu_table)
 
 	/* Release all locked user space pages */
 	for (t = 0; t < (size_t)mmu_table->l2_tables_nr; t++) {
-		if (g_ctx.f_lpae) {
-			u64 *pte = mmu_table->l2_tables[t].ptes_64;
-			int i;
+		u64 *pte64 = mmu_table->l2_tables[t].ptes_64;
+		u32 *pte32 = mmu_table->l2_tables[t].ptes_32;
+		pte_t pte;
+		int i;
 
-			for (i = 0; i < L2_ENTRIES_MAX; i++, pte++) {
-				/* Unused entries are 0 */
-				if (!*pte)
-					break;
-
-				/* pte_page() cannot return NULL */
-				page_cache_release(pte_page(*pte));
+		for (i = 0; i < L2_ENTRIES_MAX; i++) {
+#if (KERNEL_VERSION(4, 7, 0) > LINUX_VERSION_CODE) || defined(CONFIG_ARM)
+			{
+				if (g_ctx.f_lpae)
+					pte = *pte64++;
+				else
+					pte = *pte32++;
 			}
-		} else {
-			u32 *pte = mmu_table->l2_tables[t].ptes_32;
-			int i;
 
-			for (i = 0; i < L2_ENTRIES_MAX; i++, pte++) {
-				/* Unused entries are 0 */
-				if (!*pte)
-					break;
-
-				/* pte_page() cannot return NULL */
-				page_cache_release(pte_page(*pte));
+			/* Unused entries are 0 */
+			if (!pte)
+				break;
+#else
+			{
+				if (g_ctx.f_lpae)
+					pte.pte = *pte64++;
+				else
+					pte.pte = *pte32++;
 			}
+
+			/* Unused entries are 0 */
+			if (!pte.pte)
+				break;
+#endif
+
+			/* pte_page() cannot return NULL */
+			put_page(pte_page(pte));
 		}
 	}
 

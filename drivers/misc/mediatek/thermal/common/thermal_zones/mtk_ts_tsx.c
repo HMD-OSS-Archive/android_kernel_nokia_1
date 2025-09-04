@@ -256,8 +256,7 @@ static int tstsx_sysrst_set_cur_state(struct thermal_cooling_device *cdev, unsig
 		mtktstsx_info("*****************************************");
 		mtktstsx_info("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 
-/* BUG(); */
-		*(unsigned int *)0x0 = 0xdead;	/* To trigger data abort to reset the system for thermal protection. */
+		BUG();
 		/* arch_reset(0,NULL); */
 	}
 	return 0;
@@ -433,13 +432,13 @@ void mtkts_tsx_start_thermal_timer(void)
 	if (!isTimerCancelled)
 		return;
 
+	isTimerCancelled = 0;
+
 	if (down_trylock(&sem_mutex))
 		return;
 
-	if (thz_dev != NULL && interval != 0) {
+	if (thz_dev != NULL && interval != 0)
 		mod_delayed_work(system_freezable_wq, &(thz_dev->poll_queue), round_jiffies(msecs_to_jiffies(1000)));
-		isTimerCancelled = 0;
-	}
 
 	up(&sem_mutex);
 }

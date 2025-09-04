@@ -14,13 +14,13 @@
 #ifndef __HAL_BTIF_DMA_H_
 #define __HAL_BTIF_DMA_H_
 
-#include <asm/io.h>
+#include <linux/io.h>
 #include "btif_dma_pub.h"
 
 #if defined(CONFIG_MTK_CLKMGR)
-#if defined(CONFIG_ARCH_MT6580) || defined(CONFIG_ARCH_MT6570)
+#if defined(CONFIG_MACH_MT6580)
 #define MTK_BTIF_APDMA_CLK_CG MT_CG_APDMA_SW_CG
-#elif defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6735M) || defined(CONFIG_MACH_MT6753)
 #define MTK_BTIF_APDMA_CLK_CG MT_CG_PERI_APDMA
 #endif
 #else
@@ -31,7 +31,7 @@ extern struct clk *clk_btif_apdma; /*btif apdma clock*/
 #define RX_DMA_VFF_SIZE (1024 * 8)	/*Rx vFIFO Len must be 8 Byte allignment */
 
 #define DMA_TX_THRE(n) (n - 7)	/*Tx Trigger Level */
-#define DMA_RX_THRE(n) (1)	/*Rx Trigger Level */
+#define DMA_RX_THRE(n) ((n) * 3 / 4)	/*Rx Trigger Level */
 
 /**********************************Hardware related defination**************************/
 #ifndef CONFIG_OF
@@ -147,18 +147,18 @@ extern struct clk *clk_btif_apdma; /*btif apdma clock*/
 
 #define RX_DMA_VFF_LEFT_MASK (0x0000FFFF)
 
-typedef struct _MTK_BTIF_DMA_VFIFO_ {
-	DMA_VFIFO vfifo;
+struct _MTK_BTIF_DMA_VFIFO_ {
+	struct _DMA_VFIFO_ vfifo;
 	unsigned int wpt;	/*DMA's write pointer, which is maintained by SW for Tx DMA and HW for Rx DMA */
 	unsigned int last_wpt_wrap;	/*last wrap bit for wpt */
 	unsigned int rpt;	/*DMA's read pointer, which is maintained by HW for Tx DMA and SW for Rx DMA */
 	unsigned int last_rpt_wrap;	/*last wrap bit for rpt */
-} MTK_BTIF_DMA_VFIFO, *P_MTK_BTIF_DMA_VFIFO;
+};
 
 /*for DMA debug purpose*/
-typedef struct _MTK_BTIF_DMA_REG_DMP_DBG_ {
+struct _MTK_BTIF_DMA_REG_DMP_DBG_ {
 	unsigned long reg_addr;
 	unsigned int reg_val;
-} MTK_BTIF_DMA_REG_DMP_DBG, *P_MTK_BTIF_DMA_REG_DMP_DBG;
+};
 
 #endif /*__HAL_BTIF_DMA_H_*/

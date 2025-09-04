@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (c) 2016 MediaTek Inc.
  * Author: Jungchang Tsao <jungchang.tsao@mediatek.com>
- *         Daniel Hsiao <daniel.hsiao@mediatek.com>
+ *	   Daniel Hsiao <daniel.hsiao@mediatek.com>
+ *	   Tiffany Lin <tiffany.lin@mediatek.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify
@@ -17,48 +18,35 @@
 #ifndef _VENC_IPI_MSG_H_
 #define _VENC_IPI_MSG_H_
 
-#define IPIMSG_H264_ENC_ID 0x100
-#define IPIMSG_VP8_ENC_ID 0x200
-
-#define AP_IPIMSG_VENC_BASE 0x20000
-#define VPU_IPIMSG_VENC_BASE 0x30000
+#define AP_IPIMSG_VENC_BASE 0xC000
+#define VCU_IPIMSG_VENC_BASE 0xD000
 
 /**
- * enum venc_ipi_msg_id - message id between AP and VPU
+ * enum venc_ipi_msg_id - message id between AP and VCU
  * (ipi stands for inter-processor interrupt)
- * @AP_IPIMSG_XXX:		AP to VPU cmd message id
- * @VPU_IPIMSG_XXX_DONE:	VPU ack AP cmd message id
+ * @AP_IPIMSG_ENC_XXX:		AP to VCU cmd message id
+ * @VCU_IPIMSG_ENC_XXX_DONE:	VCU ack AP cmd message id
  */
 enum venc_ipi_msg_id {
-	AP_IPIMSG_H264_ENC_INIT = AP_IPIMSG_VENC_BASE +
-				  IPIMSG_H264_ENC_ID,
-	AP_IPIMSG_H264_ENC_SET_PARAM,
-	AP_IPIMSG_H264_ENC_ENCODE,
-	AP_IPIMSG_H264_ENC_DEINIT,
+	AP_IPIMSG_ENC_INIT = AP_IPIMSG_VENC_BASE,
+	AP_IPIMSG_ENC_SET_PARAM,
+	AP_IPIMSG_ENC_ENCODE,
+	AP_IPIMSG_ENC_DEINIT,
 
-	AP_IPIMSG_VP8_ENC_INIT = AP_IPIMSG_VENC_BASE +
-				 IPIMSG_VP8_ENC_ID,
-	AP_IPIMSG_VP8_ENC_SET_PARAM,
-	AP_IPIMSG_VP8_ENC_ENCODE,
-	AP_IPIMSG_VP8_ENC_DEINIT,
-
-	VPU_IPIMSG_H264_ENC_INIT_DONE = VPU_IPIMSG_VENC_BASE +
-					IPIMSG_H264_ENC_ID,
-	VPU_IPIMSG_H264_ENC_SET_PARAM_DONE,
-	VPU_IPIMSG_H264_ENC_ENCODE_DONE,
-	VPU_IPIMSG_H264_ENC_DEINIT_DONE,
-
-	VPU_IPIMSG_VP8_ENC_INIT_DONE = VPU_IPIMSG_VENC_BASE +
-				       IPIMSG_VP8_ENC_ID,
-	VPU_IPIMSG_VP8_ENC_SET_PARAM_DONE,
-	VPU_IPIMSG_VP8_ENC_ENCODE_DONE,
-	VPU_IPIMSG_VP8_ENC_DEINIT_DONE,
+	VCU_IPIMSG_ENC_INIT_DONE = VCU_IPIMSG_VENC_BASE,
+	VCU_IPIMSG_ENC_SET_PARAM_DONE,
+	VCU_IPIMSG_ENC_ENCODE_DONE,
+	VCU_IPIMSG_ENC_DEINIT_DONE,
 };
 
 /**
- * struct venc_ap_ipi_msg_init - AP to VPU init cmd structure
+ * struct venc_ap_ipi_msg_init - AP to VCU init cmd structure
  * @msg_id:	message id (AP_IPIMSG_XXX_ENC_INIT)
- * @venc_inst:	AP encoder instance (struct venc_vp8_handle/venc_h264_handle *)
+ * @reserved:	reserved for future use. vcu is running in 32bit. Without
+ *		this reserved field, if kernel run in 64bit. this struct size
+ *		will be different between kernel and vcu
+ * @venc_inst:	AP encoder instance
+ *		(struct venc_vp8_inst/venc_h264_inst *)
  */
 struct venc_ap_ipi_msg_init {
 	uint32_t msg_id;
@@ -67,25 +55,27 @@ struct venc_ap_ipi_msg_init {
 };
 
 /**
- * struct venc_ap_ipi_msg_set_param - AP to VPU set_param cmd structure
+ * struct venc_ap_ipi_msg_set_param - AP to VCU set_param cmd structure
  * @msg_id:	message id (AP_IPIMSG_XXX_ENC_SET_PARAM)
- * @inst_id:	VPU encoder instance id (struct venc_vp8_vpu_drv/venc_h264_vpu_drv *)
+ * @vcu_inst_addr:	VCU encoder instance addr
+ *			(struct venc_vp8_vsi/venc_h264_vsi *)
  * @param_id:	parameter id (venc_set_param_type)
  * @data_item:	number of items in the data array
  * @data[8]:	data array to store the set parameters
  */
 struct venc_ap_ipi_msg_set_param {
 	uint32_t msg_id;
-	uint32_t inst_id;
+	uint32_t vcu_inst_addr;
 	uint32_t param_id;
 	uint32_t data_item;
 	uint32_t data[8];
 };
 
 /**
- * struct venc_ap_ipi_msg_enc - AP to VPU enc cmd structure
+ * struct venc_ap_ipi_msg_enc - AP to VCU enc cmd structure
  * @msg_id:	message id (AP_IPIMSG_XXX_ENC_ENCODE)
- * @inst_id:	VPU encoder instance id (struct venc_vp8_vpu_drv/venc_h264_vpu_drv *)
+ * @vcu_inst_addr:	VCU encoder instance addr
+ *			(struct venc_vp8_vsi/venc_h264_vsi *)
  * @bs_mode:	bitstream mode for h264
  *		(H264_BS_MODE_SPS/H264_BS_MODE_PPS/H264_BS_MODE_FRAME)
  * @input_addr:	pointer to input image buffer plane
@@ -94,7 +84,7 @@ struct venc_ap_ipi_msg_set_param {
  */
 struct venc_ap_ipi_msg_enc {
 	uint32_t msg_id;
-	uint32_t inst_id;
+	uint32_t vcu_inst_addr;
 	uint32_t bs_mode;
 	uint32_t input_addr[3];
 	uint32_t bs_addr;
@@ -102,17 +92,18 @@ struct venc_ap_ipi_msg_enc {
 };
 
 /**
- * struct venc_ap_ipi_msg_deinit - AP to VPU deinit cmd structure
+ * struct venc_ap_ipi_msg_deinit - AP to VCU deinit cmd structure
  * @msg_id:	message id (AP_IPIMSG_XXX_ENC_DEINIT)
- * @inst_id:	VPU encoder instance id (struct venc_vp8_vpu_drv/venc_h264_vpu_drv *)
+ * @vcu_inst_addr:	VCU encoder instance addr
+ *			(struct venc_vp8_vsi/venc_h264_vsi *)
  */
 struct venc_ap_ipi_msg_deinit {
 	uint32_t msg_id;
-	uint32_t inst_id;
+	uint32_t vcu_inst_addr;
 };
 
 /**
- * enum venc_ipi_msg_status - VPU ack AP cmd status
+ * enum venc_ipi_msg_status - VCU ack AP cmd status
  */
 enum venc_ipi_msg_status {
 	VENC_IPI_MSG_STATUS_OK,
@@ -120,42 +111,46 @@ enum venc_ipi_msg_status {
 };
 
 /**
- * struct venc_vpu_ipi_msg_common - VPU ack AP cmd common structure
- * @msg_id:	message id (VPU_IPIMSG_XXX_DONE)
+ * struct venc_vcu_ipi_msg_common - VCU ack AP cmd common structure
+ * @msg_id:	message id (VCU_IPIMSG_XXX_DONE)
  * @status:	cmd status (venc_ipi_msg_status)
- * @venc_inst:	AP encoder instance (struct venc_vp8_handle/venc_h264_handle *)
+ * @venc_inst:	AP encoder instance (struct venc_vp8_inst/venc_h264_inst *)
  */
-struct venc_vpu_ipi_msg_common {
+struct venc_vcu_ipi_msg_common {
 	uint32_t msg_id;
 	uint32_t status;
 	uint64_t venc_inst;
 };
 
 /**
- * struct venc_vpu_ipi_msg_init - VPU ack AP init cmd structure
- * @msg_id:	message id (VPU_IPIMSG_XXX_ENC_SET_PARAM_DONE)
+ * struct venc_vcu_ipi_msg_init - VCU ack AP init cmd structure
+ * @msg_id:	message id (VCU_IPIMSG_XXX_ENC_SET_PARAM_DONE)
  * @status:	cmd status (venc_ipi_msg_status)
- * @venc_inst:	AP encoder instance (struct venc_vp8_handle/venc_h264_handle *)
- * @inst_id:	VPU encoder instance id (struct venc_vp8_vpu_drv/venc_h264_vpu_drv *)
+ * @venc_inst:	AP encoder instance (struct venc_vp8_inst/venc_h264_inst *)
+ * @vcu_inst_addr:	VCU encoder instance addr
+ *			(struct venc_vp8_vsi/venc_h264_vsi *)
+ * @reserved:	reserved for future use. vcu is running in 32bit. Without
+ *		this reserved field, if kernel run in 64bit. this struct size
+ *		will be different between kernel and vcu
  */
-struct venc_vpu_ipi_msg_init {
+struct venc_vcu_ipi_msg_init {
 	uint32_t msg_id;
 	uint32_t status;
 	uint64_t venc_inst;
-	uint32_t inst_id;
+	uint32_t vcu_inst_addr;
 	uint32_t reserved;
 };
 
 /**
- * struct venc_vpu_ipi_msg_set_param - VPU ack AP set_param cmd structure
- * @msg_id:	message id (VPU_IPIMSG_XXX_ENC_SET_PARAM_DONE)
+ * struct venc_vcu_ipi_msg_set_param - VCU ack AP set_param cmd structure
+ * @msg_id:	message id (VCU_IPIMSG_XXX_ENC_SET_PARAM_DONE)
  * @status:	cmd status (venc_ipi_msg_status)
- * @venc_inst:	AP encoder instance (struct venc_vp8_handle/venc_h264_handle *)
+ * @venc_inst:	AP encoder instance (struct venc_vp8_inst/venc_h264_inst *)
  * @param_id:	parameter id (venc_set_param_type)
  * @data_item:	number of items in the data array
  * @data[6]:	data array to store the return result
  */
-struct venc_vpu_ipi_msg_set_param {
+struct venc_vcu_ipi_msg_set_param {
 	uint32_t msg_id;
 	uint32_t status;
 	uint64_t venc_inst;
@@ -179,31 +174,34 @@ enum venc_ipi_msg_enc_state {
 };
 
 /**
- * struct venc_vpu_ipi_msg_enc - VPU ack AP enc cmd structure
- * @msg_id:	message id (VPU_IPIMSG_XXX_ENC_ENCODE_DONE)
+ * struct venc_vcu_ipi_msg_enc - VCU ack AP enc cmd structure
+ * @msg_id:	message id (VCU_IPIMSG_XXX_ENC_ENCODE_DONE)
  * @status:	cmd status (venc_ipi_msg_status)
- * @venc_inst:	AP encoder instance (struct venc_vp8_handle/venc_h264_handle *)
+ * @venc_inst:	AP encoder instance (struct venc_vp8_inst/venc_h264_inst *)
  * @state:	encode state (venc_ipi_msg_enc_state)
- * @key_frame:	whether the encoded frame is key frame
+ * @is_key_frm:	whether the encoded frame is key frame
  * @bs_size:	encoded bitstream size
+ * @reserved:	reserved for future use. vcu is running in 32bit. Without
+ *		this reserved field, if kernel run in 64bit. this struct size
+ *		will be different between kernel and vcu
  */
-struct venc_vpu_ipi_msg_enc {
+struct venc_vcu_ipi_msg_enc {
 	uint32_t msg_id;
 	uint32_t status;
 	uint64_t venc_inst;
 	uint32_t state;
-	uint32_t key_frame;
+	uint32_t is_key_frm;
 	uint32_t bs_size;
 	uint32_t reserved;
 };
 
 /**
- * struct venc_vpu_ipi_msg_deinit - VPU ack AP deinit cmd structure
- * @msg_id:   message id (VPU_IPIMSG_XXX_ENC_DEINIT_DONE)
+ * struct venc_vcu_ipi_msg_deinit - VCU ack AP deinit cmd structure
+ * @msg_id:   message id (VCU_IPIMSG_XXX_ENC_DEINIT_DONE)
  * @status:   cmd status (venc_ipi_msg_status)
- * @venc_inst:	AP encoder instance (struct venc_vp8_handle/venc_h264_handle *)
+ * @venc_inst:	AP encoder instance (struct venc_vp8_inst/venc_h264_inst *)
  */
-struct venc_vpu_ipi_msg_deinit {
+struct venc_vcu_ipi_msg_deinit {
 	uint32_t msg_id;
 	uint32_t status;
 	uint64_t venc_inst;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2017 MediaTek Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -15,7 +15,8 @@
 #define _MTK_THERMAL_PLATFORM_H
 
 #include <linux/thermal.h>
-#include "mtk_thermal_typedefs.h"
+
+#include <mt-plat/mtk_charger.h>
 
 extern
 int mtk_thermal_get_cpu_info(int *nocores, int **cpufreq, int **cpuloading);
@@ -24,11 +25,12 @@ extern
 int mtk_thermal_get_gpu_info(int *nocores, int **gpufreq, int **gpuloading);
 
 extern
-int mtk_thermal_get_batt_info(int *batt_voltage, int *batt_current, int *batt_temp);
+int mtk_thermal_get_batt_info
+(int *batt_voltage, int *batt_current, int *batt_temp);
 
 extern
 int mtk_thermal_get_extra_info(int *no_extra_attr,
-			       char ***attr_names, int **attr_values, char ***attr_unit);
+		char ***attr_names, int **attr_values, char ***attr_unit);
 
 extern
 int mtk_thermal_force_get_batt_temp(void);
@@ -45,8 +47,6 @@ extern
 unsigned int mtk_thermal_clear_user_scenarios(unsigned int mask);
 
 extern int force_get_tbat(void);
-#endif				/* _MTK_THERMAL_PLATFORM_H */
-
 
 /* --- SPA parameters --- */
 struct spa_Tpolicy_info {
@@ -77,7 +77,8 @@ struct SPA_T {
 
 extern struct SPA_T thermal_spa_t;
 /* --- SPA parameters --- */
-typedef enum {
+
+enum ta_daemon_crtl_cmd_to_kernel {
 	TA_DAEMON_CMD_GET_INIT_FLAG = 0,
 	TA_DAEMON_CMD_SET_DAEMON_PID,
 	TA_DAEMON_CMD_NOTIFY_DAEMON,
@@ -87,7 +88,7 @@ typedef enum {
 	TA_DAEMON_CMD_GET_TI,
 
 	TA_DAEMON_CMD_TO_KERNEL_NUMBER
-} TA_DAEMON_CTRL_CMD_TO_KERNEL; /*must sync userspace/kernel: TA_DAEMON_CTRL_CMD_FROM_USER*/
+}; /*must sync userspace/kernel: TA_DAEMON_CTRL_CMD_FROM_USER*/
 
 #define TAD_NL_MSG_T_HDR_LEN 12
 #define TAD_NL_MSG_MAX_LEN 512
@@ -135,4 +136,4 @@ int ta_get_ttj(void);
 extern int mtk_thermal_get_tpcb_target(void);
 extern int tsatm_thermal_get_catm_type(void);
 
-
+#endif				/* _MTK_THERMAL_PLATFORM_H */

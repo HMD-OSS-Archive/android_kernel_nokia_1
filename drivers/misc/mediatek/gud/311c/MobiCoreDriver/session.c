@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 TRUSTONIC LIMITED
+ * Copyright (c) 2013-2017 TRUSTONIC LIMITED
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -23,12 +23,16 @@
 #include <crypto/hash.h>
 #include <linux/scatterlist.h>
 #include <linux/fs.h>
+#include <linux/version.h>
+#if KERNEL_VERSION(4, 11, 0) <= LINUX_VERSION_CODE
+#include <linux/sched/clock.h>	/* local_clock */
+#include <linux/sched/task.h>	/* put_task_struct */
+#endif
 
 #include "public/mc_user.h"
 #include "public/mc_admin.h"
 
-#include "platform.h"		/* MC_NO_UIDGIT_H */
-#ifndef MC_NO_UIDGIT_H
+#if KERNEL_VERSION(3, 5, 0) <= LINUX_VERSION_CODE
 #include <linux/uidgid.h>
 #else
 #define kuid_t uid_t
@@ -116,7 +120,8 @@ static int wsm_create(struct tee_session *session, struct tee_wsm *wsm,
 		      struct mc_ioctl_buffer *buf)
 {
 	if (wsm->state != TEE_WSM_EMPTY) {
-		mc_dev_err("invalid wsm state %s\n", wsm_state_str(wsm->state));
+		mc_dev_notice("invalid wsm state %s\n",
+			wsm_state_str(wsm->state));
 		return -EINVAL;
 	}
 
@@ -144,7 +149,8 @@ static inline bool wsm_matches(struct tee_session *session, struct tee_wsm *wsm,
 	bool matches;
 
 	if (wsm->state != TEE_WSM_INACTIVE) {
-		mc_dev_err("invalid wsm state %s\n", wsm_state_str(wsm->state));
+		mc_dev_notice("invalid wsm state %s\n",
+			wsm_state_str(wsm->state));
 		return false;
 	}
 
@@ -168,7 +174,8 @@ static inline bool wsm_matches(struct tee_session *session, struct tee_wsm *wsm,
 static void wsm_free(struct tee_session *session, struct tee_wsm *wsm)
 {
 	if (wsm->state != TEE_WSM_NEW) {
-		mc_dev_err("invalid wsm state %s\n", wsm_state_str(wsm->state));
+		mc_dev_notice("invalid wsm state %s\n",
+			wsm_state_str(wsm->state));
 		return;
 	}
 
@@ -182,6 +189,77 @@ static void wsm_free(struct tee_session *session, struct tee_wsm *wsm)
 	wsm->state = TEE_WSM_EMPTY;
 }
 
+#if KERNEL_VERSION(4, 6, 0) <= LINUX_VERSION_CODE
+static int hash_path_and_data(struct task_struct *task, u8 *hash,
+			      const void *data, unsigned int data_len)
+{
+	struct mm_struct *mm = task->mm;
+	struct crypto_shash *tfm;
+	char *buf;
+	char *path;
+	unsigned int path_len;
+	int ret = 0;
+
+	buf = (char *)__get_free_page(GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	down_read(&mm->mmap_sem);
+	if (!mm->exe_file) {
+		ret = -ENOENT;
+		goto end;
+	}
+
+	path = d_path(&mm->exe_file->f_path, buf, PAGE_SIZE);
+	if (IS_ERR(path)) {
+		ret = PTR_ERR(path);
+		goto end;
+	}
+
+	mc_dev_devel("process path =");
+	{
+		char *c;
+
+		for (c = path; *c; c++)
+			mc_dev_devel("%c %d", *c, *c);
+	}
+
+	path_len = (unsigned int)strnlen(path, PAGE_SIZE);
+	mc_dev_devel("path_len = %u", path_len);
+	/* Compute hash of path */
+	tfm = crypto_alloc_shash("sha1", 0, 0);
+	if (IS_ERR(tfm)) {
+		ret = PTR_ERR(tfm);
+		mc_dev_notice("cannot allocate shash: %d", ret);
+		goto end;
+	}
+
+	{
+		SHASH_DESC_ON_STACK(desc, tfm);
+
+		desc->tfm = tfm;
+		desc->flags = CRYPTO_TFM_REQ_MAY_SLEEP;
+
+		crypto_shash_init(desc);
+		crypto_shash_update(desc, (u8 *)path, path_len);
+		if (data) {
+			mc_dev_devel("hashing additional data");
+			crypto_shash_update(desc, data, data_len);
+		}
+
+		crypto_shash_final(desc, hash);
+		shash_desc_zero(desc);
+	}
+
+	crypto_free_shash(tfm);
+
+end:
+	up_read(&mm->mmap_sem);
+	free_page((unsigned long)buf);
+
+	return ret;
+}
+#else
 static int hash_path_and_data(struct task_struct *task, u8 *hash,
 			      const void *data, unsigned int data_len)
 {
@@ -219,6 +297,7 @@ static int hash_path_and_data(struct task_struct *task, u8 *hash,
 
 	path_len = (unsigned int)strnlen(path, PAGE_SIZE);
 	mc_dev_devel("path_len = %u\n", path_len);
+	/* Compute hash of path */
 	desc.tfm = crypto_alloc_hash("sha1", 0, CRYPTO_ALG_ASYNC);
 	if (IS_ERR(desc.tfm)) {
 		ret = PTR_ERR(desc.tfm);
@@ -245,6 +324,11 @@ end:
 
 	return ret;
 }
+#endif
+
+#if KERNEL_VERSION(4, 9, 0) <= LINUX_VERSION_CODE
+#define GROUP_AT(gi, i) ((gi)->gid[i])
+#endif
 
 /*
  * groups_search is not EXPORTed so copied from kernel/groups.c
@@ -296,7 +380,8 @@ static int check_prepare_identity(const struct mc_identity *identity,
 
 	/* Mobicore doesn't support GP client authentication. */
 	if (!g_ctx.f_client_login) {
-		mc_dev_err("Unsupported login type %x\n", identity->login_type);
+		mc_dev_notice("Unsupported login type %x\n",
+			identity->login_type);
 		return -EINVAL;
 	}
 
@@ -306,7 +391,7 @@ static int check_prepare_identity(const struct mc_identity *identity,
 		task = pid_task(find_vpid(pid), PIDTYPE_PID);
 		if (!task) {
 			rcu_read_unlock();
-			mc_dev_err("No task for PID %d\n", pid);
+			mc_dev_notice("No task for PID %d\n", pid);
 			return -EINVAL;
 		}
 	} else {
@@ -333,7 +418,7 @@ static int check_prepare_identity(const struct mc_identity *identity,
 		 */
 		if (!has_group(cred, identity->gid)) {
 			rcu_read_unlock();
-			mc_dev_err("group %d not allowed\n", identity->gid);
+			mc_dev_notice("group %d not allowed\n", identity->gid);
 			return -EACCES;
 		}
 
@@ -364,7 +449,7 @@ static int check_prepare_identity(const struct mc_identity *identity,
 		break;
 	default:
 		/* Any other login_type value is invalid. */
-		mc_dev_err("Invalid login type %d\n", identity->login_type);
+		mc_dev_notice("Invalid login type %d\n", identity->login_type);
 		return -EINVAL;
 	}
 
@@ -397,13 +482,13 @@ struct tee_session *session_create(struct tee_client *client, bool is_gp,
 	/* Only proxy can provide a PID (Android system user) */
 	if (pid) {
 #ifndef CONFIG_ANDROID
-		mc_dev_err("Cannot provide PID\n");
+		mc_dev_notice("Cannot provide PID\n");
 		return ERR_PTR(-EPERM);
 #else
 		uid_t euid = __kuid_val(task_euid(current));
 
 		if (euid != 1000) {
-			mc_dev_err("incorrect EUID %d for PID %d\n", euid,
+			mc_dev_notice("incorrect EUID %d for PID %d\n", euid,
 				   current->tgid);
 			return ERR_PTR(-EPERM);
 		}
@@ -834,7 +919,7 @@ int session_map(struct tee_session *session, struct mc_ioctl_buffer *bufs)
 			bufs[bi].sva = wsm->sva;
 			} break;
 		default:
-			mc_dev_err("unexpected temporary WSM state %s",
+			mc_dev_notice("unexpected temporary WSM state %s",
 				   wsm_state_str(wsms[bi].state));
 			goto err;
 		}

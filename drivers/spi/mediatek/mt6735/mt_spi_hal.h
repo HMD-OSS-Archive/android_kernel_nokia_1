@@ -16,7 +16,6 @@
 #if !defined(CONFIG_MTK_CLKMGR)
 #include <linux/clk.h>
 #endif				/* !defined(CONFIG_MTK_CLKMGR) */
-#include <linux/wakelock.h>
 #include "mt_spi.h"
 
 /*******************************************************************************
@@ -113,7 +112,7 @@ struct mt_spi_t {
 	void __iomem *regs;
 	int irq;
 	int running;
-	struct wake_lock wk_lock;
+	struct wakeup_source *wk_lock;
 	struct mt_chip_conf *config;
 	struct spi_master *master;
 

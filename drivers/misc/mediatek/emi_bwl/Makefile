@@ -11,8 +11,4 @@
 # GNU General Public License for more details.
 #
 
-ifeq ($(CONFIG_MTK_COMMON_EMI), y)
-obj-y += mt8127/
-else
-obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
-endif
+obj-$(CONFIG_MTK_EMI_BWL) += $(subst ",,$(CONFIG_MTK_PLATFORM))/

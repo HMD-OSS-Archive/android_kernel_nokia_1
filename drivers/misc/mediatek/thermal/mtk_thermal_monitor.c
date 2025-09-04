@@ -331,7 +331,7 @@ static struct mtk_thermal_ext_tz_data mtk_thermal_ext_tz_values[MTK_THERMAL_EXT_
 
 static int mtk_thermal_ext_get_threshold(struct mtk_thermal_ext_tz_data *tzdata,
 struct thermal_zone_device *thermal, struct thermal_zone_device_ops *ops, int trips) {
-	unsigned long temperature;
+	int temperature;
 	int i, j, ret, trip_num;
 	long trip_point[MTK_THERMAL_MAX_TRIP_NUM] = { 0 };
 	long temp;
@@ -1789,11 +1789,11 @@ static int mtk_thermal_wrapper_unbind
  * .get_temp wrapper: get the current temperature of the thermal zone.
  */
 static int mtk_thermal_wrapper_get_temp
-(struct thermal_zone_device *thermal, unsigned long *temperature) {
+(struct thermal_zone_device *thermal, int *temperature) {
 	int ret = 0;
 	struct thermal_zone_device_ops *ops;
 	int nTemperature;
-	unsigned long raw_temp = 0;
+	int raw_temp = 0;
 #if MTK_THERMAL_MONITOR_MEASURE_GET_TEMP_OVERHEAD
 	long int t = _get_current_time_us();
 	long int dur = 0;
@@ -1937,7 +1937,7 @@ static int mtk_thermal_wrapper_get_trip_type
  *  will be fired.
  */
 static int mtk_thermal_wrapper_get_trip_temp
-(struct thermal_zone_device *thermal, int trip, unsigned long *temperature) {
+(struct thermal_zone_device *thermal, int trip, int *temperature) {
 	int ret = 0;
 	struct thermal_zone_device_ops *ops;
 
@@ -1963,7 +1963,7 @@ static int mtk_thermal_wrapper_get_trip_temp
  * .get_crit_temp wrapper:
  */
 static int mtk_thermal_wrapper_get_crit_temp
-(struct thermal_zone_device *thermal, unsigned long *temperature) {
+(struct thermal_zone_device *thermal, int *temperature) {
 	int ret = 0;
 	struct thermal_zone_device_ops *ops;
 
@@ -2198,7 +2198,7 @@ int trip, struct thermal_cooling_device *cdev) {
 
 	ret =
 	    thermal_zone_bind_cooling_device(thermal, trip, cdev, THERMAL_NO_LIMIT,
-					     THERMAL_NO_LIMIT);
+					     THERMAL_NO_LIMIT, THERMAL_WEIGHT_DEFAULT);
 
 	if (ret) {
 		THRML_ERROR_LOG("thermal_zone_bind_cooling_device Fail. Code(%d)\n", ret);
@@ -2314,7 +2314,7 @@ static int mtk_cooling_wrapper_set_cur_state
 
 	if (0 == state) {
 		int last_temp = 0;
-		unsigned long trip_temp = 0;
+		int trip_temp = 0;
 		struct thermal_zone_device_ops *tz_ops;
 
 		if ((0 < mcdata->exit_threshold) && (mcdata->tz != NULL)) {
@@ -2553,7 +2553,7 @@ int mtk_thermal_zone_bind_trigger_trip(struct thermal_zone_device *tz, int trip,
 }
 EXPORT_SYMBOL(mtk_thermal_zone_bind_trigger_trip);
 
-int mtk_thermal_get_temp(MTK_THERMAL_SENSOR_ID id)
+int mtk_thermal_get_temp(enum mtk_thermal_sensor_id id)
 {
 	int ret = 0;
 

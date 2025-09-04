@@ -61,18 +61,12 @@
 #include <linux/wait.h>
 #include <linux/spinlock.h>
 #include <linux/sched.h>
-#include <linux/wakelock.h>
 #include <linux/semaphore.h>
 #include <linux/jiffies.h>
 #include <linux/proc_fs.h>
 #include <linux/string.h>
 #include <linux/mutex.h>
 /* #include <linux/xlog.h> */
-#ifndef _IRQS_H_NOT_SUPPORT
-#include <mach/irqs.h>
-/* #include <mach/mt_irq.h> */
-#include <mach/irqs.h>
-#endif
 #include <asm/uaccess.h>
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -151,7 +145,7 @@ static struct {
 	kal_bool fIsStructMemoryOnMED;
 } btsco;
 
-static TIME_BUFFER_INFO_T time_buffer_info_rx, time_buffer_info_tx;
+static struct time_buffer_info time_buffer_info_rx, time_buffer_info_tx;
 
 static volatile kal_uint32 *bt_hw_REG_PACKET_W, *bt_hw_REG_PACKET_R, *bt_hw_REG_CONTROL;
 
@@ -438,9 +432,9 @@ static long AudDrv_btcvsd_ioctl(struct file *fp, unsigned int cmd, unsigned long
 		PRINTK_AUDDRV("GET_BTCVSD_RX_TIMESTAMP uTimestampUS:%llu,uDataCountEquiTime:%llu",
 			time_buffer_info_rx.uTimestampUS, time_buffer_info_rx.uDataCountEquiTime);
 
-		if (copy_to_user((void __user *)arg, &time_buffer_info_rx, sizeof(TIME_BUFFER_INFO_T))) {
+		if (copy_to_user((void __user *)arg, &time_buffer_info_rx, sizeof(struct time_buffer_info))) {
 			pr_warn("GET_BTCVSD_RX_TIMESTAMP Fail copy to user Ptr:%p,r_sz:%zu",
-				(kal_uint8 *)&time_buffer_info_rx, sizeof(TIME_BUFFER_INFO_T));
+				(kal_uint8 *)&time_buffer_info_rx, sizeof(struct time_buffer_info));
 			ret = -1;
 		}
 			break;
@@ -451,9 +445,9 @@ static long AudDrv_btcvsd_ioctl(struct file *fp, unsigned int cmd, unsigned long
 		PRINTK_AUDDRV("GET_BTCVSD_TX_TIMESTAMP uTimestampUS:%llu,uDataCountEquiTime:%llu",
 			time_buffer_info_tx.uTimestampUS, time_buffer_info_tx.uDataCountEquiTime);
 
-		if (copy_to_user((void __user *)arg, &time_buffer_info_tx, sizeof(TIME_BUFFER_INFO_T))) {
+		if (copy_to_user((void __user *)arg, &time_buffer_info_tx, sizeof(struct time_buffer_info))) {
 			pr_warn("GET_BTCVSD_TX_TIMESTAMP Fail copy to user Ptr:%p,r_sz:%zu",
-				(kal_uint8 *)&time_buffer_info_tx, sizeof(TIME_BUFFER_INFO_T));
+				(kal_uint8 *)&time_buffer_info_tx, sizeof(struct time_buffer_info));
 			ret = -1;
 		}
 			break;
@@ -836,8 +830,7 @@ static int AudDrv_btcvsd_probe(struct platform_device *dev)
 
 static int AudDrv_btcvsd_open(struct inode *inode, struct file *fp)
 {
-	PRINTK_AUDDRV(ANDROID_LOG_INFO, "Sound",
-		      "AudDrv_btcvsd_open do nothing inode:%p, file:%pss\n", inode, fp);
+	PRINTK_AUDDRV("AudDrv_btcvsd_open do nothing inode:%p, file:%pss\n", inode, fp);
 	return 0;
 }
 
@@ -1134,7 +1127,7 @@ static ssize_t AudDrv_btcvsd_read(struct file *fp, char __user *data,
 			unsigned long size_1 = btsco.pRX->u4BufferSize - BTSCORX_ReadIdx_tmp;
 			unsigned long size_2 = read_size - size_1;
 
-			PRINTK_AUDDRV("AudDrv_btcvsd_read 2-2 copy_to_user target=%p, source=0x%p, size_1=%zu\n",
+			PRINTK_AUDDRV("AudDrv_btcvsd_read 2-2 copy_to_user target=%p, source=0x%p, size_1=%lu\n",
 				Read_Data_Ptr, ((unsigned char *)btsco.pRX->PacketBuf + BTSCORX_ReadIdx_tmp), size_1);
 			if (copy_to_user
 			    ((void __user *)Read_Data_Ptr,
@@ -1154,7 +1147,7 @@ static ssize_t AudDrv_btcvsd_read(struct file *fp, char __user *data,
 			btsco.pRX->iPacket_r += size_1 / (SCO_RX_PLC_SIZE + BTSCO_CVSD_PACKET_VALID_SIZE);
 			spin_unlock_irqrestore(&auddrv_BTCVSDRX_lock, flags);
 
-			PRINTK_AUDDRV("AudDrv_btcvsd_read 2-2 copy_to_user target=0x%p, source=0x%p,size_2=%zu\n",
+			PRINTK_AUDDRV("AudDrv_btcvsd_read 2-2 copy_to_user target=0x%p, source=0x%p,size_2=%lu\n",
 			     (Read_Data_Ptr + size_1),
 			     ((unsigned char *)btsco.pRX->PacketBuf + BTSCORX_ReadIdx_tmp + size_1),
 			     size_2);

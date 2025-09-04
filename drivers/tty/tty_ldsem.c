@@ -299,13 +299,24 @@ down_write_failed(struct ld_semaphore *sem, long count, long timeout)
 		timeout = schedule_timeout(timeout);
 		raw_spin_lock_irq(&sem->wait_lock);
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if ((locked = writer_trylock(sem)))
+		locked = writer_trylock(sem);
+		if (locked)
 			break;
 	}
 
 	if (!locked)
 		ldsem_atomic_update(-LDSEM_WAIT_BIAS, sem);
 	list_del(&waiter.list);
+
+	/*
+	 * In case of timeout, wake up every reader who gave the right of way
+	 * to writer. Prevent separation readers into two groups:
+	 * one that helds semaphore and another that sleeps.
+	 * (in case of no contention with a writer)
+	 */
+	if (!locked && list_empty(&sem->write_wait))
+		__ldsem_wake_readers(sem);
+
 	raw_spin_unlock_irq(&sem->wait_lock);
 
 	__set_task_state(tsk, TASK_RUNNING);
@@ -318,7 +329,7 @@ down_write_failed(struct ld_semaphore *sem, long count, long timeout)
 
 
 
-static inline int __ldsem_down_read_nested(struct ld_semaphore *sem,
+static int __ldsem_down_read_nested(struct ld_semaphore *sem,
 					   int subclass, long timeout)
 {
 	long count;
@@ -337,7 +348,7 @@ static inline int __ldsem_down_read_nested(struct ld_semaphore *sem,
 	return 1;
 }
 
-static inline int __ldsem_down_write_nested(struct ld_semaphore *sem,
+static int __ldsem_down_write_nested(struct ld_semaphore *sem,
 					    int subclass, long timeout)
 {
 	long count;
@@ -371,14 +382,7 @@ int __sched ldsem_down_read(struct ld_semaphore *sem, long timeout)
  */
 int ldsem_down_read_trylock(struct ld_semaphore *sem)
 {
-	long count;
-
-	if (sem == NULL) {
-		dump_stack();
-		return 0;
-	}
-
-	count = sem->count;
+	long count = sem->count;
 
 	while (count >= 0) {
 		if (ldsem_cmpxchg(&count, count + LDSEM_READ_BIAS, sem)) {

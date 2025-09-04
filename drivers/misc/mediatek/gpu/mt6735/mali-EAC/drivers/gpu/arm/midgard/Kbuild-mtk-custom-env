@@ -34,10 +34,8 @@ endif
 
 
 VER:=eng
-ifneq ($(strip $(TARGET_BUILD_VARIANT)),)
-ifneq ($(strip $(TARGET_BUILD_VARIANT)),eng)
+ifndef CONFIG_MT_ENG_BUILD
 VER:=user
-endif
 endif
 
 ccflags-y += -DCONFIG_DEBUG_FS

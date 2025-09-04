@@ -31,7 +31,6 @@
  * struct alarm_base - Alarm timer bases
  * @lock:		Lock for syncrhonized access to the base
  * @timerqueue:		Timerqueue head managing the list of events
- * @timer: 		hrtimer used to schedule events while running
  * @gettime:		Function to read the time correlating to the base
  * @base_clockid:	clockid for the base
  */
@@ -85,8 +84,8 @@ static int alarmtimer_rtc_add_device(struct device *dev,
 
 	if (!rtc->ops->set_alarm)
 		return -1;
-	/*if (!device_may_wakeup(rtc->dev.parent))
-		return -1;*/
+	if (!device_may_wakeup(rtc->dev.parent))
+		return -1;
 
 	spin_lock_irqsave(&rtcdev_lock, flags);
 	if (!rtcdev) {
@@ -227,8 +226,8 @@ EXPORT_SYMBOL_GPL(alarm_expires_remaining);
  */
 static int alarmtimer_suspend(struct device *dev)
 {
-	struct rtc_time tm;
-	ktime_t min, now;
+	struct rtc_time tm, time;
+	ktime_t min, now, temp;
 	unsigned long flags;
 	struct rtc_device *rtc;
 	int i;
@@ -256,8 +255,10 @@ static int alarmtimer_suspend(struct device *dev)
 		if (!next)
 			continue;
 		delta = ktime_sub(next->expires, base->gettime());
-		if (!min.tv64 || (delta.tv64 < min.tv64))
+		if (!min.tv64 || (delta.tv64 < min.tv64)) {
 			min = delta;
+			temp = next->expires;
+		}
 	}
 	if (min.tv64 == 0)
 		return 0;
@@ -273,14 +274,38 @@ static int alarmtimer_suspend(struct device *dev)
 	now = rtc_tm_to_ktime(tm);
 	now = ktime_add(now, min);
 
+	time = rtc_ktime_to_tm(now);
+	pr_notice_ratelimited("%s convert %lld to %04d/%02d/%02d %02d:%02d:%02d (now = %04d/%02d/%02d %02d:%02d:%02d)\n",
+			__func__, temp.tv64,
+			time.tm_year+1900, time.tm_mon+1, time.tm_mday,
+			time.tm_hour, time.tm_min, time.tm_sec,
+			tm.tm_year+1900, tm.tm_mon+1, tm.tm_mday,
+			tm.tm_hour, tm.tm_min, tm.tm_sec);
+
 	/* Set alarm, if in the past reject suspend briefly to handle */
 	ret = rtc_timer_start(rtc, &rtctimer, now, ktime_set(0, 0));
 	if (ret < 0)
 		__pm_wakeup_event(ws, MSEC_PER_SEC);
 	return ret;
 }
+
+static int alarmtimer_resume(struct device *dev)
+{
+	struct rtc_device *rtc;
+
+	rtc = alarmtimer_get_rtcdev();
+	if (rtc)
+		rtc_timer_cancel(rtc, &rtctimer);
+	return 0;
+}
+
 #else
 static int alarmtimer_suspend(struct device *dev)
+{
+	return 0;
+}
+
+static int alarmtimer_resume(struct device *dev)
 {
 	return 0;
 }
@@ -325,19 +350,16 @@ EXPORT_SYMBOL_GPL(alarm_init);
  * @alarm: ptr to alarm to set
  * @start: time to run the alarm
  */
-int alarm_start(struct alarm *alarm, ktime_t start)
+void alarm_start(struct alarm *alarm, ktime_t start)
 {
 	struct alarm_base *base = &alarm_bases[alarm->type];
 	unsigned long flags;
-	int ret;
 
 	spin_lock_irqsave(&base->lock, flags);
 	alarm->node.expires = start;
 	alarmtimer_enqueue(base, alarm);
-	ret = hrtimer_start(&alarm->timer, alarm->node.expires,
-				HRTIMER_MODE_ABS);
+	hrtimer_start(&alarm->timer, alarm->node.expires, HRTIMER_MODE_ABS);
 	spin_unlock_irqrestore(&base->lock, flags);
-	return ret;
 }
 EXPORT_SYMBOL_GPL(alarm_start);
 
@@ -346,12 +368,12 @@ EXPORT_SYMBOL_GPL(alarm_start);
  * @alarm: ptr to alarm to set
  * @start: time relative to now to run the alarm
  */
-int alarm_start_relative(struct alarm *alarm, ktime_t start)
+void alarm_start_relative(struct alarm *alarm, ktime_t start)
 {
 	struct alarm_base *base = &alarm_bases[alarm->type];
 
-	start = ktime_add(start, base->gettime());
-	return alarm_start(alarm, start);
+	start = ktime_add_safe(start, base->gettime());
+	alarm_start(alarm, start);
 }
 EXPORT_SYMBOL_GPL(alarm_start_relative);
 
@@ -436,7 +458,7 @@ u64 alarm_forward(struct alarm *alarm, ktime_t now, ktime_t interval)
 		overrun++;
 	}
 
-	alarm->node.expires = ktime_add(alarm->node.expires, interval);
+	alarm->node.expires = ktime_add_safe(alarm->node.expires, interval);
 	return overrun;
 }
 EXPORT_SYMBOL_GPL(alarm_forward);
@@ -503,12 +525,12 @@ static enum alarmtimer_restart alarm_handle_timer(struct alarm *alarm,
  */
 static int alarm_clock_getres(const clockid_t which_clock, struct timespec *tp)
 {
-	clockid_t baseid = alarm_bases[clock2alarm(which_clock)].base_clockid;
-
 	if (!alarmtimer_get_rtcdev())
 		return -EINVAL;
 
-	return hrtimer_get_res(baseid, tp);
+	tp->tv_sec = 0;
+	tp->tv_nsec = hrtimer_resolution;
+	return 0;
 }
 
 /**
@@ -538,7 +560,6 @@ static int alarm_clock_get(clockid_t which_clock, struct timespec *tp)
 static int alarm_timer_create(struct k_itimer *new_timer)
 {
 	enum  alarmtimer_type type;
-	struct alarm_base *base;
 
 	if (!alarmtimer_get_rtcdev())
 		return -ENOTSUPP;
@@ -547,7 +568,6 @@ static int alarm_timer_create(struct k_itimer *new_timer)
 		return -EPERM;
 
 	type = clock2alarm(new_timer->it_clock);
-	base = &alarm_bases[type];
 	alarm_init(&new_timer->it.alarm.alarmtimer, type, alarm_handle_timer);
 	return 0;
 }
@@ -637,7 +657,7 @@ static int alarm_timer_set(struct k_itimer *timr, int flags,
 		ktime_t now;
 
 		now = alarm_bases[timr->it.alarm.alarmtimer.type].gettime();
-		exp = ktime_add(now, exp);
+		exp = ktime_add_safe(now, exp);
 	}
 
 	alarm_start(&timr->it.alarm.alarmtimer, exp);
@@ -784,7 +804,8 @@ static int alarm_timer_nsleep(const clockid_t which_clock, int flags,
 	/* Convert (if necessary) to absolute time */
 	if (flags != TIMER_ABSTIME) {
 		ktime_t now = alarm_bases[type].gettime();
-		exp = ktime_add(now, exp);
+
+		exp = ktime_add_safe(now, exp);
 	}
 
 	if (alarmtimer_do_nsleep(&alarm, exp))
@@ -820,6 +841,7 @@ out:
 /* Suspend hook structures */
 static const struct dev_pm_ops alarmtimer_pm_ops = {
 	.suspend = alarmtimer_suspend,
+	.resume = alarmtimer_resume,
 };
 
 static struct platform_driver alarmtimer_driver = {

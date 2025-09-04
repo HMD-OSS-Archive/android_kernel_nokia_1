@@ -15,7 +15,7 @@
 #define _CUST_BATTERY_METER_H
 
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 /* ============================================================
 // define
 // ============================================================*/
@@ -157,7 +157,7 @@
 #define FG_BAT_INT
 #define IS_BATTERY_REMOVE_BY_PMIC
 
-#elif defined(CONFIG_ARCH_MT6735M)
+#elif defined(CONFIG_MACH_MT6735M)
 /* ============================================================
 // define
 // ============================================================*/
@@ -341,7 +341,7 @@
 #define CUST_POWERON_DELTA_VBAT_INDEX           15	//Add for RTC Vbat
 #endif
 #if defined(CONFIG_FIH_PROJECT_NE1)
-//modify D0 (10 -> 25).
+//modify by D0 (10 -> 25).
 #define CUST_POWERON_DELTA_HW_SW_OCV_CAPACITY_TOLRANCE	25
 #else
 #define CUST_POWERON_DELTA_HW_SW_OCV_CAPACITY_TOLRANCE	10
@@ -380,7 +380,7 @@
 #define NTC_MIN_TEMP        (-40)
 #define NO_NTC_TEMP         (-128)
 
-// BAT_ID
+//BAT_ID
 #define BATTERY_ID_CHECK
 //#define MTK_GET_BATTERY_ID_BY_AUXADC
 //#define TOTAL_BATTERY_NUMBER	2
@@ -401,7 +401,7 @@
 //#define TOTAL_BATTERY_NUMBER	1
 #endif
 
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 /* ============================================================
 // define
 // ============================================================*/

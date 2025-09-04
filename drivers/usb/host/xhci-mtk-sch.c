@@ -287,16 +287,11 @@ static bool need_bw_sch(struct usb_host_endpoint *ep,
 
 int xhci_mtk_sch_init(struct xhci_hcd_mtk *mtk)
 {
-	struct xhci_hcd *xhci;
 	struct mu3h_sch_bw_info *sch_array;
 	int num_usb_bus;
 	int i;
 
-	xhci = hcd_to_xhci(mtk->hcd);
-
 	/* ss IN and OUT are separated */
-	mtk->num_u3_ports = get_num_u3_ports(xhci);
-	mtk->num_u2_ports = get_num_u2_ports(xhci);
 	num_usb_bus = mtk->num_u3_ports * 2 + mtk->num_u2_ports;
 
 	sch_array = kcalloc(num_usb_bus, sizeof(*sch_array), GFP_KERNEL);
@@ -339,7 +334,6 @@ int xhci_mtk_add_ep_quirk(struct usb_hcd *hcd, struct usb_device *udev,
 	slot_ctx = xhci_get_slot_ctx(xhci, virt_dev->in_ctx);
 	ep_ctx = xhci_get_ep_ctx(xhci, virt_dev->in_ctx, ep_index);
 	sch_array = mtk->sch_array;
-
 
 	xhci_dbg(xhci, "%s() type:%d, speed:%d, mpkt:%d, dir:%d, ep:%p\n",
 		__func__, usb_endpoint_type(&ep->desc), udev->speed,

@@ -46,14 +46,14 @@
 
 /* total 32 bytes <= u32(4 bytes) * 8 = 32 bytes */
 struct pl_lk_log {
-	u32 sig;            /* default 0xabcd1234 */
-	u32 buff_size;      /* total buf size */
-	u32 off_pl;         /* pl offset, sizeof(struct pl_lk_log) */
-	u32 sz_pl;          /* preloader size */
-	u32 pl_flag;        /* pl log flag */
-	u32 off_lk;         /* lk offset, sizeof((struct pl_lk_log) + sz_pl */
-	u32 sz_lk;          /* lk log size */
-	u32 lk_flag;        /* lk log flag */
+	u32 sig;            // default 0xabcd1234
+	u32 buff_size;      // total buf size
+	u32 off_pl;         // pl offset, sizeof(struct pl_lk_log)
+	u32 sz_pl;          // preloader size
+	u32 pl_flag;        // pl log flag
+	u32 off_lk;         // lk offset, sizeof((struct pl_lk_log) + sz_pl
+	u32 sz_lk;          // lk log size
+	u32 lk_flag;        // lk log flag
 };
 
 /* total 40 bytes <= u32(4 bytes) * 10 = 40 bytes */
@@ -75,9 +75,11 @@ struct sram_log_header {
 	u32 sig;
 	u32 reboot_count;
 	u32 save_to_emmc;
-	struct dram_buf_header dram_buf;        /* 40 bytes */
-	struct pl_lk_log dram_curlog_header;    /* 32 bytes */
-	u32 reserve[43];                        /* reserve 43 * 4 char size */
+	struct dram_buf_header dram_buf;        // 40 bytes
+	struct pl_lk_log dram_curlog_header;    // 32 bytes
+	u32 gz_log_addr;
+	u32 gz_log_len;
+	u32 reserve[41];                        // reserve 41 * 4 char size
 };
 
 #ifdef CONFIG_MTK_DRAM_LOG_STORE

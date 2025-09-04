@@ -11,8 +11,8 @@
 # GNU General Public License for more details.
 #
 
-ifneq ($(CONFIG_MTK_PERFMGR_TOUCH_BOOST),y)
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/
+
 obj-y += perf_ioctl.o
-obj-y += $(MTK_PLATFORM)/
-endif
+obj-y += $(CONFIG_MTK_PLATFORM)/
 

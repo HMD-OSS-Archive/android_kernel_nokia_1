@@ -48,7 +48,6 @@
 #include <linux/pm_wakeup.h>  included in linux/device.h
 #else
 */
-#include <linux/wakelock.h>
 /*#endif*/
 #include <linux/device.h>
 #include <linux/kdev_t.h>
@@ -80,7 +79,7 @@
 #include <mt-plat/upmu_common.h>
 #include "pmic.h"
 /*#include <mach/eint.h> TBD*/
-#include <mach/mt_pmic_wrap.h>
+#include <mach/mtk_pmic_wrap.h>
 #if defined CONFIG_MTK_LEGACY
 #include <mt-plat/mt_gpio.h>
 #endif
@@ -93,7 +92,7 @@
 
 #if defined(CONFIG_MTK_KERNEL_POWER_OFF_CHARGING)
 #include <mt-plat/mt_boot.h>
-#include <mt-plat/mt_gpt.h>
+#include <mt-plat/mtk_gpt.h>
 #endif
 
 #if defined(CONFIG_MTK_SMART_BATTERY)
@@ -180,7 +179,7 @@ unsigned int pmic_read_interface(unsigned int RegNum, unsigned int *val, unsigne
 	unsigned int return_value = 0;
 #if defined(CONFIG_PMIC_HW_ACCESS_EN)
 	unsigned int pmic_reg = 0;
-	unsigned int rdata;
+	unsigned int rdata = 0;
 #endif
 	if ((pmic_suspend_state == true) && irqs_disabled())
 		return pmic_read_interface_nolock(RegNum, val, MASK, SHIFT);
@@ -216,7 +215,7 @@ unsigned int pmic_config_interface(unsigned int RegNum, unsigned int val, unsign
 	unsigned int return_value = 0;
 #if defined(CONFIG_PMIC_HW_ACCESS_EN)
 	unsigned int pmic_reg = 0;
-	unsigned int rdata;
+	unsigned int rdata = 0;
 #endif
 	if ((pmic_suspend_state == true) && irqs_disabled())
 		return pmic_config_interface_nolock(RegNum, val, MASK, SHIFT);
@@ -274,7 +273,7 @@ unsigned int pmic_read_interface_nolock(unsigned int RegNum, unsigned int *val, 
 
 #if defined(CONFIG_PMIC_HW_ACCESS_EN)
 	unsigned int pmic_reg = 0;
-	unsigned int rdata;
+	unsigned int rdata = 0;
 
 
 	/*mt_read_byte(RegNum, &pmic_reg); */
@@ -305,7 +304,7 @@ unsigned int pmic_config_interface_nolock(unsigned int RegNum, unsigned int val,
 
 #if defined(CONFIG_PMIC_HW_ACCESS_EN)
 	unsigned int pmic_reg = 0;
-	unsigned int rdata;
+	unsigned int rdata = 0;
 
 	/* pmic wrapper has spinlock protection. pmic do not to do it again */
 
@@ -3411,8 +3410,9 @@ void PMIC_EINT_SETTING(void)
 
 	node = of_find_compatible_node(NULL, NULL, "mediatek, pmic-eint");
 	if (node) {
-		of_property_read_u32_array(node, "debounce", ints, ARRAY_SIZE(ints));
-		mt_gpio_set_debounce(ints[0], ints[1]);
+		ret = of_property_read_u32_array(node, "debounce", ints, ARRAY_SIZE(ints));
+		if (ret == 0)
+			mt_gpio_set_debounce(ints[0], ints[1]);
 
 		g_pmic_irq = irq_of_parse_and_map(node, 0);
 		ret = request_irq(g_pmic_irq, (irq_handler_t) mt_pmic_eint_irq,
@@ -3550,6 +3550,8 @@ static int pmic_thread_kthread(void *x)
 			enable_irq(g_pmic_irq);
 #endif
 		schedule();
+		if (g_pmic_irq < 0)
+			break;
 	}
 
 	return 0;
@@ -3819,21 +3821,21 @@ void pmic_setting_for_co_tsx(void)
 	case 0x41:
 	case 0x42:
 	case 0x43:
-		/* Denali-1+ MT6737T */
+		/* D1+ MT6737T */
 
 	case 0x49:
 	case 0x4A:
 	case 0x4B:
-		/* Denali-2+ MT6737M */
+		/* D2+ MT6737M */
 
 	case 0x51:
 	case 0x52:
 	case 0x53:
-		/* Denali-2+ MT6737 */
+		/* D2+ MT6737 */
 
 	case 0x54:
 	case 0x55:
-		/* Denali MT6737WH MT6737CH */
+		/* D2+ MT6737WH MT6737CH */
 		ret = pmic_config_interface(0x14, 0x1, 0x1, 5);
 		ret = pmic_config_interface(0x14, 0x1, 0x1, 7);
 		ret = pmic_config_interface(0x25A, 0x0, 0x1, 10);
@@ -4879,7 +4881,7 @@ static int __init pmic_mt_probe(struct platform_device *dev)
 	upmu_set_reg_value(0x2a6, 0xff);
 
 
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	PMICLOG("[PMIC_INIT_SETTING_V1] delay to MT6311 init\n");
 #else
 	PMIC_INIT_SETTING_V1();

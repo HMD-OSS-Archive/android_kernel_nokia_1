@@ -25,10 +25,8 @@ ccflags-y += -I$(srctree)/drivers/staging/android
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/mach/mt6735/include
 
 VER:=eng
-ifneq ($(strip $(TARGET_BUILD_VARIANT)),)
-ifneq ($(strip $(TARGET_BUILD_VARIANT)),eng)
+ifndef CONFIG_MT_ENG_BUILD
 VER:=user
-endif
 endif
 
 ccflags-y += -DCONFIG_DEBUG_FS

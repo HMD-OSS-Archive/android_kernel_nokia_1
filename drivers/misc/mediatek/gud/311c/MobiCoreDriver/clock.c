@@ -43,7 +43,7 @@ int mc_clock_init(void)
 	clk_ctx.mc_ce_core_src_clk = clk_get(g_ctx.mcd, "core_clk_src");
 	if (IS_ERR(clk_ctx.mc_ce_core_src_clk)) {
 		ret = PTR_ERR(clk_ctx.mc_ce_core_src_clk);
-		mc_dev_err("cannot get core src clock: %d\n", ret);
+		mc_dev_notice("cannot get core src clock: %d\n", ret);
 		goto error;
 	}
 
@@ -52,7 +52,7 @@ int mc_clock_init(void)
 				 MC_CRYPTO_CLOCK_CORESRC_PROPNAME,
 				 &of_core_src_rate)) {
 		core_src_rate = MC_CLOCK_CORESRC_DEFAULTRATE;
-		mc_dev_err("cannot get ce clock frequency from DT, use %d\n",
+		mc_dev_notice("cannot get ce clock frequency from DT, use %d\n",
 			   core_src_rate);
 	} else {
 		core_src_rate = of_core_src_rate;
@@ -63,7 +63,7 @@ int mc_clock_init(void)
 	if (ret) {
 		clk_put(clk_ctx.mc_ce_core_src_clk);
 		clk_ctx.mc_ce_core_src_clk = NULL;
-		mc_dev_err("cannot set core clock src rate: %d\n", ret);
+		mc_dev_notice("cannot set core clock src rate: %d\n", ret);
 		ret = -EIO;
 		goto error;
 	}
@@ -73,7 +73,7 @@ int mc_clock_init(void)
 	clk_ctx.mc_ce_core_clk = clk_get(g_ctx.mcd, "core_clk");
 	if (IS_ERR(clk_ctx.mc_ce_core_clk)) {
 		ret = PTR_ERR(clk_ctx.mc_ce_core_clk);
-		mc_dev_err("cannot get core clock: %d\n", ret);
+		mc_dev_notice("cannot get core clock: %d\n", ret);
 		goto error;
 	}
 	/* Get Interface clk */
@@ -81,7 +81,7 @@ int mc_clock_init(void)
 	if (IS_ERR(clk_ctx.mc_ce_iface_clk)) {
 		clk_put(clk_ctx.mc_ce_core_clk);
 		ret = PTR_ERR(clk_ctx.mc_ce_iface_clk);
-		mc_dev_err("cannot get iface clock: %d\n", ret);
+		mc_dev_notice("cannot get iface clock: %d\n", ret);
 		goto error;
 	}
 	/* Get AXI clk */
@@ -90,7 +90,7 @@ int mc_clock_init(void)
 		clk_put(clk_ctx.mc_ce_iface_clk);
 		clk_put(clk_ctx.mc_ce_core_clk);
 		ret = PTR_ERR(clk_ctx.mc_ce_bus_clk);
-		mc_dev_err("cannot get AXI bus clock: %d\n", ret);
+		mc_dev_notice("cannot get AXI bus clock: %d\n", ret);
 		goto error;
 	}
 	return ret;
@@ -124,19 +124,19 @@ int mc_clock_enable(void)
 
 	rc = clk_prepare_enable(clk_ctx.mc_ce_core_clk);
 	if (rc) {
-		mc_dev_err("cannot enable core clock\n");
+		mc_dev_notice("cannot enable core clock\n");
 		goto err_core;
 	}
 
 	rc = clk_prepare_enable(clk_ctx.mc_ce_iface_clk);
 	if (rc) {
-		mc_dev_err("cannot enable interface clock\n");
+		mc_dev_notice("cannot enable interface clock\n");
 		goto err_iface;
 	}
 
 	rc = clk_prepare_enable(clk_ctx.mc_ce_bus_clk);
 	if (rc) {
-		mc_dev_err("cannot enable bus clock\n");
+		mc_dev_notice("cannot enable bus clock\n");
 		goto err_bus;
 	}
 

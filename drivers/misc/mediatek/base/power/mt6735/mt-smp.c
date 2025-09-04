@@ -1,15 +1,14 @@
 /*
- * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2018 MediaTek Inc.
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 #include <linux/init.h>
 #include <linux/smp.h>
@@ -43,6 +42,7 @@
 
 #define SLAVE_JUMP_REG  (SRAMROM_BASE+0x34)
 
+__attribute__((unused))
 static DEFINE_SPINLOCK(boot_lock);
 
 /*
@@ -50,7 +50,7 @@ static DEFINE_SPINLOCK(boot_lock);
  * observers, irrespective of whether they're taking part in coherency
  * or not.  This is necessary for the hotplug code to work reliably.
  */
-static void __cpuinit write_pen_release(int val)
+static void write_pen_release(int val)
 {
 	pen_release = val;
 	/* Make sure this is visible to other CPUs */
@@ -60,7 +60,7 @@ static void __cpuinit write_pen_release(int val)
 	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
 }
 
-void __cpuinit mt_smp_secondary_init(unsigned int cpu)
+void mt_smp_secondary_init(unsigned int cpu)
 {
 #ifndef CONFIG_MTK_GIC
 	mt_gic_secondary_init();
@@ -102,7 +102,7 @@ static void __init smp_set_boot_addr(void)
 	iounmap(infracfg_ao_base);
 }
 
-int __cpuinit mt_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
+int mt_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
 	unsigned long timeout;
 
@@ -155,7 +155,7 @@ int __cpuinit mt_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
 		spm_mtcmos_ctrl_cpu3(STA_POWER_ON, 1);
 		break;
 
-#ifdef CONFIG_ARCH_MT6753
+#ifdef CONFIG_MACH_MT6753
 	case 4:
 		#ifdef CONFIG_MTK_FPGA
 		mt_reg_sync_writel(SLAVE4_MAGIC_NUM, SLAVE4_MAGIC_REG);
@@ -208,7 +208,7 @@ int __cpuinit mt_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
 		#endif
 		spm_mtcmos_ctrl_cpu7(STA_POWER_ON, 1);
 		break;
-#endif /* CONFIG_ARCH_MT6753 */
+#endif /* CONFIG_MACH_MT6753 */
 
 	default:
 		break;

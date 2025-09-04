@@ -19,6 +19,7 @@
 static struct manuf_data fih_proinfo_data;
 static int read_flag = 0;
 static int write_flag = 0;
+static struct manuf_data manuf_data;
 /*J6000092 add for proinfo partition cache end*/
 
 int write_ef(struct manuf_data * wdata)
@@ -26,9 +27,8 @@ int write_ef(struct manuf_data * wdata)
 	int len = 0;
 
 	struct file *pid_filp = NULL;
-	char temp[80];
 	mm_segment_t oldfs;
-	int pid_len;
+	loff_t pos = 0;
 
 	printk("write_ef()\n");
 
@@ -39,7 +39,8 @@ int write_ef(struct manuf_data * wdata)
 	if(!IS_ERR(pid_filp))
 	{
 		strncpy(wdata->sync_info, MANUF_SYNC_INFO_STRING, strlen(MANUF_SYNC_INFO_STRING));
-		len = pid_filp->f_op->write(pid_filp, &wdata->magic,sizeof(struct manuf_data), &pid_filp->f_pos);
+		//len = pid_filp->f_op->write(pid_filp, (char *)&wdata->magic,sizeof(struct manuf_data), &pid_filp->f_pos);
+		vfs_write(pid_filp, (char __user *)&wdata->magic, sizeof(struct manuf_data), &pos);
 
 		// added by sinkin after write action
 		vfs_fsync(pid_filp, 0);
@@ -72,11 +73,10 @@ int write_ef(struct manuf_data * wdata)
 int read_ef(struct manuf_data * rdata)
 {
 	int len = 0;
-	int pid_len;
-	char temp[80];
 
 	mm_segment_t oldfs;
 	struct file *pid_filp = NULL;
+	loff_t pos = 0;
 
 	printk("read_ef() read_flag = %d, write_flag = %d\n", read_flag, write_flag);
 
@@ -90,7 +90,8 @@ int read_ef(struct manuf_data * rdata)
 
 		if(!IS_ERR(pid_filp))
 		{
-			len = pid_filp->f_op->read(pid_filp, &rdata->magic, sizeof(struct manuf_data), &pid_filp->f_pos);
+			//len = pid_filp->f_op->read(pid_filp, (char *)&rdata->magic, sizeof(struct manuf_data), &pid_filp->f_pos);
+			vfs_read(pid_filp, (char __user *)&rdata->magic, sizeof(struct manuf_data), &pos);
 			filp_close(pid_filp, NULL);
 
 			if (len != sizeof(struct manuf_data))
@@ -122,9 +123,7 @@ int read_ef(struct manuf_data * rdata)
 
 int fih_read_pid(char* pid_str)
 {
-	struct manuf_data manuf_data;
 	int access;
-	int pid_len;
 
 	printk("fih_read_pid\n");
 
@@ -159,10 +158,7 @@ int fih_read_pid(char* pid_str)
 
 int fih_write_pid(char* pid_str)
 {
-	struct manuf_data manuf_data;
 	int access;
-
-	int temp_len = 0;
 
 	//printk("fih_write_pid with pid=%s, len=%d\n", pid_str, strlen(pid_str));
 
@@ -200,9 +196,7 @@ int fih_write_pid(char* pid_str)
 
 int fih_read_CAVIS(char* pid_str, int i)
 {
-	struct manuf_data manuf_data;
 	int access;
-	int pid_len;
 
 	printk("fih_read_CAVIS()\n");
 
@@ -251,10 +245,8 @@ int fih_read_CAVIS(char* pid_str, int i)
 
 int fih_write_CAVIS(char* pid_str, int i)
 {
-	struct manuf_data manuf_data;
 	int access;
 
-	int temp_len = 0;
 
 	//printk("[DW]fih_write_CAVIS with cavis=%s, len=%d, num=%d\n", pid_str, strlen(pid_str),i);
 
@@ -292,7 +284,6 @@ int fih_write_CAVIS(char* pid_str, int i)
 
 int fih_read_ps_thd(u8 cali[7])
 {
-	struct manuf_data manuf_data;
 	int access, i, size;
 
 	printk("[DW] %s\n", __func__);
@@ -319,7 +310,6 @@ int fih_read_ps_thd(u8 cali[7])
 
 int fih_write_ps_thd(u8 cali[7])
 {
-	struct manuf_data manuf_data;
 	int access, i, size;
 
 	printk("[DW] %s\n", __func__);
@@ -354,7 +344,6 @@ int fih_write_ps_thd(u8 cali[7])
 
 int fih_read_als_slope(u8 cali[16])
 {
-	struct manuf_data manuf_data;
 	int access, i, size;
 
 	printk("[DW] %s\n", __func__);
@@ -381,7 +370,6 @@ int fih_read_als_slope(u8 cali[16])
 
 int fih_write_als_slope(u8 cali[16])
 {
-	struct manuf_data manuf_data;
 	int access, i, size;
 
 	printk("[DW] %s\n", __func__);
@@ -416,8 +404,7 @@ int fih_write_als_slope(u8 cali[16])
 
 int fih_read_tp_rawdata_range(struct manuf_tp_rawdata_range_t *p)
 {
-	struct manuf_data manuf_data;
-	int access, size;
+	int access;
 
 	printk("[Kernel] %s\n", __func__);
 	memset(&manuf_data, '\0', sizeof(struct manuf_data));
@@ -442,7 +429,6 @@ int fih_read_tp_rawdata_range(struct manuf_tp_rawdata_range_t *p)
 
 int fih_write_tp_rawdata_range(struct manuf_tp_rawdata_range_t *p)
 {
-	struct manuf_data manuf_data;
 	int access;
 
 	printk("[Kernel] %s\n", __func__);
@@ -478,8 +464,7 @@ int fih_write_tp_rawdata_range(struct manuf_tp_rawdata_range_t *p)
 
 int fih_read_gsensor_cali(struct manuf_gsensor_cali *p)
 {
-	int access, size;
-	struct manuf_data manuf_data;
+	int access;
 
 	printk("[Kernel] %s\n", __func__);
 	memset(&manuf_data, '\0', sizeof(struct manuf_data) );
@@ -503,7 +488,6 @@ int fih_read_gsensor_cali(struct manuf_gsensor_cali *p)
 
 int fih_write_gsensor_cali(struct manuf_gsensor_cali *p)
 {
-	struct manuf_data manuf_data;
 	int access;
 
 	printk("[Kernel] %s\n", __func__);
@@ -539,8 +523,7 @@ int fih_write_gsensor_cali(struct manuf_gsensor_cali *p)
 
 int fih_read_skuid(char* skuid)
 {
-	int access, size;
-	struct manuf_data manuf_data;
+	int access;
 
 	memset(&manuf_data, '\0', sizeof(struct manuf_data) );
 

@@ -28,7 +28,7 @@
 int wireless_charger_gpio_number = (168 | 0x80000000);
 #endif
 
-//drop 
+//drop
 /*
 #if 1
 #include <mach/gpio_const.h>
@@ -180,7 +180,7 @@ static u32 charging_hw_init(void *data)
 	u32 status = STATUS_OK;
 	static bool charging_init_flag = KAL_FALSE;
 
-	//modify 
+	//modify
     /*
     mt_set_gpio_mode(bq24157_gpio_number,bq24157_gpio_on_mode);
     mt_set_gpio_dir(bq24157_gpio_number,bq24157_gpio_on_dir);
@@ -236,7 +236,7 @@ static u32 charging_enable(void *data)
 		if (mt_usb_is_device())
 #endif
     	{
-            //drop 
+            //drop
             /*
 	        mt_set_gpio_mode(bq24157_gpio_number,bq24157_gpio_off_mode);
 	        mt_set_gpio_dir(bq24157_gpio_number,bq24157_gpio_off_dir);
@@ -256,7 +256,7 @@ static u32 charging_set_cv_voltage(void *data)
 {
 	u32 status = STATUS_OK;
 	u16 register_value;
-//add ,but not use,Just wait.
+//add, but not use,Just wait.
 #if 1
     u32 cv_value = *(u32 *) (data);
 

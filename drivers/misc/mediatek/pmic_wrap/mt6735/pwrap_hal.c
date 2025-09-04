@@ -210,15 +210,9 @@ void pwrap_dump_ap_register(void)
 {
 	u32 i = 0;
 
-	PWRAPREG("Reset PMIC Wrap WACS2 start\n");
-	WRAP_WR32(PMIC_WRAP_WACS2_EN, DISABLE);
-	WRAP_WR32(PMIC_WRAP_WACS2_EN, ENABLE);
-	PWRAPREG("PMIC_WRAP_WACS2_EN = 0x%x\n", WRAP_RD32(PMIC_WRAP_WACS2_EN));
-	PWRAPREG("Reset PMIC Wrap WACS2 done\n");
-
 	PWRAPREG("dump pwrap register, base=0x%p\n", PMIC_WRAP_BASE);
 	PWRAPREG("address     :   3 2 1 0    7 6 5 4    B A 9 8    F E D C\n");
-	#if defined(CONFIG_ARCH_MT6735M)
+	#if defined(CONFIG_MACH_MT6735M)
 	for (i = 0; i <= 0x234; i += 16) {
 		PWRAPREG("offset 0x%.3x:0x%.8x 0x%.8x 0x%.8x 0x%.8x\n", i,
 				WRAP_RD32(PMIC_WRAP_BASE+i+0),
@@ -1322,7 +1316,7 @@ s32 pwrap_init(void)
 	/* ############################### */
 	/* PMIC_WRAP enables */
 	/* ############################### */
-  #if defined(CONFIG_ARCH_MT6735M)
+  #if defined(CONFIG_MACH_MT6735M)
 	WRAP_WR32(PMIC_WRAP_HIPRIO_ARB_EN, 0xff);
 	PWRAPLOG("mt_pwrap_init---- use D2\n");
   #else
@@ -1330,7 +1324,7 @@ s32 pwrap_init(void)
   #endif
 	WRAP_WR32(PMIC_WRAP_WACS0_EN, ENABLE);
 	WRAP_WR32(PMIC_WRAP_WACS1_EN, ENABLE);
-  #if defined(CONFIG_ARCH_MT6735M)
+  #if defined(CONFIG_MACH_MT6735M)
   /* not enable wacs3    D2 change */
   #else
 	WRAP_WR32(PMIC_WRAP_WACS3_EN, ENABLE);
@@ -1350,7 +1344,7 @@ s32 pwrap_init(void)
 	WRAP_WR32(PMIC_WRAP_INIT_DONE0 , ENABLE);
 	WRAP_WR32(PMIC_WRAP_INIT_DONE2 , ENABLE);
 	PWRAPLOG("mt_pwrap_init---- debug13\n");
-	#if defined(CONFIG_ARCH_MT6735M)
+	#if defined(CONFIG_MACH_MT6735M)
 	/* not enable wacs3    D2 change */
 	#else
 	WRAP_WR32(PMIC_WRAP_INIT_DONE3 , ENABLE);
@@ -1461,21 +1455,18 @@ static void pwrap_int_test(void)
 	u32 rdata1 = 0;
 	u32 rdata2 = 0;
 
-	while (1) {
-	   #ifdef SLV_6328
+	#ifdef SLV_6328
 		rdata1 = WRAP_RD32(PMIC_WRAP_EINT_STA);
 		pwrap_read(MT6328_INT_STA, &rdata2);
 		PWRAPREG("Pwrap INT status check,PMIC_WRAP_EINT_STA=0x%x", rdata1);
 		PWRAPREG("MT6328_INT_STA[0x01B4]=0x%x\n", rdata2);
-	   #endif
-	   #ifdef SLV_6332
+	#endif
+	#ifdef SLV_6332
 		rdata1 = WRAP_RD32(PMIC_WRAP_EINT_STA);
 		pwrap_read(MT6332_INT_STA, &rdata2);
 		PWRAPREG("Pwrap INT status check,PMIC_WRAP_EINT_STA=0x%x", rdata1);
 		PWRAPREG("MT6332_INT_STA[0x8112]=0x%x\n", rdata2);
-	   #endif
-	   msleep(500);
-	}
+	#endif
 }
 static void pwrap_ut(u32 ut_test)
 {

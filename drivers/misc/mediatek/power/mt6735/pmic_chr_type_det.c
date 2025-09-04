@@ -22,7 +22,6 @@
 #include <linux/list.h>
 #include <linux/mutex.h>
 #include <linux/kthread.h>
-#include <linux/wakelock.h>
 #include <linux/device.h>
 #include <linux/kdev_t.h>
 #include <linux/fs.h>
@@ -40,7 +39,7 @@
 #include <mt-plat/upmu_common.h>
 #include <mach/upmu_sw.h>
 #include <mach/upmu_hw.h>
-#include <mach/mt_pmic_wrap.h>
+#include <mach/mtk_pmic_wrap.h>
 #if defined CONFIG_MTK_LEGACY
 /*#include <mach/mt_gpio.h> TBD*/
 #endif
@@ -52,7 +51,7 @@
 #include <linux/time.h>
 
 #ifdef CONFIG_MTK_USB2JTAG_SUPPORT
-#include <mt-plat/mt_usb2jtag.h>
+#include <mt-plat/mtk_usb2jtag.h>
 #endif
 
 /* ============================================================ // */

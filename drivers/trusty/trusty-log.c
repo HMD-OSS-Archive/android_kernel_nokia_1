@@ -17,6 +17,7 @@
 #include <linux/notifier.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
+#include <linux/module.h>
 #include <linux/log2.h>
 #include <asm/page.h>
 #include "trusty-log.h"

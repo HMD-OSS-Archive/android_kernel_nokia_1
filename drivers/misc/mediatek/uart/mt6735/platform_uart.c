@@ -1851,7 +1851,7 @@ void mtk_uart_get_modem_status(struct mtk_uart *uart)
 	status = UART_READ32(UART_MSR);
 	status &= UART_MSR_DSR | UART_MSR_CTS | UART_MSR_DCD | UART_MSR_RI;
 
-	MSG(INFO, "MSR: DCD(%d), RI(%d), DSR(%d), CTS(%d)\n",
+	MSG(INFO, "MSR: DCD(%d), RI(%d), DSR(%d), CTSx(%d)\n",
 	    status & UART_MSR_DCD ? 1 : 0,
 	    status & UART_MSR_RI ? 1 : 0, status & UART_MSR_DSR ? 1 : 0, status & UART_MSR_CTS ? 1 : 0);
 
@@ -1957,7 +1957,7 @@ unsigned int mtk_uart_get_mctrl(struct uart_port *port)
 
 	status = UART_READ32(UART_MSR);
 
-	MSG(INFO, "MSR: DCD(%d), RI(%d), DSR(%d), CTS(%d)\n",
+	MSG(INFO, "MSR: DCD(%d), RI(%d), DSR(%d), CTSx(%d)\n",
 	    status & UART_MSR_DCD ? 1 : 0,
 	    status & UART_MSR_RI ? 1 : 0, status & UART_MSR_DSR ? 1 : 0, status & UART_MSR_CTS ? 1 : 0);
 

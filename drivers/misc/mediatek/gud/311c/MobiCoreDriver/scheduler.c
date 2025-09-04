@@ -216,10 +216,11 @@ int mc_scheduler_start(void)
 	sched_ctx.thread_run = true;
 	sched_ctx.thread = kthread_run(tee_scheduler, NULL, "tee_scheduler");
 	if (IS_ERR(sched_ctx.thread)) {
-		mc_dev_err("tee_scheduler thread creation failed\n");
+		mc_dev_notice("tee_scheduler thread creation failed\n");
 		return PTR_ERR(sched_ctx.thread);
 	}
 
+	set_user_nice(sched_ctx.thread, -20);
 	mcp_register_scheduler(mc_dev_command);
 	complete(&sched_ctx.idle_complete);
 	return 0;

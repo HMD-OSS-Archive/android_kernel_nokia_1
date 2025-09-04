@@ -20,26 +20,23 @@ ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v2/$(MTK_PLATFORM) \
              -I$(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/include
 
 # Enable AEE
-ccflags-y += -DCMDQ_AEE_READY
+# porting aee not ready yet
+# ccflags-y += -DCMDQ_AEE_READY
 
 # Enable MET
 ccflags-y += -DMET_USER_EVENT_SUPPORT
 
-ifneq ($(TARGET_BUILD_VARIANT),eng)
-ccflags-y += -D_MTK_USER_
-endif
-
-ifneq ($(TARGET_BUILD_VARIANT),user)
+ifeq ($(CONFIG_MTK_ENG_BUILD),y)
 ccflags-y += -D_CMDQ_TEST_PROC_
+ccflags-y += -D_CMDQ_DEBUG_
 endif
 
 # Common Clock Framework
 ifneq ($(CONFIG_MTK_CLKMGR),y)
 
-ifeq ($(CONFIG_ARCH_MT6580),y)
-else ifeq ($(CONFIG_ARCH_MT6735M),y)
-else ifeq ($(CONFIG_ARCH_MT6753),y)
-else ifeq ($(CONFIG_ARCH_MT6570),y)
+ifeq ($(CONFIG_MACH_MT6580),y)
+else ifeq ($(CONFIG_MACH_MT6735M),y)
+else ifeq ($(CONFIG_MACH_MT6753),y)
 else
 ccflags-y += -DCMDQ_USE_CCF
 endif
@@ -90,7 +87,9 @@ ccflags-y += -DCMDQ_DISP_LEGACY_SUB_SCENARIO
 endif
 
 ifeq ($(CONFIG_MTK_CMDQ_TAB), y)
-ccflags-y += -DCMDQ_USE_LEGACY
+ccflags-y += -DEARLY_PORTING_MIGRATION
+#porting
+#ccflags-y += -DCMDQ_USE_LEGACY
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v2/inc/cmdq_sec_dr \
              -I$(srctree)/drivers/misc/mediatek/cmdq/v2/inc/cmdq_sec_tl \
              -I$(srctree)/include/trustzone
@@ -101,8 +100,9 @@ endif
 endif
 
 ccflags-y += -D_CMDQ_DISABLE_MARKER_
-ifeq (,$(filter $(CONFIG_MTK_PLATFORM), "elbrus"))
-ccflags-y += -DCMDQ_PROFILE_MMP
+# porting don't support mmp
+ifeq (,$(filter $(CONFIG_MTK_PLATFORM), "elbrus", "mt8173"))
+#ccflags-y += -DCMDQ_PROFILE_MMP
 endif
 
 # driver module
@@ -111,7 +111,8 @@ obj-y += cmdq_core.o
 obj-y += cmdq_virtual.o
 obj-y += cmdq_device.o
 obj-y += cmdq_driver.o
-obj-y += cmdq_mmp.o
+# porting mmp is not ready
+# obj-y += cmdq_mmp.o
 obj-y += cmdq_mdp_common.o
 obj-y += cmdq_prof.o
 obj-y += cmdq_test.o
@@ -122,3 +123,5 @@ obj-y += mtee/
 endif
 
 obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
+
+

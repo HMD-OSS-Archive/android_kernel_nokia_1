@@ -19,9 +19,9 @@
 #endif
 
 #if defined(CONFIG_MTK_CLKMGR)
-#if defined(CONFIG_ARCH_MT6580) || defined(CONFIG_ARCH_MT6570)
+#if defined(CONFIG_MACH_MT6580)
 #define MTK_BTIF_CG_BIT MT_CG_BTIF_SW_CG
-#elif defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6735M) || defined(CONFIG_MACH_MT6753)
 #define MTK_BTIF_CG_BIT MT_CG_PERI_BTIF
 #endif
 #else
@@ -74,8 +74,10 @@ struct clk *clk_btif; /*btif  clock*/
 #define BTIF_DMA_EN_RX  (0x1 << 0)	/*Enable Rx DMA */
 #define BTIF_DMA_EN_TX  (0x1 << 1)	/*Enable Tx DMA */
 #define BTIF_DMA_EN_AUTORST_EN  (0x1 << 2)	/*1: timeout counter will be auto reset */
-#define BTIF_DMA_EN_AUTORST_DIS  (0x0 << 2)	/*0: after Rx timeout happens,
-							SW shall reset the interrupt by reading BTIF 0x4C */
+#define BTIF_DMA_EN_AUTORST_DIS  (0x0 << 2)	/*
+						 * 0: after Rx timeout happens,
+						 * SW shall reset the interrupt by reading BTIF 0x4C
+						 */
 
 /*BTIF_TRI_LVL bits*/
 #define BTIF_TRI_LVL_TX_MASK ((0xf) << 0)

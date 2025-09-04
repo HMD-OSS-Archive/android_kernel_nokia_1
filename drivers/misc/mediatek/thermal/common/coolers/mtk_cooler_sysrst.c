@@ -138,8 +138,6 @@ static int sysrst_tsap_set_cur_state(struct thermal_cooling_device *cdev, unsign
 		tscpu_printk("*****************************************\n");
 		tscpu_printk("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
 
-
-
 #ifndef CONFIG_ARM64
 		BUG();
 #else

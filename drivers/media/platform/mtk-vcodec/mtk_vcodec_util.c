@@ -1,7 +1,7 @@
 /*
-* Copyright (c) 2015 MediaTek Inc.
+* Copyright (c) 2016 MediaTek Inc.
 * Author: PC Chen <pc.chen@mediatek.com>
-*         Tiffany Lin <tiffany.lin@mediatek.com>
+*	Tiffany Lin <tiffany.lin@mediatek.com>
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
@@ -17,26 +17,33 @@
 
 #include "mtk_vcodec_drv.h"
 #include "mtk_vcodec_util.h"
-#include "mtk_vpu.h"
+#include "mtk_vcu.h"
 
-bool mtk_vcodec_dbg = false;
-int mtk_v4l2_dbg_level = 0;
+/* For encoder, this will enable logs in venc/*/
+bool mtk_vcodec_dbg;
+EXPORT_SYMBOL(mtk_vcodec_dbg);
 
-module_param(mtk_v4l2_dbg_level, int, S_IRUGO | S_IWUSR);
-module_param(mtk_vcodec_dbg, bool, S_IRUGO | S_IWUSR);
+/* The log level of v4l2 encoder or decoder driver.
+ * That is, files under mtk-vcodec/.
+ */
+int mtk_v4l2_dbg_level;
+EXPORT_SYMBOL(mtk_v4l2_dbg_level);
 
-void __iomem *mtk_vcodec_get_reg_addr(void *data, unsigned int reg_idx)
+void __iomem *mtk_vcodec_get_reg_addr(struct mtk_vcodec_ctx *data,
+					unsigned int reg_idx)
 {
 	struct mtk_vcodec_ctx *ctx = (struct mtk_vcodec_ctx *)data;
 
 	if (!data || reg_idx >= NUM_MAX_VCODEC_REG_BASE) {
-		mtk_v4l2_err("Invalid arguments");
+		mtk_v4l2_err("Invalid arguments, reg_idx=%d", reg_idx);
 		return NULL;
 	}
 	return ctx->dev->reg_base[reg_idx];
 }
+EXPORT_SYMBOL(mtk_vcodec_get_reg_addr);
 
-int mtk_vcodec_mem_alloc(void *data, struct mtk_vcodec_mem *mem)
+int mtk_vcodec_mem_alloc(struct mtk_vcodec_ctx *data,
+			struct mtk_vcodec_mem *mem)
 {
 	unsigned long size = mem->size;
 	struct mtk_vcodec_ctx *ctx = (struct mtk_vcodec_ctx *)data;
@@ -52,55 +59,59 @@ int mtk_vcodec_mem_alloc(void *data, struct mtk_vcodec_mem *mem)
 
 	memset(mem->va, 0, size);
 
-	mtk_v4l2_debug(3, "[%d]  - va      = %p", ctx->idx, mem->va);
-	mtk_v4l2_debug(3, "[%d]  - dma     = 0x%lx", ctx->idx,
+	mtk_v4l2_debug(4, "[%d]  - va      = %p", ctx->id, mem->va);
+	mtk_v4l2_debug(4, "[%d]  - dma     = 0x%lx", ctx->id,
 		       (unsigned long)mem->dma_addr);
-	mtk_v4l2_debug(3, "[%d]    size = 0x%lx", ctx->idx, size);
+	mtk_v4l2_debug(4, "[%d]    size = 0x%lx", ctx->id, size);
 
 	return 0;
 }
+EXPORT_SYMBOL(mtk_vcodec_mem_alloc);
 
-void mtk_vcodec_mem_free(void *data, struct mtk_vcodec_mem *mem)
+void mtk_vcodec_mem_free(struct mtk_vcodec_ctx *data,
+			struct mtk_vcodec_mem *mem)
 {
 	unsigned long size = mem->size;
 	struct mtk_vcodec_ctx *ctx = (struct mtk_vcodec_ctx *)data;
 	struct device *dev = &ctx->dev->plat_dev->dev;
 
+	if (!mem->va) {
+		mtk_v4l2_err("%s dma_free size=%ld failed!", dev_name(dev),
+			     size);
+		return;
+	}
+
+	mtk_v4l2_debug(4, "[%d]  - va      = %p", ctx->id, mem->va);
+	mtk_v4l2_debug(4, "[%d]  - dma     = 0x%lx", ctx->id,
+		       (unsigned long)mem->dma_addr);
+	mtk_v4l2_debug(4, "[%d]    size = 0x%lx", ctx->id, size);
+
 	dma_free_coherent(dev, size, mem->va, mem->dma_addr);
 	mem->va = NULL;
-
-	mtk_v4l2_debug(3, "[%d]  - va      = %p", ctx->idx, mem->va);
-	mtk_v4l2_debug(3, "[%d]  - dma     = 0x%lx", ctx->idx,
-		       (unsigned long)mem->dma_addr);
-	mtk_v4l2_debug(3, "[%d]    size = 0x%lx", ctx->idx, size);
+	mem->dma_addr = 0;
+	mem->size = 0;
 }
+EXPORT_SYMBOL(mtk_vcodec_mem_free);
 
-int mtk_vcodec_get_ctx_id(void *data)
+void mtk_vcodec_set_curr_ctx(struct mtk_vcodec_dev *dev,
+	struct mtk_vcodec_ctx *ctx)
 {
-	struct mtk_vcodec_ctx *ctx = (struct mtk_vcodec_ctx *)data;
+	unsigned long flags;
 
-	if (!ctx)
-		return -1;
-
-	return ctx->idx;
+	spin_lock_irqsave(&dev->irqlock, flags);
+	dev->curr_ctx = ctx;
+	spin_unlock_irqrestore(&dev->irqlock, flags);
 }
+EXPORT_SYMBOL(mtk_vcodec_set_curr_ctx);
 
-struct platform_device *mtk_vcodec_get_plat_dev(void *data)
+struct mtk_vcodec_ctx *mtk_vcodec_get_curr_ctx(struct mtk_vcodec_dev *dev)
 {
-	struct mtk_vcodec_ctx *ctx = (struct mtk_vcodec_ctx *)data;
+	unsigned long flags;
+	struct mtk_vcodec_ctx *ctx;
 
-	if (!ctx)
-		return NULL;
-
-	return vpu_get_plat_device(ctx->dev->plat_dev);
+	spin_lock_irqsave(&dev->irqlock, flags);
+	ctx = dev->curr_ctx;
+	spin_unlock_irqrestore(&dev->irqlock, flags);
+	return ctx;
 }
-
-void mtk_vcodec_fmt2str(u32 fmt, char *str)
-{
-	char a = fmt & 0xFF;
-	char b = (fmt >> 8) & 0xFF;
-	char c = (fmt >> 16) & 0xFF;
-	char d = (fmt >> 24) & 0xFF;
-
-	sprintf(str, "%c%c%c%c", a, b, c, d);
-}
+EXPORT_SYMBOL(mtk_vcodec_get_curr_ctx);

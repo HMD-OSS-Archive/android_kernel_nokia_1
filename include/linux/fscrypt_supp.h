@@ -123,20 +123,16 @@ extern int fscrypt_fname_disk_to_usr(struct inode *, u32, u32,
  * followed by the second-to-last ciphertext block of the filename.  Due to the
  * use of the CBC-CTS encryption mode, the second-to-last ciphertext block
  * depends on the full plaintext.  (Note that ciphertext stealing causes the
- * last two blocks to appear "flipped".)  This makes collisions very unlikely:
- * just a 1 in 2^128 chance for two filenames to collide even if they share the
- * same filesystem-specific hashes.
+ * last two blocks to appear "flipped".)  This makes accidental collisions very
+ * unlikely: just a 1 in 2^128 chance for two filenames to collide even if they
+ * share the same filesystem-specific hashes.
  *
- * This scheme isn't strictly immune to intentional collisions because it's
- * basically like a CBC-MAC, which isn't secure on variable-length inputs.
- * However, generating a CBC-MAC collision requires the ability to choose
- * arbitrary ciphertext, which won't normally be possible with filename
- * encryption since it would require write access to the raw disk.
- *
- * Taking a real cryptographic hash like SHA-256 over the full ciphertext would
- * be better in theory but would be less efficient and more complicated to
- * implement, especially since the filesystem would need to calculate it for
- * each directory entry examined during a search.
+ * However, this scheme isn't immune to intentional collisions, which can be
+ * created by anyone able to create arbitrary plaintext filenames and view them
+ * without the key.  Making the "digest" be a real cryptographic hash like
+ * SHA-256 over the full ciphertext would prevent this, although it would be
+ * less efficient and harder to implement, especially since the filesystem would
+ * need to calculate it for each directory entry examined during a search.
  */
 struct fscrypt_digested_name {
 	u32 hash;
@@ -200,8 +196,8 @@ extern int __fscrypt_prepare_symlink(struct inode *dir, unsigned int len,
 extern int __fscrypt_encrypt_symlink(struct inode *inode, const char *target,
 				     unsigned int len,
 				     struct fscrypt_str *disk_link);
-extern void *fscrypt_get_symlink(struct inode *inode, const void *caddr,
+extern const char *fscrypt_get_symlink(struct inode *inode, const void *caddr,
 				       unsigned int max_size,
-				       struct nameidata *nd);
+				       struct delayed_call *done);
 
 #endif	/* _LINUX_FSCRYPT_SUPP_H */

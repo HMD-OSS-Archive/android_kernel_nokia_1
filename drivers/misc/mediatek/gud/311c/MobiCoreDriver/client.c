@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015 TRUSTONIC LIMITED
+ * Copyright (c) 2013-2017 TRUSTONIC LIMITED
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -17,6 +17,14 @@
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/err.h>
+#include <linux/sched.h>	/* struct task_struct */
+#include <linux/version.h>
+#if KERNEL_VERSION(4, 11, 0) <= LINUX_VERSION_CODE
+#include <linux/sched/mm.h>	/* get_task_mm */
+#include <linux/sched/task.h>	/* put_task_struct */
+#endif
+#include <net/sock.h>		/* sockfd_lookup */
+#include <linux/file.h>		/* fput */
 
 #include "public/mc_user.h"
 #include "public/mc_admin.h"
@@ -112,7 +120,7 @@ static int cbuf_map(struct vm_area_struct *vmarea, uintptr_t addr, u32 len,
 		return -EINVAL;
 
 	if (len != (u32)(vmarea->vm_end - vmarea->vm_start)) {
-		mc_dev_err("cbuf incompatible with vma\n");
+		mc_dev_notice("cbuf incompatible with vma\n");
 		return -EINVAL;
 	}
 
@@ -123,7 +131,7 @@ static int cbuf_map(struct vm_area_struct *vmarea, uintptr_t addr, u32 len,
 			      vmarea->vm_page_prot);
 	if (ret) {
 		*uaddr = 0;
-		mc_dev_err("User mapping failed\n");
+		mc_dev_notice("User mapping failed\n");
 		return ret;
 	}
 
@@ -500,7 +508,7 @@ static struct tee_session *client_get_session(struct tee_client *client,
 
 	mutex_unlock(&client->sessions_lock);
 	if (!session)
-		mc_dev_err("session %x not found\n", session_id);
+		mc_dev_notice("session %x not found\n", session_id);
 
 	return session;
 }
@@ -630,7 +638,7 @@ static void cbuf_vm_close(struct vm_area_struct *vmarea)
 	cbuf_put(cbuf);
 }
 
-static struct vm_operations_struct cbuf_vm_ops = {
+static const struct vm_operations_struct cbuf_vm_ops = {
 	.open = cbuf_vm_open,
 	.close = cbuf_vm_close,
 };
@@ -653,7 +661,7 @@ int client_cbuf_create(struct tee_client *client, u32 len, uintptr_t *addr,
 
 	order = get_order(len);
 	if (order > MAX_ORDER) {
-		mc_dev_err("Buffer size too large\n");
+		mc_dev_notice("Buffer size too large\n");
 		return -ENOMEM;
 	}
 
@@ -758,7 +766,7 @@ int client_cbuf_free(struct tee_client *client, uintptr_t addr)
 	struct cbuf *cbuf = cbuf_get_by_addr(client, addr);
 
 	if (!cbuf) {
-		mc_dev_err("cbuf %lu not found\n", addr);
+		mc_dev_notice("cbuf %lu not found\n", addr);
 		return -EINVAL;
 	}
 
@@ -793,7 +801,7 @@ struct tee_mmu *client_mmu_create(struct tee_client *client, pid_t pid,
 		}
 
 		if ((offset + len) > cbuf->len) {
-			mc_dev_err("crosses cbuf boundary\n");
+			mc_dev_notice("crosses cbuf boundary\n");
 			cbuf_put(cbuf);
 			return ERR_PTR(-EINVAL);
 		}
@@ -804,7 +812,7 @@ struct tee_mmu *client_mmu_create(struct tee_client *client, pid_t pid,
 			task = pid_task(find_vpid(pid), PIDTYPE_PID);
 			if (!task) {
 				rcu_read_unlock();
-				mc_dev_err("No task for PID %d\n", pid);
+				mc_dev_notice("No task for PID %d\n", pid);
 				return ERR_PTR(-EINVAL);
 			}
 			get_task_struct(task);

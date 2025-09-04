@@ -27,12 +27,7 @@ void trace_end(void);
 #define trace_end()
 #endif
 
-#if defined(CONFIG_MTK_HIBERNATION) && defined(CONFIG_MTK_SCHED_TRACERS)
-int resize_ring_buffer_for_hibernation(int enable);
-#else
-#define resize_ring_buffer_for_hibernation(on) (0)
-#endif				/* CONFIG_MTK_HIBERNATION */
-
+struct trace_array;
 extern bool ring_buffer_expanded;
 ssize_t tracing_resize_ring_buffer(struct trace_array *tr,
 				   unsigned long size, int cpu_id);

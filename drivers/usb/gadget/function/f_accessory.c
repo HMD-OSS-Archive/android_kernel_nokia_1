@@ -215,6 +215,7 @@ static inline struct acc_dev *func_to_dev(struct usb_function *f)
 static struct usb_request *acc_request_new(struct usb_ep *ep, int buffer_size)
 {
 	struct usb_request *req = usb_ep_alloc_request(ep, GFP_KERNEL);
+
 	if (!req)
 		return NULL;
 
@@ -585,7 +586,6 @@ static ssize_t acc_read(struct file *fp, char __user *buf,
 	if (count > BULK_BUFFER_SIZE)
 		count = BULK_BUFFER_SIZE;
 
-
 	/* we will block until we're online */
 	pr_debug("acc_read: waiting for online\n");
 	ret = wait_event_interruptible(dev->read_wq, dev->online);
@@ -599,7 +599,7 @@ static ssize_t acc_read(struct file *fp, char __user *buf,
 	data_length -= data_length % dev->ep_out->maxpacket;
 
 	if (dev->rx_done) {
-		// last req cancelled. try to get it.
+		/* last req cancelled. try to get it. */
 		req = dev->rx_req[0];
 		goto copy_data;
 	}
@@ -623,8 +623,9 @@ requeue_req:
 		r = ret;
 		ret = usb_ep_dequeue(dev->ep_out, req);
 		if (ret != 0) {
-			// cancel failed. There can be a data already received.
-			// it will be retrieved in the next read.
+			/* cancel failed. There can be a data already received.
+			 * it will be retrieved in the next read.
+			 */
 			pr_debug("acc_read: cancelling failed %d", ret);
 		}
 		goto done;
@@ -639,7 +640,6 @@ copy_data:
 
 		pr_debug("rx %p %u\n", req, req->actual);
 		xfer = (req->actual < count) ? req->actual : count;
-
 		r = xfer;
 		if (copy_to_user(buf, req->buf, xfer))
 			r = -EFAULT;
@@ -658,7 +658,9 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 	struct usb_request *req = 0;
 	ssize_t r = count;
 	unsigned xfer;
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6735M) || defined(CONFIG_MACH_MT6753)
 	int sendZLP = 0;
+#endif
 	int ret;
 
 	pr_debug("acc_write(%zu)\n", count);
@@ -668,17 +670,20 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 		return -ENODEV;
 	}
 
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6735M) || defined(CONFIG_MACH_MT6753)
 	/* we need to send a zero length packet to signal the end of transfer
-	 * if the transfer size is aligned to a packet boundary.
+	 * if the transfer size is aligned to a packet boundary
 	 */
 	if ((count & (dev->ep_in->maxpacket - 1)) == 0)
 		sendZLP = 1;
 
 	while (count > 0 || sendZLP) {
-		/* so we exit after sending ZLP */
-		if (count == 0)
-			sendZLP = 0;
-
+	/* so we exit after sending ZLP */
+	if (count == 0)
+		sendZLP = 0;
+#else
+	while (count > 0) {
+#endif
 		if (!dev->online) {
 			pr_debug("acc_write dev->error\n");
 			r = -EIO;
@@ -694,11 +699,18 @@ static ssize_t acc_write(struct file *fp, const char __user *buf,
 			break;
 		}
 
-		if (count > BULK_BUFFER_SIZE)
+		if (count > BULK_BUFFER_SIZE) {
 			xfer = BULK_BUFFER_SIZE;
-		else
+			/* ZLP, They will be more TX requests so not yet. */
+			req->zero = 0;
+		} else {
 			xfer = count;
-
+			/*
+			 * If the data length is a multiple of the
+			 * maxpacket size then send a zero length packet(ZLP).
+			*/
+			req->zero = ((xfer % dev->ep_in->maxpacket) == 0);
+		}
 		if (copy_from_user(req->buf, buf, xfer)) {
 			r = -EFAULT;
 			break;
@@ -818,7 +830,6 @@ static struct miscdevice acc_device = {
 	.fops = &acc_fops,
 };
 
-
 static const struct hid_device_id acc_hid_table[] = {
 	{ HID_USB_DEVICE(HID_ANY_ID, HID_ANY_ID) },
 	{ }
@@ -853,11 +864,13 @@ int acc_ctrlrequest(struct usb_composite_dev *cdev,
 	unsigned long flags;
 
 /*
-	printk(KERN_INFO "acc_ctrlrequest "
-			"%02x.%02x v%04x i%04x l%u\n",
-			b_requestType, b_request,
-			w_value, w_index, w_length);
+ *	printk(KERN_INFO "acc_ctrlrequest "
+ *			"%02x.%02x v%04x i%04x l%u\n",
+ *			b_requestType, b_request,
+ *			w_value, w_index, w_length);
 */
+	if (!dev)
+		goto err;
 
 	if (b_requestType == (USB_DIR_OUT | USB_TYPE_VENDOR)) {
 		if (b_request == ACCESSORY_START) {
@@ -969,7 +982,6 @@ __acc_function_bind(struct usb_configuration *c,
 		}
 		dev->cdev = c->cdev;
 	}
-
 	ret = hid_register_driver(&acc_hid_driver);
 	if (ret)
 		return ret;
@@ -1002,10 +1014,12 @@ __acc_function_bind(struct usb_configuration *c,
 	return 0;
 }
 
+#ifdef CONFIG_USB_G_ANDROID
 static int
 acc_function_bind(struct usb_configuration *c, struct usb_function *f) {
 	return __acc_function_bind(c, f, false);
 }
+#endif
 
 static int
 acc_function_bind_configfs(struct usb_configuration *c,
@@ -1069,6 +1083,7 @@ acc_function_unbind(struct usb_configuration *c, struct usb_function *f)
 static void acc_start_work(struct work_struct *data)
 {
 	char *envp[2] = { "ACCESSORY=START", NULL };
+
 	kobject_uevent_env(&acc_device.this_device->kobj, KOBJ_CHANGE, envp);
 }
 
@@ -1212,6 +1227,7 @@ static void acc_function_disable(struct usb_function *f)
 	VDBG(cdev, "%s disabled\n", dev->function.name);
 }
 
+#ifdef CONFIG_USB_G_ANDROID
 static int acc_bind_config(struct usb_configuration *c)
 {
 	struct acc_dev *dev = _acc_dev;
@@ -1240,6 +1256,7 @@ static int acc_bind_config(struct usb_configuration *c)
 
 	return usb_add_function(c, &dev->function);
 }
+#endif
 
 static int acc_setup(void)
 {

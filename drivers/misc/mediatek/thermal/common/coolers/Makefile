@@ -19,17 +19,19 @@ ccflags-y  += -I$(srctree)/drivers/misc/mediatek/base/power/include/
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/video/include
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/gpu/ged/include
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/thermal/common/inc/
+ccflags-y  += -I$(srctree)/drivers/power/mediatek/
+ccflags-y  += -I$(srctree)/drivers/misc/mediatek/base/power/eem_v1/inc/
 
 ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6735"))
-ifeq ($(CONFIG_ARCH_MT6735),y)
+ifeq ($(CONFIG_MACH_MT6735),y)
 ccflags-y  += -I$(THERMAL_CHIP_DRIVER_DIR)/inc/D1
 endif
 
-ifeq ($(CONFIG_ARCH_MT6735M),y)
+ifeq ($(CONFIG_MACH_MT6735M),y)
 ccflags-y  += -I$(THERMAL_CHIP_DRIVER_DIR)/inc/D2
 endif
 
-ifeq ($(CONFIG_ARCH_MT6753),y)
+ifeq ($(CONFIG_MACH_MT6753),y)
 ccflags-y  += -I$(THERMAL_CHIP_DRIVER_DIR)/inc/D3
 endif
 

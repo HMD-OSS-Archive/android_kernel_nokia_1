@@ -38,7 +38,6 @@
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/bitops.h>
-#include <linux/wakelock.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
@@ -50,6 +49,7 @@
 #include <ccmni_pfp.h>
 #include <ccci_tty.h>
 #include <ccci.h>
+#include "ccci_layer.h"
 
 #define  CCMNI_TX_QUEUE         8
 #define  CCMNI_UART_OFFSET      2
@@ -67,7 +67,7 @@ struct ccmni_instance_t {
 	struct timer_list timer;
 	unsigned long send_len;
 	struct net_device *dev;
-	struct wake_lock wake_lock;
+	struct wakeup_source wake_lock;
 	spinlock_t spinlock;
 
 	struct shared_mem_tty_t *shared_mem;
@@ -87,7 +87,7 @@ struct ccmni_v1_ctl_block_t {
 	int m_md_id;
 	int ccci_is_ready;
 	struct ccmni_instance_t *ccmni_instance[CCMNI_V1_PORT_NUM];
-	struct wake_lock ccmni_wake_lock;
+	struct wakeup_source ccmni_wake_lock;
 	char wakelock_name[16];
 	struct MD_CALL_BACK_QUEUE ccmni_notifier;
 };
@@ -422,7 +422,7 @@ static void ccmni_read(unsigned long arg)
 
 	CCCI_CCMNI_MSG(md_id, "CCMNI%d_read invoke wake_lock_timeout(1s)\n",
 		       ccmni->channel);
-	wake_lock_timeout(&ctl_b->ccmni_wake_lock, HZ);
+	__pm_wakeup_event(&ctl_b->ccmni_wake_lock, HZ);
 }
 
 /*   will be called when modem sends us something. */
@@ -875,13 +875,12 @@ int ccmni_v1_init(int md_id)
 
 	snprintf(ctl_b->wakelock_name, sizeof(ctl_b->wakelock_name),
 		 "ccci%d_net_v1", (md_id + 1));
-	wake_lock_init(&ctl_b->ccmni_wake_lock, WAKE_LOCK_SUSPEND,
-		       ctl_b->wakelock_name);
+	wakeup_source_init(&ctl_b->ccmni_wake_lock, ctl_b->wakelock_name);
 
 	return ret;
 
  _CCMNI_INSTANCE_CREATE_FAIL:
-	for (curr = 0; curr <= count; curr++)
+	for (curr = 0; curr < count; curr++)
 		ccmni_destroy_instance(md_id, curr);
 	kfree(ctl_b);
 	ccmni_ctl_block[md_id] = NULL;
@@ -899,7 +898,7 @@ void ccmni_v1_exit(int md_id)
 			ccmni_destroy_instance(md_id, count);
 
 		md_unregister_call_chain(md_id, &ctl_b->ccmni_notifier);
-		wake_lock_destroy(&ctl_b->ccmni_wake_lock);
+		__pm_relax(&ctl_b->ccmni_wake_lock);
 		kfree(ctl_b);
 		ccmni_ctl_block[md_id] = NULL;
 	}

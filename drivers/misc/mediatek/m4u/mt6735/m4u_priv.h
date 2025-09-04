@@ -25,7 +25,6 @@
 #endif
 
 #include "m4u.h"
-#include "m4u_reg.h"
 #include "../2.0/m4u_pgtable.h"
 #include "m4u_platform.h"
 
@@ -34,7 +33,7 @@
 
 #include "m4u_hw.h"
 
-/* #define M4U_FPGAPORTING */
+#define M4U_FPGAPORTING
 #define M4U_PROFILE
 
 #define M4U_DVT 0
@@ -46,7 +45,7 @@
 #define MMP_Event unsigned int
 #else
 #include <mmprofile.h>
-
+#include <mmprofile_function.h>
 extern void MMProfileEnable(int enable);
 extern void MMProfileStart(int start);
 
@@ -73,7 +72,11 @@ extern void MMProfileStart(int start);
 #define outer_flush_all(...)
 #endif
 
-#ifdef M4U_FPGAPORTING
+#ifndef smp_inner_dcache_flush_all
+#define smp_inner_dcache_flush_all(...)
+#endif
+
+#if 0
 #define enable_clock(...)
 #define disable_clock(...)
 #define smp_inner_dcache_flush_all(...)
@@ -168,7 +171,8 @@ void *mva_get_priv_ext(unsigned int mva);
 int mva_foreach_priv(mva_buf_fn_t *fn, void *data);
 void *mva_get_priv(unsigned int mva);
 unsigned int m4u_do_mva_alloc(unsigned long va, unsigned int size, void *priv);
-unsigned int m4u_do_mva_alloc_fix(unsigned int mva, unsigned int size, void *priv);
+unsigned int m4u_do_mva_alloc_fix(unsigned long va, unsigned int mva, unsigned int size, void *priv);
+unsigned int m4u_do_mva_alloc_start_from(unsigned long va, unsigned int mva, unsigned int size, void *priv);
 int m4u_do_mva_free(unsigned int mva, unsigned int size);
 
 /* ================================= */
@@ -268,12 +272,12 @@ extern int gM4U_log_to_uart;
 } while (0)
 /*aee_kernel_warning(m4u_name, "[M4U] error:"string,##args); */
 
-#define M4U_PRINT_LOG_OR_SEQ(seq_file, fmt, args...) \
+#define M4U_PRINT_SEQ(seq_file, fmt, args...) \
 	do {\
 		if (seq_file)\
 			seq_printf(seq_file, fmt, ##args);\
 		else\
-			pr_debug(fmt, ##args);\
+			pr_info(fmt, ##args);\
 	} while (0)
 
 /* ======================================= */

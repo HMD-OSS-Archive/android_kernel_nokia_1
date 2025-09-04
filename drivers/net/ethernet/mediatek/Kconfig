@@ -1,30 +1,26 @@
-#
-# MediaTek network device configuration
-#
-
 config NET_VENDOR_MEDIATEK
-        bool "Mediatek GMAC"
-	default y
-	depends on PHYLIB
-        ---help---
-	  If you have a network (Ethernet) card belonging to this class, say Y
-	  and read the Ethernet-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-	  Note that the answer to this question doesn't directly affect the
-	  kernel: saying N will just cause the configurator to skip all
-	  the questions about Realtek devices. If you say Y, you will be asked for
-	  your specific card in the following questions.
+	bool "MediaTek ethernet driver"
+	depends on ARCH_MEDIATEK
+	---help---
+	  If you have a Mediatek SoC with ethernet, say Y.
 
 if NET_VENDOR_MEDIATEK
 
-config NET_MEDIATEK_MT7623
-	tristate "MediaTek(R) MT2701/MT7623 support"
+config NET_MEDIATEK_SOC
+	tristate "MediaTek MT7623 Gigabit ethernet support"
+	depends on NET_VENDOR_MEDIATEK && (MACH_MT7623 || MACH_MT2701)
+	select PHYLIB
 	---help---
-	  This driver supports Mediatek 2701/7623 gigabit ethernet
-	  family of adapters.
+	  This driver supports the gigabit ethernet MACs in the
+	  MediaTek MT2701/MT7623 chipset family.
 
-	  To compile this driver as a module, choose M here. The module
-	  will be called mtk-eth
+config MT2712_MAC
+	tristate "MediaTek MT2712 Gigabit AVB ethernet support"
+	select PHYLIB
+	select PTP_1588_CLOCK
+	select VLAN_8021Q
+	---help---
+	  This driver supports the gigabit avb ethernet MACs in the
+	  MediaTek MT2712 chipset family.
 
 endif #NET_VENDOR_MEDIATEK

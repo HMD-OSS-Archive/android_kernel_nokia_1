@@ -36,9 +36,10 @@
 #include <linux/kallsyms.h>
 #include <linux/proc_fs.h>
 #include <linux/export.h>
-#include <linux/ratelimit.h>
 
 #include <asm/hardware/cache-l2x0.h>
+#include <asm/hardware/cache-uniphier.h>
+#include <asm/outercache.h>
 #include <asm/exception.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/irq.h>
@@ -78,26 +79,6 @@ asm_do_IRQ(unsigned int irq, struct pt_regs *regs)
 	handle_IRQ(irq, regs);
 }
 
-void set_irq_flags(unsigned int irq, unsigned int iflags)
-{
-	unsigned long clr = 0, set = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
-
-	if (irq >= nr_irqs) {
-		printk(KERN_ERR "Trying to set irq flags for IRQ%d\n", irq);
-		return;
-	}
-
-	if (iflags & IRQF_VALID)
-		clr |= IRQ_NOREQUEST;
-	if (iflags & IRQF_PROBE)
-		clr |= IRQ_NOPROBE;
-	if (!(iflags & IRQF_NOAUTOEN))
-		clr |= IRQ_NOAUTOEN;
-	/* Order is clear bits in "clr" then set bits in "set" */
-	irq_modify_status(irq, clr, set & ~clr);
-}
-EXPORT_SYMBOL_GPL(set_irq_flags);
-
 void __init init_IRQ(void)
 {
 	int ret;
@@ -109,12 +90,15 @@ void __init init_IRQ(void)
 
 	if (IS_ENABLED(CONFIG_OF) && IS_ENABLED(CONFIG_CACHE_L2X0) &&
 	    (machine_desc->l2c_aux_mask || machine_desc->l2c_aux_val)) {
-		outer_cache.write_sec = machine_desc->l2c_write_sec;
+		if (!outer_cache.write_sec)
+			outer_cache.write_sec = machine_desc->l2c_write_sec;
 		ret = l2x0_of_init(machine_desc->l2c_aux_val,
 				   machine_desc->l2c_aux_mask);
-		if (ret)
+		if (ret && ret != -ENODEV)
 			pr_err("L2C: failed to init: %d\n", ret);
 	}
+
+	uniphier_cache_init();
 }
 
 #ifdef CONFIG_MULTI_IRQ_HANDLER
@@ -159,7 +143,7 @@ void fixup_update_irq_need_migrate_list(struct irq_desc *desc)
 		if (!c->irq_set_affinity)
 			pr_err("IRQ%u: unable to set affinity\n", d->irq);
 		else if (c->irq_set_affinity(d, cpu_possible_mask, true) == IRQ_SET_MASK_OK)
-			cpumask_copy(d->affinity, cpu_possible_mask);
+			cpumask_copy(irq_data_get_affinity_mask(d), cpu_possible_mask);
 	}
 }
 
@@ -191,13 +175,13 @@ bool check_consistency_of_irq_settings(struct irq_desc *desc)
 	rcu_read_unlock();
 
 	/* compare with the setting of smp affinity */
-	if (mt_cpumask_equal(d->affinity, cpu_possible_mask)) {
+	if (mt_cpumask_equal(irq_data_get_affinity_mask(d), cpu_possible_mask)) {
 		/*
 		 * if smp affinity is set to all CPUs
 		 * AND this IRQ is not be found in any per-cpu list -> success
 		 */
 		ret = (cpumask_empty(&per_cpu_list_affinity)) ? true : false;
-	} else if (!mt_cpumask_equal(&per_cpu_list_affinity, d->affinity)) {
+	} else if (!mt_cpumask_equal(&per_cpu_list_affinity, irq_data_get_affinity_mask(d))) {
 		/* smp affinity should be the same as per-cpu list */
 		ret = false;
 	}
@@ -205,11 +189,11 @@ bool check_consistency_of_irq_settings(struct irq_desc *desc)
 	/* print out to error logs */
 	if (!ret) {
 		pr_err("[IRQ] IRQ %d: smp affinity is not consistent with per-cpu list\n", d->irq);
-		cpumask_xor(&tmp_affinity, &per_cpu_list_affinity, d->affinity);
+		cpumask_xor(&tmp_affinity, &per_cpu_list_affinity, irq_data_get_affinity_mask(d));
 
 		/* iterates on cpus with inconsitent setting */
 		for_each_cpu(cpu, &tmp_affinity)
-			if (cpumask_test_cpu(cpu, d->affinity))
+			if (cpumask_test_cpu(cpu, irq_data_get_affinity_mask(d)))
 				pr_err("[IRQ] @CPU%u: smp affinity is set, but per-cpu list is not set\n", cpu);
 			else
 				pr_err("[IRQ] @CPU%u: smp affinity is not set, but per-cpu list is set\n", cpu);
@@ -231,13 +215,13 @@ check_gic:
 		/* failed to get GICD_ITARGETSR the setting */
 		pr_err("[IRQ] unable to get GICD_ITARGETSR setting of IRQ %d\n", d->irq);
 		ret = false;
-	} else if (!mt_cpumask_equal(&gic_target_affinity, d->affinity)) {
+	} else if (!mt_cpumask_equal(&gic_target_affinity, irq_data_get_affinity_mask(d))) {
 		pr_err("[IRQ] IRQ %d: smp affinity is not consistent with GICD_ITARGETSR\n", d->irq);
-		cpumask_xor(&tmp_affinity, &gic_target_affinity, d->affinity);
+		cpumask_xor(&tmp_affinity, &gic_target_affinity, irq_data_get_affinity_mask(d));
 
 		/* iterates on cpus with inconsitent setting */
 		for_each_cpu(cpu, &tmp_affinity)
-			if (cpumask_test_cpu(cpu, d->affinity))
+			if (cpumask_test_cpu(cpu, irq_data_get_affinity_mask(d)))
 				pr_err("[IRQ] @CPU%u: smp affinity is set, but gic reg is not set\n", cpu);
 			else
 				pr_err("[IRQ] @CPU%u: smp affinity is not set, but gic reg is set\n", cpu);
@@ -333,7 +317,7 @@ bool update_irq_need_migrate_list(struct irq_desc *desc, const struct cpumask *n
 	pr_debug("[IRQ] update per-cpu list (IRQ %d)\n", d->irq);
 
 	/* find out the per-cpu irq-need-migrate lists to be updated */
-	cpumask_xor(&need_update_affinity, d->affinity, new_affinity);
+	cpumask_xor(&need_update_affinity, irq_data_get_affinity_mask(d), new_affinity);
 
 	/* return if there is no need to update the per-cpu irq-need-migrate lists */
 	if (cpumask_empty(&need_update_affinity))
@@ -345,9 +329,9 @@ bool update_irq_need_migrate_list(struct irq_desc *desc, const struct cpumask *n
 		 * case 1: new affinity is to all cpus
 		 * clear this IRQs from all per-cpu irq-need-migrate lists of old affinity
 		 */
-		del_from_irq_need_migrate_list(desc, d->affinity);
+		del_from_irq_need_migrate_list(desc, irq_data_get_affinity_mask(d));
 		return true;
-	} else if (mt_cpumask_equal(d->affinity, cpu_possible_mask)) {
+	} else if (mt_cpumask_equal(irq_data_get_affinity_mask(d), cpu_possible_mask)) {
 		/*
 		 * case 2: old affinity is to all cpus
 		 * add this IRQs to per-cpu irq-need-migrate lists of new affinity
@@ -361,7 +345,7 @@ bool update_irq_need_migrate_list(struct irq_desc *desc, const struct cpumask *n
 		return false;
 
 	/* needs to be update AND is in old affinity -> list_del */
-	cpumask_and(&tmp_affinity, &need_update_affinity, d->affinity);
+	cpumask_and(&tmp_affinity, &need_update_affinity, irq_data_get_affinity_mask(d));
 	del_from_irq_need_migrate_list(desc, &tmp_affinity);
 
 	return true;
@@ -375,7 +359,7 @@ void update_affinity_settings(struct irq_desc *desc, const struct cpumask *new_a
 
 	need_fix = !update_irq_need_migrate_list(desc, new_affinity);
 	if (update_smp_affinity)
-		cpumask_copy(d->affinity, new_affinity);
+		cpumask_copy(irq_data_get_affinity_mask(d), new_affinity);
 	if (need_fix)
 		fixup_update_irq_need_migrate_list(desc);
 
@@ -389,7 +373,7 @@ void update_affinity_settings(struct irq_desc *desc, const struct cpumask *new_a
 static bool migrate_one_irq(struct irq_desc *desc)
 {
 	struct irq_data *d = irq_desc_get_irq_data(desc);
-	const struct cpumask *affinity = d->affinity;
+	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
 	struct irq_chip *c;
 	bool ret = false;
 
@@ -410,7 +394,7 @@ static bool migrate_one_irq(struct irq_desc *desc)
 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
 	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
 #ifndef CONFIG_MTK_IRQ_NEW_DESIGN
-		cpumask_copy(d->affinity, affinity);
+		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
 #else
 		update_affinity_settings(desc, affinity, true);
 #endif
@@ -466,8 +450,8 @@ void migrate_irqs(void)
 		affinity_broken = migrate_one_irq(desc);
 		raw_spin_unlock(&desc->lock);
 
-		if (affinity_broken && printk_ratelimit())
-			pr_warn("IRQ%u no longer affine to CPU%u\n",
+		if (affinity_broken)
+			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
 				i, smp_processor_id());
 	}
 #endif

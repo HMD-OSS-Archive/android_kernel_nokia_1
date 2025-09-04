@@ -18,7 +18,6 @@
 #include <linux/kthread.h>
 #include <linux/vmalloc.h>
 #include <linux/interrupt.h>
-#include <linux/irq_work.h>
 
 /* TIMER_SOFTIRQ duration warning test */
 
@@ -95,7 +94,7 @@ void sched_mon_test_irq_disable(void)
 	unsigned long flags;
 
 	local_irq_save(flags);
-	mdelay(300);
+	mdelay(600);
 	local_irq_restore(flags);
 
 	/* The test will trigger KernelAPI Dump */
@@ -142,9 +141,9 @@ static const struct file_operations proc_sched_monitor_test_fops = {
 	.write = sched_mon_test_write,
 };
 
-void mt_sched_monitor_test_init(void)
+void mt_sched_monitor_test_init(struct proc_dir_entry *dir)
 {
-	proc_create("mtmon/sched_mon_test", 0220, NULL,
+	proc_create("sched_mon_test", 0220, dir,
 		&proc_sched_monitor_test_fops);
 }
 

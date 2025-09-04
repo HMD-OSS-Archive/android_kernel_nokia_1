@@ -616,7 +616,7 @@ int mtkts_bts_get_hw_temp(void)
 	return t_ret;
 }
 
-static int mtkts_bts_get_temp(struct thermal_zone_device *thermal, unsigned long *t)
+static int mtkts_bts_get_temp(struct thermal_zone_device *thermal, int *t)
 {
 	*t = mtkts_bts_get_hw_temp();
 
@@ -747,13 +747,13 @@ static int mtkts_bts_get_trip_type(struct thermal_zone_device *thermal, int trip
 }
 
 static int mtkts_bts_get_trip_temp(struct thermal_zone_device *thermal, int trip,
-				   unsigned long *temp)
+				   int *temp)
 {
 	*temp = trip_temp[trip];
 	return 0;
 }
 
-static int mtkts_bts_get_crit_temp(struct thermal_zone_device *thermal, unsigned long *temperature)
+static int mtkts_bts_get_crit_temp(struct thermal_zone_device *thermal, int *temperature)
 {
 	*temperature = MTKTS_BTS_TEMP_CRIT;
 	return 0;

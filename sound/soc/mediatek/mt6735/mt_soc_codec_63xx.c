@@ -70,7 +70,7 @@
 #include "AudDrv_Clk.h"
 #include "mt_soc_analog_type.h"
 #ifdef _GIT318_READY
-#include "mt_clkbuf_ctl.h"
+#include <mach/mt_clkbuf_ctl.h>
 #endif
 #ifdef _GIT318_PMIC_READY
 #include <mach/mt_pmic.h>
@@ -194,12 +194,12 @@ typedef enum {
 static int mAudio_VOW_Mic_type = AUDIO_VOW_MIC_TYPE_Handset_AMIC;
 static void Audio_Amp_Change(int channels, bool enable);
 
-// Beging, 
+// Beging,
 struct pinctrl *pinctrl78;
 struct pinctrl_state *extPAen_default;
 struct pinctrl_state *extPAen_High;
 struct pinctrl_state *extPAen_Low;
-// End, 
+// End,
 
 
 static void SavePowerState(void)
@@ -1895,7 +1895,7 @@ static void Speaker_Amp_Change(bool enable)
 
 #ifdef CONFIG_MTK_SPEAKER
     /* speaker amp for FRT ------------ st. */
-    //Frontier Speaker is Class D. Modified by Stephen Zhang, BDC.
+    //Frontier Speaker is Class D. Modified by Stephen Zhang, BDC, FIH.
 		if (strncmp("FRT", CONFIG_ARCH_MTK_PROJECT, 3) == 0) {
 			 Speaker_mode = AUDIO_SPEAKER_MODE_D;
 	  }
@@ -2007,10 +2007,10 @@ static void Ext_Speaker_Amp_Change(bool enable)
 		pr_debug("Ext_Speaker_Amp_Change ON+\n");
 		
 		if (strncmp("NE1", CONFIG_ARCH_MTK_PROJECT, 3) == 0) {
-			// Beging, 
+			// Beging,
 			pinctrl_select_state(pinctrl78, extPAen_High);
 			pr_warn("Ext_Speaker_Amp_Change enable\n");
-			// End, 
+			// End,
 		}
 		
 #ifndef CONFIG_MTK_SPEAKER
@@ -2075,7 +2075,7 @@ static void Ext_Speaker_Amp_Change(bool enable)
 			// Beging,
 			pinctrl_select_state(pinctrl78, extPAen_Low);
 			pr_warn("Ext_Speaker_Amp_Change disable\n");
-			// End, 
+			// End,
 		}
 		
 #ifndef CONFIG_MTK_SPEAKER
@@ -4651,7 +4651,7 @@ static void InitGlobalVarDefault(void)
 
 static int mt6331_codec_probe(struct snd_soc_codec *codec)
 {
-	struct snd_soc_dapm_context *dapm = &codec->dapm;
+	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
 
 	pr_debug("%s()\n", __func__);
 
@@ -4730,11 +4730,12 @@ static struct snd_soc_codec_driver soc_mtk_codec = {
 	/* .controls = mt6331_snd_controls, */
 	/* .num_controls = ARRAY_SIZE(mt6331_snd_controls), */
 
-	.dapm_widgets = mt6331_dapm_widgets,
-	.num_dapm_widgets = ARRAY_SIZE(mt6331_dapm_widgets),
-	.dapm_routes = mtk_audio_map,
-	.num_dapm_routes = ARRAY_SIZE(mtk_audio_map),
-
+	.component_driver = {
+		.dapm_widgets = mt6331_dapm_widgets,
+		.num_dapm_widgets = ARRAY_SIZE(mt6331_dapm_widgets),
+		.dapm_routes = mtk_audio_map,
+		.num_dapm_routes = ARRAY_SIZE(mtk_audio_map),
+	},
 };
 
 static int mtk_mt6331_codec_dev_probe(struct platform_device *pdev)
@@ -4753,7 +4754,7 @@ static int mtk_mt6331_codec_dev_probe(struct platform_device *pdev)
 	pr_debug("%s: dev name %s\n", __func__, dev_name(&pdev->dev));
 
     if (strncmp("NE1", CONFIG_ARCH_MTK_PROJECT, 3) == 0) {
-		// Begin, 
+		// Begin,
 		/* gpio setting */
 		pinctrl78 = devm_pinctrl_get(&pdev->dev);
 		if (IS_ERR(pinctrl78))
@@ -4782,7 +4783,7 @@ static int mtk_mt6331_codec_dev_probe(struct platform_device *pdev)
 			ret = PTR_ERR(extPAen_Low);
 			pr_warn("Cannot find pinctrl78 extPAenLow!\n");
 		}	
-		// End, 	
+		// End,	
 	}
 
 #ifdef BBOX_CODEC_PROBE_FAIL

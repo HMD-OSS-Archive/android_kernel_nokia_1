@@ -25,8 +25,7 @@
 #define IF_RA_RCVD	0x20
 #define IF_RS_SENT	0x10
 #define IF_READY	0x80000000
-/*add for VzW feature*/
-#define IF_RS_VZW_SENT 0x01
+#define IF_RS_VZW_SENT 0x01  /*add for VzW feature*/
 
 /* prefix flags */
 #define IF_PREFIX_ONLINK	0x01
@@ -43,7 +42,7 @@ enum {
 struct inet6_ifaddr {
 	struct in6_addr		addr;
 	__u32			prefix_len;
-	
+
 	/* In seconds, relative to tstamp. Expiry is at tstamp + HZ * lft. */
 	__u32			valid_lft;
 	__u32			prefered_lft;
@@ -192,8 +191,8 @@ struct inet6_dev {
 	__u32			if_flags;
 	int			dead;
 
+	u32			desync_factor;
 	u8			rndid[8];
-	struct timer_list	regen_timer;
 	struct list_head	tempaddr_list;
 
 	struct in6_addr		token;

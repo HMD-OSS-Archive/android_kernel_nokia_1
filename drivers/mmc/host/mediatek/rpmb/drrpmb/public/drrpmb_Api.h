@@ -1,9 +1,10 @@
 /*
- * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2019 MediaTek Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
+
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -39,18 +40,18 @@
  * @param len Length of the data to process.
  * @param data Data to be processed
  */
-typedef struct {
+struct cmd_t {
 	dciCommandHeader_t  header;     /**< Command header */
 	uint32_t            len;        /**< Length of data to process */
-} cmd_t;
+};
 
 /**
  * Response structure
  */
-typedef struct {
+struct rsp_t {
 	dciResponseHeader_t header;     /**< Response header */
 	uint32_t            len;
-} rsp_t;
+};
 
 
 /*
@@ -60,25 +61,27 @@ typedef struct {
 
 #if RPMB_MULTI_BLOCK_ACCESS
 #define MAX_RPMB_TRANSFER_BLK (16)
-#define MAX_RPMB_REQUEST_SIZE (512*MAX_RPMB_TRANSFER_BLK) /* 8KB(16blks) per requests. */
+/* 8KB(16blks) per requests. */
+#define MAX_RPMB_REQUEST_SIZE (512*MAX_RPMB_TRANSFER_BLK)
 #else
 #define MAX_RPMB_TRANSFER_BLK (1)
-#define MAX_RPMB_REQUEST_SIZE (512*MAX_RPMB_TRANSFER_BLK) /* 512B(1blks) per requests. */
+/* 512B(1blks) per requests. */
+#define MAX_RPMB_REQUEST_SIZE (512*MAX_RPMB_TRANSFER_BLK)
 #endif
 
-typedef struct {
+struct rpmb_req_t {
 	uint8_t frame[MAX_RPMB_REQUEST_SIZE];
 	uint32_t frameLen;
 	uint16_t type;
 	uint16_t addr;
 	uint16_t blks;
 	uint16_t result;
-} rpmb_req_t;
+};
 
 /*
  * DCI message data.
  */
-typedef struct {
+struct dciMessage_t {
 	union {
 		cmd_t     command;
 		rsp_t     response;
@@ -86,7 +89,7 @@ typedef struct {
 
 	rpmb_req_t    request;
 
-} dciMessage_t;
+};
 
 /*
  * Driver UUID. Update accordingly after reserving UUID

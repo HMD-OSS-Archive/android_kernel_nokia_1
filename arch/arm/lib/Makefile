@@ -4,8 +4,6 @@
 # Copyright (C) 1995-2000 Russell King
 #
 
-subdir-ccflags-y += -Werror
-
 lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
 		   csumpartialcopy.o csumpartialcopyuser.o clearbit.o \
 		   delay.o delay-loop.o findbit.o memchr.o memcpy.o   \
@@ -31,13 +29,16 @@ else
   lib-y	+= io-readsw-armv4.o io-writesw-armv4.o
 endif
 
-lib-$(CONFIG_ARCH_RPC)		+= ecard.o io-acorn.o floppydma.o
+ifeq ($(CONFIG_ARCH_RPC),y)
+  lib-y				+= ecard.o io-acorn.o floppydma.o
+  AFLAGS_delay-loop.o		+= -march=armv4
+endif
 
 $(obj)/csumpartialcopy.o:	$(obj)/csumpartialcopygeneric.S
 $(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
 
 ifeq ($(CONFIG_KERNEL_MODE_NEON),y)
-  NEON_FLAGS			:= -mfloat-abi=softfp -mfpu=neon
+  NEON_FLAGS			:= -march=armv7-a -mfloat-abi=softfp -mfpu=neon
   CFLAGS_xor-neon.o		+= $(NEON_FLAGS)
   obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
 endif

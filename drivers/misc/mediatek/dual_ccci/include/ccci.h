@@ -14,8 +14,8 @@
 #ifndef __CCCI_H__
 #define __CCCI_H__
 #include "ccci_common.h"
-#define BOOT_TIMER_HS1 10
-#define BOOT_TIMER_HS2 10
+#define BOOT_TIMER_HS1 30
+#define BOOT_TIMER_HS2 30
 
 typedef void (*ccci_aed_cb_t) (unsigned int flag, char *aed_str);
 /******************************************************************************/

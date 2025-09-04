@@ -5,8 +5,6 @@
 #include <linux/types.h>
 #include <asm/opcodes.h>
 
-#ifdef CONFIG_BUG
-
 /*
  * Use a suitable undefined instruction to use for ARM/Thumb2 bug handling.
  * We need to be careful not to conflict with those used by other modules and
@@ -35,7 +33,8 @@
 
 #define __BUG(__file, __line, __value)				\
 do {								\
-	asm volatile("nop\n\t""1:\t" BUG_INSTR(__value) "\n"  \
+	asm volatile("nop\n\t"					\
+		"1:\t" BUG_INSTR(__value) "\n"  \
 		".pushsection .rodata.str, \"aMS\", %progbits, 1\n" \
 		"2:\t.asciz " #__file "\n" 			\
 		".popsection\n" 				\
@@ -47,17 +46,16 @@ do {								\
 	unreachable();						\
 } while (0)
 
-#else  /* not CONFIG_DEBUG_BUGVERBOSE */
+#else
 
 #define __BUG(__file, __line, __value)				\
 do {								\
-	asm volatile("nop\n\t" BUG_INSTR(__value) "\n");			\
+	asm volatile("nop\n\t" BUG_INSTR(__value) "\n");	\
 	unreachable();						\
 } while (0)
 #endif  /* CONFIG_DEBUG_BUGVERBOSE */
 
 #define HAVE_ARCH_BUG
-#endif  /* CONFIG_BUG */
 
 #include <asm-generic/bug.h>
 

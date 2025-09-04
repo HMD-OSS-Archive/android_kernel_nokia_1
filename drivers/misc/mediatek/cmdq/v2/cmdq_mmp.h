@@ -14,10 +14,11 @@
 #ifndef __CMDQ_MMP_H__
 #define __CMDQ_MMP_H__
 
-#include "mmprofile.h"
 #include "cmdq_core.h"
+#include "mmprofile.h"
+#include "mmprofile_function.h"
 
-typedef struct {
+struct CMDQ_MMP_Events_t {
 	MMP_Event CMDQ;
 	MMP_Event CMDQ_IRQ;
 	MMP_Event thread_en;
@@ -33,11 +34,11 @@ typedef struct {
 	MMP_Event MDP_reset;
 	MMP_Event thread_suspend;
 	MMP_Event thread_resume;
-} CMDQ_MMP_Events_t;
+};
 
 void cmdq_mmp_init(void);
-CMDQ_MMP_Events_t *cmdq_mmp_get_event(void);
+struct CMDQ_MMP_Events_t *cmdq_mmp_get_event(void);
 
 extern void MMProfileEnable(int enable);
 extern void MMProfileStart(int start);
-#endif				/* __CMDQ_MMP_H__ */
+#endif /* __CMDQ_MMP_H__ */

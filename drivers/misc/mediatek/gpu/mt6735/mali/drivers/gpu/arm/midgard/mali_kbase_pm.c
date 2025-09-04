@@ -35,7 +35,7 @@
 unsigned int g_current_gpu_platform_id = 0; 
 
 mtk_gpu_freq_limit_data mt6735_gpu_freq_limit_data[MTK_MT6735_GPU_LIMIT_COUNT]=
-{ {2, 2, (const int[]){0,1}}, // Denali-1;   
+{ {2, 2, (const int[]){0,1}}, // D1;   
 };
 
 extern unsigned int (*mtk_get_gpu_loading_fp)(void);

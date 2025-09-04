@@ -12,45 +12,72 @@
 #
 
 ifneq ($(CONFIG_MTK_SMI_VARIANT),y)
+ccflags-y += -I$(srctree)/drivers/clk/mediatek
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/$(CONFIG_MTK_PLATFORM)/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/dramc/$(CONFIG_MTK_PLATFORM)/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/freqhopping/$(CONFIG_MTK_PLATFORM)/
 
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/m4u/$(MTK_PLATFORM)/
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)/
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v2/
-ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v2/$(MTK_PLATFORM)/
-obj-y += smi_common.o
-obj-y += smi_debug.o
-obj-y += smi_info_util.o
-obj-y += smi_config_util.o
-obj-y += smi_configuration.o
-obj-y += smi_internal.o
+ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6580" "mt6735"))
+CMDQ_VER := "v2"
+else
+CMDQ_VER := "v3"
+obj-y += met/
+endif
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/$(CMDQ_VER)/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/$(CMDQ_VER)/$(CONFIG_MTK_PLATFORM)/
 
-ifeq ($(CONFIG_ARCH_MT6735),y)
-ccflags-y += -I$(srctree)/drivers/clk/mediatek
-ccflags-y += -DSMI_D1
-obj-y += mmdvfs_mgr.o
-else ifeq ($(CONFIG_ARCH_MT6735M),y)
-ccflags-y += -DSMI_D2
-obj-y += mmdvfs_mgr.o
-else ifeq ($(CONFIG_ARCH_MT6753),y)
-ccflags-y += -DSMI_D3
-obj-y += mmdvfs_mgr.o
-else ifeq ($(CONFIG_ARCH_MT6580),y)
-ccflags-y += -DSMI_R
-else ifeq ($(CONFIG_ARCH_MT6570),y)
-ccflags-y += -DSMI_RU
-else ifeq ($(CONFIG_ARCH_MT6755),y)
-ccflags-y += -DSMI_J
-ccflags-y += -I$(srctree)/drivers/clk/mediatek
-obj-y += mmdvfs_mgr_v2.o
-else ifeq ($(CONFIG_ARCH_MT6797),y)
-ccflags-y += -DSMI_EV
-ccflags-y += -I$(srctree)/drivers/clk/mediatek
-obj-y += mmdvfs_mgr_v2.o
-else 
-ccflags-y += -DSMI_BRINGUP
+SUPPORT_QOS := true
+ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6758"))
+ccflags-y += -DSMI_VIN
+ccflags-y += -DMMDVFS_HOOK
+SUPPORT_QOS := false
+obj-y += mmdvfs_mgr_v3.o
+obj-y += mmdvfs_mgr_util.o
+obj-y += mmdvfs_profile_adaptor.o
+
+else ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6765"))
+ccflags-y += -DSMI_CER
+ccflags-y += -DMMDVFS_HOOK
+#ccflags-y += -DVCORE_READY
+#ccflags-y += -DPLL_HOPPING_READY
+ccflags-y += -DMMDVFS_QOS_SUPPORT
+obj-y += mmdvfs_mgr_v3.o
+obj-y += mmdvfs_mgr_util.o
+obj-y += mmdvfs_profile_adaptor.o
+SUPPORT_USE_DDR_TYPE := true
+SUPPORT_MMP := true
 endif
 
+ifeq ($(CONFIG_MACH_MT6735M),y)
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include/mach/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/freqhopping/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)/
+ccflags-y += -DSMI_D2
+ccflags-y += -DMMDVFS_HOOK
+SUPPORT_QOS := false
+obj-y += mmdvfs_mgr.o
+endif
+
+ifeq (true, $(SUPPORT_QOS))
+obj-y += mmdvfs_pmqos.o
+endif
+
+ifeq ($(CONFIG_MMPROFILE),y)
+ifeq (true, $(SUPPORT_MMP))
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/mmp/
+ccflags-y += -DMMDVFS_MMP
+endif
+endif
+
+ifeq (true, $(SUPPORT_USE_DDR_TYPE))
+ccflags-y += -DUSE_DDR_TYPE
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/$(MTK_PLATFORM)/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/emi/submodule/
+endif
+
+obj-y += smi_legacy.o
 else
 obj-y += $(subst ",,variant)/
 endif

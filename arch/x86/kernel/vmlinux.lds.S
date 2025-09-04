@@ -81,11 +81,11 @@ PHDRS {
 SECTIONS
 {
 #ifdef CONFIG_X86_32
-        . = LOAD_OFFSET + LOAD_PHYSICAL_ADDR;
-        phys_startup_32 = startup_32 - LOAD_OFFSET;
+	. = LOAD_OFFSET + LOAD_PHYSICAL_ADDR;
+	phys_startup_32 = ABSOLUTE(startup_32 - LOAD_OFFSET);
 #else
-        . = __START_KERNEL;
-        phys_startup_64 = startup_64 - LOAD_OFFSET;
+	. = __START_KERNEL;
+	phys_startup_64 = ABSOLUTE(startup_64 - LOAD_OFFSET);
 #endif
 
 	/* Text and read-only data */
@@ -97,12 +97,21 @@ SECTIONS
 		_stext = .;
 		TEXT_TEXT
 		SCHED_TEXT
+		CPUIDLE_TEXT
 		LOCK_TEXT
 		KPROBES_TEXT
 		ENTRY_TEXT
 		IRQENTRY_TEXT
+		SOFTIRQENTRY_TEXT
 		*(.fixup)
 		*(.gnu.warning)
+
+#ifdef CONFIG_RETPOLINE
+		__indirect_thunk_start = .;
+		*(.text.__x86.indirect_thunk)
+		__indirect_thunk_end = .;
+#endif
+
 		/* End of text section */
 		_etext = .;
 	} :text = 0x9090
@@ -183,12 +192,25 @@ SECTIONS
 	 * start another segment - init.
 	 */
 	PERCPU_VADDR(INTERNODE_CACHE_BYTES, 0, :percpu)
+	ASSERT(SIZEOF(.data..percpu) < CONFIG_PHYSICAL_START,
+	       "per-CPU data too large - increase CONFIG_PHYSICAL_START")
 #endif
 
 	INIT_TEXT_SECTION(PAGE_SIZE)
 #ifdef CONFIG_X86_64
 	:init
 #endif
+
+	/*
+	 * Section for code used exclusively before alternatives are run. All
+	 * references to such code must be patched out by alternatives, normally
+	 * by using X86_FEATURE_ALWAYS CPU feature bit.
+	 *
+	 * See static_cpu_has() for an example.
+	 */
+	.altinstr_aux : AT(ADDR(.altinstr_aux) - LOAD_OFFSET) {
+		*(.altinstr_aux)
+	}
 
 	INIT_DATA_SECTION(16)
 
@@ -320,6 +342,7 @@ SECTIONS
 		__brk_limit = .;
 	}
 
+	. = ALIGN(PAGE_SIZE);		/* keep VO_INIT_SIZE page aligned */
 	_end = .;
 
         STABS_DEBUG
@@ -327,7 +350,9 @@ SECTIONS
 
 	/* Sections to be discarded */
 	DISCARDS
-	/DISCARD/ : { *(.eh_frame) }
+	/DISCARD/ : {
+		*(.eh_frame)
+	}
 }
 
 
@@ -342,7 +367,7 @@ SECTIONS
  * Per-cpu symbols which need to be offset from __per_cpu_load
  * for the boot processor.
  */
-#define INIT_PER_CPU(x) init_per_cpu__##x = x + __per_cpu_load
+#define INIT_PER_CPU(x) init_per_cpu__##x = ABSOLUTE(x) + __per_cpu_load
 INIT_PER_CPU(gdt_page);
 INIT_PER_CPU(irq_stack_union);
 
@@ -359,7 +384,7 @@ INIT_PER_CPU(irq_stack_union);
 
 #endif /* CONFIG_X86_32 */
 
-#ifdef CONFIG_KEXEC
+#ifdef CONFIG_KEXEC_CORE
 #include <asm/kexec.h>
 
 . = ASSERT(kexec_control_code_size <= KEXEC_CONTROL_CODE_MAX_SIZE,

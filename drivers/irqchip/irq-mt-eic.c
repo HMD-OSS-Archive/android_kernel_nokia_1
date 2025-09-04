@@ -1049,10 +1049,10 @@ static void mt_eint_set_timer_event(unsigned int eint_num)
 	/* register timer for this sw debounce eint */
 	eint_timer->expires =
 		jiffies + usecs_to_jiffies(EINT_FUNC.deb_time[eint_num]);
-	pr_debug("EINT Module - expires:%lu, jiffies:%lu, deb_in_jiffies:%lu, ",
+	dbgmsg("EINT Module - expires:%lu, jiffies:%lu, deb_in_jiffies:%lu, ",
 		 eint_timer->expires, jiffies,
 		 usecs_to_jiffies(EINT_FUNC.deb_time[eint_num]));
-	pr_debug("deb:%d, in %s\n", EINT_FUNC.deb_time[eint_num], __func__);
+	dbgmsg("deb:%d, in %s\n", EINT_FUNC.deb_time[eint_num], __func__);
 	eint_timer->data = eint_num;
 	eint_timer->function = &mt_eint_timer_event_handler;
 	if (!timer_pending(eint_timer)) {
@@ -2309,7 +2309,7 @@ void mt_eint_print_status(void)
 		/* read status register every 32 interrupts */
 		status = mt_eint_get_status(reg_base);
 		if (status)
-			pr_notice("EINT Module - index:%d,EINT_STA = 0x%x\n",
+			dbgmsg("EINT Module - index:%d,EINT_STA = 0x%x\n",
 				reg_base, status);
 		else
 			continue;
@@ -2321,7 +2321,7 @@ void mt_eint_print_status(void)
 
 			status_check = status & (1 << offset);
 			if (status_check) {
-				pr_notice("EINT %d is pending\n", index);
+				dbgmsg("EINT %d is pending\n", index);
 #if (EINT_DEBUG == 1)
 				mt_eint_dump_status(index);
 #endif

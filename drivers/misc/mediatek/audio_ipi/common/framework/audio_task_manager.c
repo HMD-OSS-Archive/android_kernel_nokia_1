@@ -1,15 +1,15 @@
 /*
-* Copyright (C) 2016 MediaTek Inc.
-*
-* This program is free software; you can redistribute it and/or modify
-* it under the terms of the GNU General Public License version 2 as
-* published by the Free Software Foundation.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-* See http://www.gnu.org/licenses/gpl-2.0.html for more details.
-*/
+ * Copyright (C) 2016 MediaTek Inc.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
+ */
 
 #include "audio_task_manager.h"
 
@@ -21,6 +21,7 @@
 #include <linux/wait.h>
 #include <linux/spinlock.h>
 
+#include <linux/io.h>
 #include <linux/mutex.h>
 
 #include <scp_ipi.h>
@@ -34,6 +35,8 @@
 #include "audio_ipi_queue.h"
 #include "audio_messenger_ipi.h"
 
+/* using for filter ipi message*/
+#include <audio_spkprotect_msg_id.h>
 
 #ifdef CONFIG_MTK_DO /* with DO */
 static DEFINE_MUTEX(audio_load_task_mutex);
@@ -47,7 +50,7 @@ static DEFINE_MUTEX(audio_load_task_mutex);
 #endif
 
 
-struct audio_task {
+struct audio_task_t {
 #ifdef CONFIG_MTK_DO /* with DO */
 	char *feature_name;
 	char *do_name;
@@ -55,12 +58,10 @@ struct audio_task {
 	bool is_do_loaded;
 	task_unloaded_t task_unloaded;
 #endif
-	ipi_queue_handler_t *ipi_queue_handler;
+	struct ipi_queue_handler_t *ipi_queue_handler;
 };
 
-typedef struct audio_task audio_task_t;
-
-static audio_task_t g_audio_task_array[TASK_SCENE_SIZE];
+static struct audio_task_t g_audio_task_array[TASK_SCENE_SIZE];
 
 static char *g_current_do_name;
 
@@ -92,7 +93,7 @@ static char *get_feature_name(const task_scene_t task_scene)
 	case TASK_SCENE_VOIP:
 	case TASK_SCENE_SPEAKER_PROTECTION:
 	default: {
-		AUD_LOG_E("%s not support task %d", __func__, task_scene);
+		pr_notice("%s not support task %d", __func__, task_scene);
 		break;
 	}
 	}
@@ -124,7 +125,7 @@ static char *get_do_name(const task_scene_t task_scene)
 	case TASK_SCENE_VOIP:
 	case TASK_SCENE_SPEAKER_PROTECTION:
 	default: {
-		AUD_LOG_E("%s not support task %d", __func__, task_scene);
+		pr_notice("%s not support task %d", __func__, task_scene);
 		break;
 	}
 	}
@@ -132,10 +133,10 @@ static char *get_do_name(const task_scene_t task_scene)
 	return do_name;
 #else
 	char *feature_name = g_audio_task_array[task_scene].feature_name;
-	DOListNode *all_do_info = mt_do_get_do_infos();
+	struct do_list_node *all_do_info = mt_do_get_do_infos();
 
-	DOListNode *do_node = NULL;
-	DOListNode *feature_node = NULL;
+	struct do_list_node *do_node = NULL;
+	struct do_list_node *feature_node = NULL;
 
 	char *do_name = NULL;
 
@@ -157,7 +158,8 @@ static char *get_do_name(const task_scene_t task_scene)
 
 
 	if (do_name != NULL)
-		AUD_LOG_D("get feature %s in DO set %s\n", feature_name, do_name);
+		pr_debug("get feature %s in DO set %s\n",
+			 feature_name, do_name);
 
 	return do_name;
 #endif
@@ -174,7 +176,7 @@ int audio_task_register_callback(
 	recv_message_t  recv_message,
 	task_unloaded_t task_unloaded)
 {
-	audio_task_t *task = &g_audio_task_array[task_scene];
+	struct audio_task_t *task = &g_audio_task_array[task_scene];
 
 #ifdef CONFIG_MTK_DO /* with DO */
 	task->feature_name = get_feature_name(task_scene);
@@ -204,7 +206,7 @@ int audio_task_register_callback(
 #ifdef CONFIG_MTK_DO /* with DO */
 static void load_target_tasks(char *target_do_name)
 {
-	audio_task_t *task = NULL;
+	struct audio_task_t *task = NULL;
 	int i = 0;
 
 
@@ -225,7 +227,7 @@ static void load_target_tasks(char *target_do_name)
 static void unload_current_tasks(void)
 {
 
-	audio_task_t *task = NULL;
+	struct audio_task_t *task = NULL;
 	int i = 0;
 
 	for (i = 0; i < TASK_SCENE_SIZE; i++) {
@@ -252,12 +254,12 @@ int audio_load_task(const task_scene_t task_scene)
 #ifndef CONFIG_MTK_DO /* without DO, do nothing */
 	return -1;
 #else
-	DOListNode *current_do = NULL;
+	struct do_list_node *current_do = NULL;
 
 	char *target_do_name = NULL;
 	int retval = 0;
 
-	AUD_LOG_D("%s(+), task_scene: %d", __func__, task_scene);
+	pr_debug("%s(+), task_scene: %d", __func__, task_scene);
 
 	mutex_lock(&audio_load_task_mutex);
 
@@ -265,12 +267,13 @@ int audio_load_task(const task_scene_t task_scene)
 	AUD_ASSERT(target_do_name != NULL);
 
 	/* already loaded, do nothing */
-	if (g_current_do_name != NULL && !strcmp(target_do_name, g_current_do_name))
+	if (g_current_do_name != NULL &&
+	    !strcmp(target_do_name, g_current_do_name))
 		goto audio_load_task_exit;
 
 	/* unload current */
 	if (g_current_do_name == NULL) { /* scp might load a default DO */
-		current_do = mt_do_get_loaded_do();
+		current_do = mt_do_get_loaded_do(SCP_B);
 		if (current_do != NULL &&
 		    current_do->name != NULL &&
 		    strcmp(target_do_name, current_do->name) != 0)
@@ -291,31 +294,38 @@ audio_load_task_exit:
 
 	mutex_unlock(&audio_load_task_mutex);
 
-	AUD_LOG_D("%s(-), task_scene: %d\n", __func__, task_scene);
+	pr_debug("%s(-), task_scene: %d\n", __func__, task_scene);
 	return retval;
 #endif /* end of CONFIG_MTK_DO */
 }
 
 
-
+static bool check_print_msg_info(const struct ipi_msg_t *p_ipi_msg)
+{
+	if (p_ipi_msg->task_scene == TASK_SCENE_SPEAKER_PROTECTION &&
+	    p_ipi_msg->msg_id == SPK_PROTECT_DLCOPY)
+		return false;
+	else
+		return true;
+}
 
 
 int audio_send_ipi_msg(
-	ipi_msg_t *p_ipi_msg,
+	struct ipi_msg_t *p_ipi_msg,
 	uint8_t task_scene, /* task_scene_t */
 	uint8_t msg_layer, /* audio_ipi_msg_layer_t */
-	audio_ipi_msg_data_t data_type,
-	audio_ipi_msg_ack_t ack_type,
+	uint8_t data_type, /* audio_ipi_msg_data_t */
+	uint8_t ack_type, /* audio_ipi_msg_ack_t */
 	uint16_t msg_id,
 	uint32_t param1,
 	uint32_t param2,
 	char    *data_buffer)
 {
-	ipi_queue_handler_t *handler = NULL;
+	struct ipi_queue_handler_t *handler = NULL;
 	uint32_t ipi_msg_len = 0;
 
 	if (p_ipi_msg == NULL) {
-		AUD_LOG_E("%s(), p_ipi_msg = NULL, return\n", __func__);
+		pr_notice("%s(), p_ipi_msg = NULL, return\n", __func__);
 		return -1;
 	}
 
@@ -342,9 +352,16 @@ int audio_send_ipi_msg(
 	ipi_msg_len = get_message_buf_size(p_ipi_msg);
 	check_msg_format(p_ipi_msg, ipi_msg_len);
 
+	/* if need atomic , direct call send_message_to_scp*/
+	if (msg_layer == AUDIO_IPI_LAYER_KERNEL_TO_SCP_ATOMIC) {
+		if (check_print_msg_info(p_ipi_msg) == true)
+			print_msg_info(__func__, "p_ipi_msg", p_ipi_msg);
+		return send_message_to_scp(p_ipi_msg);
+	}
+
 	handler = get_ipi_queue_handler(p_ipi_msg->task_scene);
 	if (handler == NULL) {
-		AUD_LOG_E("%s(), handler = NULL, return\n", __func__);
+		pr_notice("%s(), handler = NULL, return\n", __func__);
 		return -1;
 	}
 
@@ -352,13 +369,13 @@ int audio_send_ipi_msg(
 }
 
 
-int audio_send_ipi_filled_msg(ipi_msg_t *p_ipi_msg)
+int audio_send_ipi_filled_msg(struct ipi_msg_t *p_ipi_msg)
 {
-	ipi_queue_handler_t *handler = NULL;
+	struct ipi_queue_handler_t *handler = NULL;
 
 	handler = get_ipi_queue_handler(p_ipi_msg->task_scene);
 	if (handler == NULL) {
-		AUD_LOG_E("%s(), handler = NULL, return\n", __func__);
+		pr_notice("%s(), handler = NULL, return\n", __func__);
 		return -1;
 	}
 
@@ -379,7 +396,7 @@ void audio_task_manager_init(void)
 
 void audio_task_manager_deinit(void)
 {
-	audio_task_t *task = NULL;
+	struct audio_task_t *task = NULL;
 	int i = 0;
 
 	for (i = 0; i < TASK_SCENE_SIZE; i++) {

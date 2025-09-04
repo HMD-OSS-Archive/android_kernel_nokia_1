@@ -1,22 +1,20 @@
 /*
- * Copyright (c) 2015 MediaTek Inc.
+ * Copyright (C) 2018 MediaTek Inc.
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/cpu.h>
 #include <linux/kthread.h>
-#include <linux/wakelock.h>
 #include <linux/delay.h>
 #include <asm-generic/bug.h>
 
@@ -25,7 +23,15 @@
 /*
  * hps algo - hmp
  */
+static void mark_cpu_offline(int cpu, bool state)
+{
+	struct device *dev = get_cpu_device(cpu);
 
+	if (!dev)
+		return;
+	dev->offline = state;
+
+}
 static void algo_hmp_limit(
 		struct cpumask *little_online_cpumask,
 		struct cpumask *big_online_cpumask,
@@ -48,6 +54,7 @@ static void algo_hmp_limit(
 
 			cpu_down(cpu);
 			cpumask_clear_cpu(cpu, big_online_cpumask);
+			mark_cpu_offline(cpu, true);
 			--big_num_online;
 			if (--val == 0)
 				break;
@@ -65,6 +72,7 @@ static void algo_hmp_limit(
 
 			cpu_down(cpu);
 			cpumask_clear_cpu(cpu, little_online_cpumask);
+			mark_cpu_offline(cpu, true);
 			--little_num_online;
 			if (--val == 0)
 				break;
@@ -100,6 +108,7 @@ static void algo_hmp_base(
 
 			cpu_up(cpu);
 			cpumask_set_cpu(cpu, big_online_cpumask);
+			mark_cpu_offline(cpu, false);
 			++bo;
 			if (--val == 0)
 				break;
@@ -121,6 +130,7 @@ static void algo_hmp_base(
 
 			cpu_up(cpu);
 			cpumask_set_cpu(cpu, little_online_cpumask);
+			mark_cpu_offline(cpu, false);
 			++lo;
 			if (--val == 0)
 				break;
@@ -170,6 +180,7 @@ static void algo_hmp_rush_boost(
 
 			cpu_up(cpu);
 			cpumask_set_cpu(cpu, little_online_cpumask);
+			mark_cpu_offline(cpu, false);
 			++little_num_online;
 			if (--val == 0)
 				break;
@@ -184,6 +195,7 @@ static void algo_hmp_rush_boost(
 
 			cpu_up(cpu);
 			cpumask_set_cpu(cpu, big_online_cpumask);
+			mark_cpu_offline(cpu, false);
 			++big_num_online;
 			if (--val == 0)
 				break;
@@ -242,6 +254,7 @@ static void algo_hmp_up(
 			if (!cpumask_test_cpu(cpu, little_online_cpumask)) {
 				cpu_up(cpu);
 				cpumask_set_cpu(cpu, little_online_cpumask);
+				mark_cpu_offline(cpu, false);
 				++little_num_online;
 				break;
 			}
@@ -254,6 +267,7 @@ static void algo_hmp_up(
 			if (!cpumask_test_cpu(cpu, big_online_cpumask)) {
 				cpu_up(cpu);
 				cpumask_set_cpu(cpu, big_online_cpumask);
+				mark_cpu_offline(cpu, false);
 				++big_num_online;
 				break;
 			}
@@ -318,6 +332,7 @@ static void algo_hmp_down(
 
 			cpu_down(cpu);
 			cpumask_clear_cpu(cpu, big_online_cpumask);
+			mark_cpu_offline(cpu, true);
 			--big_num_online;
 			if (--val == 0)
 				break;
@@ -332,6 +347,7 @@ static void algo_hmp_down(
 
 			cpu_down(cpu);
 			cpumask_clear_cpu(cpu, little_online_cpumask);
+			mark_cpu_offline(cpu, true);
 			--little_num_online;
 			if (--val == 0)
 				break;
@@ -385,6 +401,7 @@ static void algo_hmp_big_to_little(
 
 		cpu_up(cpu);
 		cpumask_set_cpu(cpu, little_online_cpumask);
+		mark_cpu_offline(cpu, false);
 		++little_num_online;
 		break;
 	}
@@ -392,6 +409,7 @@ static void algo_hmp_big_to_little(
 	/* down 1 big */
 	cpu_down(val);
 	cpumask_clear_cpu(cpu, big_online_cpumask);
+	mark_cpu_offline(val, true);
 	--big_num_online;
 	hps_ctxt.action |= BIT(ACTION_BIG_TO_LITTLE);
 }
@@ -628,6 +646,7 @@ static void algo_smp_limit(
 
 		cpu_down(cpu);
 		cpumask_clear_cpu(cpu, little_online_cpumask);
+		mark_cpu_offline(cpu, true);
 		--little_num_online;
 
 		if (--val == 0)
@@ -661,6 +680,7 @@ static void algo_smp_base(
 
 		cpu_up(cpu);
 		cpumask_set_cpu(cpu, little_online_cpumask);
+		mark_cpu_offline(cpu, false);
 		++little_num_online;
 
 		if (--val == 0)
@@ -710,6 +730,7 @@ static void algo_smp_rush_boost(
 
 		cpu_up(cpu);
 		cpumask_set_cpu(cpu, little_online_cpumask);
+		mark_cpu_offline(cpu, false);
 		++little_num_online;
 
 		if (--val == 0)
@@ -768,6 +789,7 @@ static void algo_smp_up(
 
 		cpu_up(cpu);
 		cpumask_set_cpu(cpu, little_online_cpumask);
+		mark_cpu_offline(cpu, false);
 		++little_num_online;
 		break;
 	}
@@ -828,6 +850,7 @@ static void algo_smp_down(
 
 		cpu_down(cpu);
 		cpumask_clear_cpu(cpu, little_online_cpumask);
+		mark_cpu_offline(cpu, true);
 		--little_num_online;
 
 		if (--val == 0)

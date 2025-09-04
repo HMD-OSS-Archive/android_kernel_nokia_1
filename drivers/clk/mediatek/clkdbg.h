@@ -1,14 +1,14 @@
 /*
- * Copyright (C) 2015 MediaTek Inc.
+ * Copyright (C) 2016 MediaTek Inc.
  *
- * This program is free software: you can redistribute it and/or modify
+ * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
 #ifndef __DRV_CLKDBG_H
@@ -65,6 +65,7 @@ struct provider_clk {
 	const char *provider_name;
 	u32 idx;
 	struct clk *ck;
+	u32 pwr_mask;
 };
 
 struct clkdbg_ops {
@@ -75,6 +76,10 @@ struct clkdbg_ops {
 	const struct regname *(*get_all_regnames)(void);
 	const char * const *(*get_all_clk_names)(void);
 	const char * const *(*get_pwr_names)(void);
+	void (*setup_provider_clk)(struct provider_clk *pvdck);
+	void (*set_all_clk_cg_disable)(unsigned int disable);
+	void (*set_all_pll_disable)(unsigned int disable);
+	void (*set_all_mtcmos_disable)(unsigned int disable);
 };
 
 void set_clkdbg_ops(const struct clkdbg_ops *ops);

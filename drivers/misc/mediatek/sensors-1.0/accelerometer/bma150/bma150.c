@@ -2466,7 +2466,7 @@ static int bma255_get_data(int* x ,int* y,int* z, int* status)
 	return 0;
 }
 
-// 
+//
 static int bma150_acc_batch(int flag, int64_t samplingPeriodNs, int64_t maxBatchReportLatencyNs)
 {
     return bma255_set_delay((u64)samplingPeriodNs);

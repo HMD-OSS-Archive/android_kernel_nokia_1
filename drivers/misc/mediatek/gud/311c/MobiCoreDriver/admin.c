@@ -101,6 +101,12 @@ static struct tee_object *tee_object_alloc(bool is_sp_trustlet, size_t length)
 		size += header_length + 3 * MAX_SO_CONT_SIZE;
 	}
 
+	/* Check size for overflow */
+	if (size < length) {
+		mc_dev_notice("cannot allocate object of size %zu", length);
+		return NULL;
+	}
+
 	/* Allocate memory */
 	obj = vzalloc(size);
 	if (!obj)
@@ -176,12 +182,12 @@ static int request_send(u32 command, const struct mc_uuid_t *uuid, bool is_gp,
 	if (g_request.server_state != READY) {
 		mutex_unlock(&g_request.states_mutex);
 		if (g_request.server_state != NOT_CONNECTED) {
-			mc_dev_err("invalid daemon state %d\n",
+			mc_dev_notice("invalid daemon state %d\n",
 				   g_request.server_state);
 			ret = -EPROTO;
 			goto end;
 		} else {
-			mc_dev_err("daemon not connected\n");
+			mc_dev_notice("daemon not connected\n");
 			ret = -EHOSTUNREACH;
 			goto end;
 		}
@@ -231,7 +237,7 @@ static int request_send(u32 command, const struct mc_uuid_t *uuid, bool is_gp,
 		break;
 	case REQUEST_RECEIVED:
 		/* Should not happen as complete means the state changed */
-		mc_dev_err("daemon is in a bad state: %d\n",
+		mc_dev_notice("daemon is in a bad state: %d\n",
 			   g_request.server_state);
 		ret = -EPIPE;
 		break;
@@ -262,7 +268,7 @@ static int request_receive(void *address, u32 size)
 		    (g_request.server_state == DATA_SENT);
 	mutex_unlock(&g_request.states_mutex);
 	if (!server_ok) {
-		mc_dev_err("expected server state %d or %d, not %d\n",
+		mc_dev_notice("expected server state %d or %d, not %d\n",
 			   RESPONSE_SENT, DATA_SENT, g_request.server_state);
 		request_cancel();
 		return -EPIPE;
@@ -316,7 +322,7 @@ static int admin_get_root_container(void *address)
 	/* Check length against max */
 	if (g_request.response.length >= MAX_SO_CONT_SIZE) {
 		request_cancel();
-		mc_dev_err("response length exceeds maximum\n");
+		mc_dev_notice("response length exceeds maximum\n");
 		ret = EREMOTEIO;
 		goto end;
 	}
@@ -346,7 +352,7 @@ static int admin_get_sp_container(void *address, u32 spid)
 	/* Check length against max */
 	if (g_request.response.length >= MAX_SO_CONT_SIZE) {
 		request_cancel();
-		mc_dev_err("response length exceeds maximum\n");
+		mc_dev_notice("response length exceeds maximum\n");
 		ret = EREMOTEIO;
 		goto end;
 	}
@@ -377,7 +383,7 @@ static int admin_get_trustlet_container(void *address,
 	/* Check length against max */
 	if (g_request.response.length >= MAX_SO_CONT_SIZE) {
 		request_cancel();
-		mc_dev_err("response length exceeds maximum\n");
+		mc_dev_notice("response length exceeds maximum\n");
 		ret = EREMOTEIO;
 		goto end;
 	}
@@ -499,13 +505,13 @@ struct tee_object *tee_object_read(u32 spid, uintptr_t address, size_t length)
 
 	/* Check length */
 	if (length < sizeof(thdr)) {
-		mc_dev_err("buffer shorter than header size\n");
+		mc_dev_notice("buffer shorter than header size\n");
 		return ERR_PTR(-EFAULT);
 	}
 
 	/* Read header */
 	if (copy_from_user(&thdr, addr, sizeof(thdr))) {
-		mc_dev_err("header: copy_from_user failed\n");
+		mc_dev_notice("header: copy_from_user failed\n");
 		return ERR_PTR(-EFAULT);
 	}
 
@@ -521,7 +527,7 @@ struct tee_object *tee_object_read(u32 spid, uintptr_t address, size_t length)
 	/* Copy the rest of the data */
 	data += sizeof(thdr);
 	if (copy_from_user(data, &addr[sizeof(thdr)], length - sizeof(thdr))) {
-		mc_dev_err("data: copy_from_user failed\n");
+		mc_dev_notice("data: copy_from_user failed\n");
 		vfree(obj);
 		return ERR_PTR(-EFAULT);
 	}
@@ -671,7 +677,7 @@ static ssize_t admin_write(struct file *file, const char __user *user,
 
 	/* No offset allowed [yet] */
 	if (*off) {
-		mc_dev_err("offset not supported\n");
+		mc_dev_notice("offset not supported\n");
 		g_request.response.error_no = EPIPE;
 		ret = -ECOMM;
 		goto err;
@@ -680,7 +686,7 @@ static ssize_t admin_write(struct file *file, const char __user *user,
 	if (server_state_is(REQUEST_RECEIVED)) {
 		/* Check client state */
 		if (!client_state_is(REQUEST_SENT)) {
-			mc_dev_err("expected client state %d, not %d\n",
+			mc_dev_notice("expected client state %d, not %d\n",
 				   REQUEST_SENT, g_request.client_state);
 			g_request.response.error_no = EPIPE;
 			ret = -EPIPE;
@@ -690,7 +696,7 @@ static ssize_t admin_write(struct file *file, const char __user *user,
 		/* Receive response header */
 		if (copy_from_user(&g_request.response, user,
 				   sizeof(g_request.response))) {
-			mc_dev_err("failed to get response from daemon\n");
+			mc_dev_notice("failed to get response from daemon\n");
 			g_request.response.error_no = EPIPE;
 			ret = -ECOMM;
 			goto err;
@@ -699,7 +705,7 @@ static ssize_t admin_write(struct file *file, const char __user *user,
 		/* Check request ID */
 		if (g_request.request.request_id !=
 						g_request.response.request_id) {
-			mc_dev_err("expected id %d, not %d\n",
+			mc_dev_notice("expected id %d, not %d\n",
 				   g_request.request.request_id,
 				   g_request.response.request_id);
 			g_request.response.error_no = EPIPE;
@@ -731,7 +737,7 @@ static ssize_t admin_write(struct file *file, const char __user *user,
 
 		/* Check client state */
 		if (!client_state_is(BUFFERS_READY)) {
-			mc_dev_err("expected client state %d, not %d\n",
+			mc_dev_notice("expected client state %d, not %d\n",
 				   BUFFERS_READY, g_request.client_state);
 			g_request.response.error_no = EPIPE;
 			ret = -EPIPE;
@@ -744,7 +750,7 @@ static ssize_t admin_write(struct file *file, const char __user *user,
 
 		ret = copy_from_user(g_request.buffer, user, len);
 		if (ret) {
-			mc_dev_err("failed to get data from daemon\n");
+			mc_dev_notice("failed to get data from daemon\n");
 			g_request.response.error_no = EPIPE;
 			ret = -ECOMM;
 			goto err;
@@ -780,7 +786,7 @@ int is_authenticator_pid(pid_t pid)
 
 	/* Now compare (under locks to avoid a race-based attack) */
 	if (!service) {
-		mc_dev_err("No authenticator connected\n");
+		mc_dev_notice("No authenticator connected\n");
 		ret = -ENOTCONN;
 		goto end;
 	}
@@ -789,10 +795,10 @@ int is_authenticator_pid(pid_t pid)
 	rcu_read_lock();
 	task = pid_task(find_vpid(pid), PIDTYPE_PID);
 	if (!task) {
-		mc_dev_err("No task for PID %d\n", pid);
+		mc_dev_notice("No task for PID %d\n", pid);
 		ret = -EINVAL;
 	} else if (task->tgid != service->tgid) {
-		mc_dev_err("PID %d is not an authenticator\n", pid);
+		mc_dev_notice("PID %d is not an authenticator\n", pid);
 		ret = -EPERM;
 	}
 	rcu_read_unlock();
@@ -833,7 +839,7 @@ static long admin_ioctl(struct file *file, unsigned int cmd,
 			}
 			ret = 0;
 		} else {
-			mc_dev_err("admin TGID %d is not a listener\n",
+			mc_dev_notice("admin TGID %d is not a listener\n",
 				   current->tgid);
 			ret = -EPERM;
 		}
@@ -850,7 +856,7 @@ static long admin_ioctl(struct file *file, unsigned int cmd,
 
 		/* Check client state */
 		if (!client_state_is(REQUEST_SENT)) {
-			mc_dev_err("expected client state %d, not %d\n",
+			mc_dev_notice("expected client state %d, not %d\n",
 				   REQUEST_SENT, g_request.client_state);
 			g_request.response.error_no = EPIPE;
 			complete(&g_request.server_complete);
@@ -964,7 +970,7 @@ static long admin_ioctl(struct file *file, unsigned int cmd,
 			if (role == TEE_ROLE_LISTENER)
 				server_state_change(READY);
 		} else {
-			mc_dev_err("TGID %d failed to take role %d: ret %d\n",
+			mc_dev_notice("TGID %d failed to take role %d: ret %d\n",
 				   current->tgid, role, ret);
 		}
 		mutex_unlock(&admin_ctx.services_mutex);
@@ -1041,7 +1047,7 @@ static int admin_open(struct inode *inode, struct file *file)
 		service = &admin_ctx.services[1];
 		mc_dev_devel("admin connection #1, TGID %d\n", current->tgid);
 	} else {
-		mc_dev_err("both admin connections already open\n");
+		mc_dev_notice("both admin connections already open\n");
 		ret = -EBUSY;
 	}
 

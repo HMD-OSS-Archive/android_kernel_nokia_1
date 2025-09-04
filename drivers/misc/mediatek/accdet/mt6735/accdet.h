@@ -33,7 +33,7 @@
 #include <linux/uaccess.h>
 #include <linux/io.h>
 #include <linux/workqueue.h>
-#include <linux/switch.h>
+//#include <linux/switch.h>
 #include <linux/delay.h>
 
 #include <linux/device.h>
@@ -43,7 +43,6 @@
 #include <linux/uaccess.h>
 #include <linux/kthread.h>
 #include <linux/input.h>
-#include <linux/wakelock.h>
 #include <linux/time.h>
 
 #include <linux/string.h>
@@ -79,7 +78,7 @@ extern struct i2c_client *ts3a225e_i2c_client;
 extern int ts3a225e_read_byte(unsigned char cmd, unsigned char *returnData);
 extern int ts3a225e_write_byte(unsigned char cmd, unsigned char writeData);
 #endif
-extern struct of_device_id accdet_of_match[];
+extern const struct of_device_id accdet_of_match[];
 void mt_accdet_remove(void);
 void mt_accdet_suspend(void);
 void mt_accdet_resume(void);

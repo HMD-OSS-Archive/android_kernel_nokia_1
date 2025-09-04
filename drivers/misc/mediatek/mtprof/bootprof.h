@@ -12,9 +12,9 @@
  */
 
 /*
-  boot logger: drivers/misc/mtprof/bootprof
-  interface: /proc/bootprof
-*/
+ *  boot logger: drivers/misc/mtprof/bootprof
+ * interface: /proc/bootprof
+ */
 #ifndef _BOOTPROF_H_
 #define _BOOTPROF_H_
 #ifdef CONFIG_SCHEDSTATS

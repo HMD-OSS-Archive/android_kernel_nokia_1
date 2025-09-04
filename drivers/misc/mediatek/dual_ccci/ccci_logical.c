@@ -18,8 +18,9 @@
 #include <mach/irqs.h>
 #include <linux/kallsyms.h>
 #include <linux/delay.h>
-#include <linux/wakelock.h>
 #include <ccci.h>
+
+#include "ccci_layer.h"
 
 #define FIRST_PENDING        (1<<0)
 #define PENDING_50MS        (1<<1)
@@ -417,7 +418,7 @@ static void __logic_layer_tasklet(unsigned long data)
 		}
 	}
 	logic_ctlb->m_running = 0;
-	/* wake_lock_timeout(&logic_ctlb->m_wakeup_wake_lock, 3*HZ/2); */
+	/* __pm_wakeup_event(&logic_ctlb->m_wakeup_wake_lock, 3*HZ/2); */
 }
 
 static void __let_logic_dispatch_tasklet_run(void *ctl_b)
@@ -832,8 +833,7 @@ int ccci_logic_ctlb_init(int md_id)
 	ctl_b->m_md_id = md_id;
 	snprintf(ctl_b->m_wakelock_name, sizeof(ctl_b->m_wakelock_name),
 		 "ccci%d_logic", (md_id + 1));
-	wake_lock_init(&ctl_b->m_wakeup_wake_lock, WAKE_LOCK_SUSPEND,
-		       ctl_b->m_wakelock_name);
+	wakeup_source_init(&ctl_b->m_wakeup_wake_lock, ctl_b->m_wakelock_name);
 	ctl_b->m_send_notify_cb = NULL;
 	spin_lock_init(&ctl_b->m_lock);
 
@@ -888,7 +888,7 @@ void ccci_logic_ctlb_deinit(int md_id)
 			}
 		}
 		/*  Step 5, destroy wake lock */
-		wake_lock_destroy(&ctl_b->m_wakeup_wake_lock);
+		__pm_relax(&ctl_b->m_wakeup_wake_lock);
 		/*  Step 6, free logic_dispatch_ctlb memory */
 		kfree(ctl_b);
 		logic_dispatch_ctlb[md_id] = NULL;

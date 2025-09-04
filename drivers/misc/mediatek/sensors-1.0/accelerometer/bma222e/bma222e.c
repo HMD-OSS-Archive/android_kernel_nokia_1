@@ -59,8 +59,10 @@ static const struct i2c_device_id bma222_i2c_id[] = { {BMA222_DEV_NAME, 0}, {} }
 /*----------------------------------------------------------------------------*/
 static int bma222_i2c_probe(struct i2c_client *client, const struct i2c_device_id *id);
 static int bma222_i2c_remove(struct i2c_client *client);
+#if 0
 static int bma222_suspend(struct i2c_client *client, pm_message_t msg);
 static int bma222_resume(struct i2c_client *client);
+#endif
 static int gsensor_local_init(void);
 static int gsensor_remove(void);
 #ifdef CONFIG_CUSTOM_KERNEL_SENSORHUB
@@ -134,6 +136,12 @@ static const struct of_device_id accel_of_match[] = {
 	{},
 };
 
+#if 0
+static const struct dev_pm_ops bma222_i2c_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(bma222_suspend, bma222_resume)
+};
+#endif
+
 static struct i2c_driver bma222_i2c_driver = {
 	.driver = {
 /* .owner          = THIS_MODULE, */
@@ -142,8 +150,9 @@ static struct i2c_driver bma222_i2c_driver = {
 		   },
 	.probe = bma222_i2c_probe,
 	.remove = bma222_i2c_remove,
-	.suspend = bma222_suspend,
-	.resume = bma222_resume,
+	#if 0
+	.pm = &bma222_i2c_pm_ops,
+	#endif
 	.id_table = bma222_i2c_id,
 /* .address_data = &bma222_addr_data, */
 };
@@ -908,7 +917,6 @@ static int BMA222_ReadSensorData(struct i2c_client *client, char *buf, int bufsi
 	acc[obj->cvt.map[BMA222_AXIS_Z]] =
 	    obj->cvt.sign[BMA222_AXIS_Z] * obj->data[BMA222_AXIS_Z];
 
-
 	acc[BMA222_AXIS_X] =
 	    acc[BMA222_AXIS_X] * GRAVITY_EARTH_1000 / obj->reso->sensitivity;
 	acc[BMA222_AXIS_Y] =
@@ -1415,6 +1423,8 @@ static int gsensor_setup_irq(void)
 	return err;
 }
 #endif				/* #ifdef CONFIG_CUSTOM_KERNEL_SENSORHUB */
+
+#if 0
 /*----------------------------------------------------------------------------*/
 static int bma222_suspend(struct i2c_client *client, pm_message_t msg)
 {
@@ -1468,6 +1478,7 @@ static int bma222_resume(struct i2c_client *client)
 
 	return 0;
 }
+#endif
 
 /*----------------------------------------------------------------------------*/
 /* if use  this typ of enable , Gsensor should report inputEvent(x, y, z ,stats, div) to HAL */
@@ -1687,9 +1698,14 @@ static int bma222_factory_set_cali(int32_t data[3])
 	int err = 0;
 	int cali[3] = { 0 };
 
-	cali[BMA222_AXIS_X] = data[0] * obj_i2c_data->reso->sensitivity / GRAVITY_EARTH_1000;
-	cali[BMA222_AXIS_Y] = data[1] * obj_i2c_data->reso->sensitivity / GRAVITY_EARTH_1000;
-	cali[BMA222_AXIS_Z] = data[2] * obj_i2c_data->reso->sensitivity / GRAVITY_EARTH_1000;
+	/* obj */
+	obj_i2c_data->cali_sw[BMA222_AXIS_X] += data[0];
+	obj_i2c_data->cali_sw[BMA222_AXIS_Y] += data[1];
+	obj_i2c_data->cali_sw[BMA222_AXIS_Z] += data[2];
+
+	cali[BMA222_AXIS_X] = data[0] * gsensor_gain.x / GRAVITY_EARTH_1000;
+	cali[BMA222_AXIS_Y] = data[1] * gsensor_gain.y / GRAVITY_EARTH_1000;
+	cali[BMA222_AXIS_Z] = data[2] * gsensor_gain.z / GRAVITY_EARTH_1000;
 	err = BMA222_WriteCalibration(bma222_i2c_client, cali);
 	if (err) {
 		GSE_ERR("bma222_WriteCalibration failed!\n");
@@ -1700,17 +1716,9 @@ static int bma222_factory_set_cali(int32_t data[3])
 
 static int bma222_factory_get_cali(int32_t data[3])
 {
-	int err = 0;
-	int cali[3] = { 0 };
-
-	err = BMA222_ReadCalibration(bma222_i2c_client, cali);
-	if (err) {
-		GSE_ERR("mpu6050a_ReadCalibration failed!\n");
-		return -1;
-	}
-	data[0] = cali[BMA222_AXIS_X] * GRAVITY_EARTH_1000 / obj_i2c_data->reso->sensitivity;
-	data[1] = cali[BMA222_AXIS_Y] * GRAVITY_EARTH_1000 / obj_i2c_data->reso->sensitivity;
-	data[2] = cali[BMA222_AXIS_Z] * GRAVITY_EARTH_1000 / obj_i2c_data->reso->sensitivity;
+	data[0] = obj_i2c_data->cali_sw[BMA222_AXIS_X];
+	data[1] = obj_i2c_data->cali_sw[BMA222_AXIS_Y];
+	data[2] = obj_i2c_data->cali_sw[BMA222_AXIS_Z];
 	return 0;
 }
 static int bma222_factory_do_self_test(void)

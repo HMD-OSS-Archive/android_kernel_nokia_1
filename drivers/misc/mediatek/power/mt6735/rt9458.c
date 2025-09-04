@@ -587,7 +587,7 @@ static int rt9458_parse_dt(struct rt9458_info *info, struct device *dev)
 
 	//struct device_node *np = dev->of_node;
 
-	//Jason.
+	//
 	/* check customer setting */
 	struct device_node *np; 
 	np = of_find_compatible_node(NULL, NULL, "richtek,rt9458");
@@ -800,7 +800,7 @@ static int rt_charger_enable_otg(struct mtk_charger_info *mchr_info, void *data)
 
 	pr_info("%s: enable = %d\n", __func__, enable);
 
-	//Jason:
+	//
 	if (enable) {
 		rt9458_clr_bit(info, RT9458_REG_CTRL2, RT9458_MASK_HZ_EN);
 		rt9458_clr_bit(info, RT9458_REG_CTRL7, RT9458_MASK_CHG_EN);

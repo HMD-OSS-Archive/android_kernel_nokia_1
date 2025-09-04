@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 TRUSTONIC LIMITED
+ * Copyright (c) 2013-2017 TRUSTONIC LIMITED
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -18,6 +18,11 @@
 #include <linux/cpu.h>
 #include <linux/moduleparam.h>
 #include <linux/debugfs.h>
+#include <linux/sched.h>	/* local_clock */
+#include <linux/version.h>
+#if KERNEL_VERSION(4, 11, 0) <= LINUX_VERSION_CODE
+#include <linux/sched/clock.h>	/* local_clock */
+#endif
 #include <linux/uaccess.h>
 
 #include "public/mc_user.h"
@@ -219,8 +224,8 @@ static void mc_cpu_offline(int cpu)
 	/* Chose the first online CPU and switch! */
 	for_each_online_cpu(i) {
 		if (cpu != i) {
-			mc_dev_devel("CPU %d is dying, switching to %d\n",
-				     cpu, i);
+			mc_dev_info("CPU %d is dying, switching to %d\n",
+				    cpu, i);
 			mc_switch_core(i);
 			break;
 		}
@@ -269,13 +274,13 @@ static cpumask_t mc_exec_core_switch(union mc_fc_generic *mc_fc_generic)
 	mc_fc_generic->as_in.param[0] = cpu_id[mc_fc_generic->as_in.param[0]];
 
 	if (_smc(mc_fc_generic) != 0 || mc_fc_generic->as_out.ret != 0) {
-		mc_dev_err("CoreSwap failed %d -> %d (cpu %d still active)\n",
+		mc_dev_devel("CoreSwap failed %d -> %d (cpu %d still active)\n",
 			     raw_smp_processor_id(),
 			     mc_fc_generic->as_in.param[0],
 			     raw_smp_processor_id());
 	} else {
 		active_cpu = new_cpu;
-		mc_dev_info("CoreSwap ok %d -> %d\n",
+		mc_dev_devel("CoreSwap ok %d -> %d\n",
 			     raw_smp_processor_id(), active_cpu);
 	}
 	cpumask_clear(&cpu);
@@ -371,11 +376,19 @@ static bool mc_fastcall(void *data)
 		.data = data,
 	};
 
+#if KERNEL_VERSION(4, 9, 0) <= LINUX_VERSION_CODE
+	if (!kthread_queue_work(&fastcall_worker, &fc_work.work))
+		return false;
+
+	/* If work is queued or executing, wait for it to finish execution */
+	kthread_flush_work(&fc_work.work);
+#else
 	if (!queue_kthread_work(&fastcall_worker, &fc_work.work))
 		return false;
 
 	/* If work is queued or executing, wait for it to finish execution */
 	flush_kthread_work(&fc_work.work);
+#endif
 #else
 	struct fastcall_work fc_work = {
 		.data = data,
@@ -392,6 +405,7 @@ static bool mc_fastcall(void *data)
 
 int mc_fastcall_init(void)
 {
+	cpumask_t new_msk = CPU_MASK_CPU0;
 	int ret = mc_clock_init();
 
 	if (ret)
@@ -403,12 +417,20 @@ int mc_fastcall_init(void)
 	if (IS_ERR(fastcall_thread)) {
 		ret = PTR_ERR(fastcall_thread);
 		fastcall_thread = NULL;
-		mc_dev_err("cannot create fastcall wq: %d\n", ret);
+		mc_dev_notice("cannot create fastcall wq: %d\n", ret);
 		return ret;
 	}
+#ifdef TEE_FASTCALL_RT
+	struct sched_param param = {.sched_priority = 1};
 
+	ret = sched_setscheduler(fastcall_thread, SCHED_FIFO, &param);
+	if (ret)
+		mc_dev_info("cannot set tee_fastcall priority: %d\n", ret);
+#else
+	set_user_nice(fastcall_thread, -20);
+#endif
 	/* this thread MUST run on CPU 0 at startup */
-	set_cpus_allowed_ptr(fastcall_thread, &CPU_MASK_CPU0);
+	set_cpus_allowed_ptr(fastcall_thread, &new_msk);
 
 	wake_up_process(fastcall_thread);
 #ifdef TBASE_CORE_SWITCHER
@@ -500,7 +522,7 @@ int mc_fc_info(u32 ext_info_id, u32 *state, u32 *ext_info)
 		if (ext_info)
 			*ext_info = 0;
 
-		mc_dev_err("code %d for idx %d\n", ret, ext_info_id);
+		mc_dev_notice("code %d for idx %d\n", ret, ext_info_id);
 	} else {
 		if (state)
 			*state = fc_info.as_out.state;
@@ -537,7 +559,7 @@ int mc_fc_nsiq(void)
 	mc_fastcall(&fc);
 	ret = convert_fc_ret(fc.as_out.ret);
 	if (ret)
-		mc_dev_err("failed: %d\n", ret);
+		mc_dev_notice("failed: %d\n", ret);
 
 	return ret;
 }
@@ -552,7 +574,7 @@ int mc_fc_yield(void)
 	mc_fastcall(&fc);
 	ret = convert_fc_ret(fc.as_out.ret);
 	if (ret)
-		mc_dev_err("failed: %d\n", ret);
+		mc_dev_notice("failed: %d\n", ret);
 
 	return ret;
 }

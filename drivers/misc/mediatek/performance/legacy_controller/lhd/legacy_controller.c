@@ -34,7 +34,7 @@
 
 #ifdef CONFIG_TRACING
 #include <linux/kallsyms.h>
-#include <linux/ftrace_event.h>
+#include <linux/trace_events.h>
 #endif
 
 #define TAG "[boost_controller]"
@@ -55,7 +55,7 @@ static int log_enable;
 #define legacy_debug(enable, fmt, x...)\
 	do {\
 		if (enable)\
-			pr_debug(fmt, ##x);\
+			pr_err(fmt, ##x);\
 	} while (0)
 
 static char *lbc_copy_from_user_for_proc(const char __user *buffer, size_t count)
@@ -118,7 +118,7 @@ int update_userlimit_cpu_core(int kicker, int num_cluster, struct ppm_limit_data
 	mutex_lock(&boost_core);
 
 	if (num_cluster != nr_ppm_clusters) {
-		pr_debug(TAG"num_cluster : %d nr_ppm_clusters: %d, doesn't match",
+		pr_err(TAG"num_cluster : %d nr_ppm_clusters: %d, doesn't match",
 			 num_cluster, nr_ppm_clusters);
 		retval = -1;
 		goto ret_update;
@@ -181,7 +181,7 @@ int update_userlimit_cpu_freq(int kicker, int num_cluster, struct ppm_limit_data
 	mutex_lock(&boost_freq);
 
 	if (num_cluster != nr_ppm_clusters) {
-		pr_debug(TAG"num_cluster : %d nr_ppm_clusters: %d, doesn't match\n",
+		pr_err(TAG"num_cluster : %d nr_ppm_clusters: %d, doesn't match\n",
 			 num_cluster, nr_ppm_clusters);
 		retval = -1;
 		goto ret_update;
@@ -455,6 +455,8 @@ static int __init perfmgr_legacy_boost_init(void)
 	mutex_init(&boost_core);
 	mutex_init(&boost_freq);
 	boost_dir = proc_mkdir("perfmgr/legacy", NULL);
+
+	log_enable = 0;
 
 	nr_ppm_clusters = 1;
 	nr_cpu = num_possible_cpus();

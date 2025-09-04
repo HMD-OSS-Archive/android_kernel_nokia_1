@@ -28,9 +28,13 @@
 #include <asm/uaccess.h>
 #include "mt-plat/mtk_thermal_monitor.h"
 #include "mach/mt_thermal.h"
-#include <tmp_battery.h>
 #include <linux/uidgid.h>
 #include <linux/slab.h>
+#if (CONFIG_MTK_GAUGE_VERSION == 30)
+#include <mtk_battery.h>
+#else
+#include <tmp_battery.h>
+#endif
 
 /* ************************************ */
 /* Weak functions */
@@ -190,7 +194,7 @@ static int mtktsbattery_get_hw_temp(void)
 	return t_ret;
 }
 
-static int mtktsbattery_get_temp(struct thermal_zone_device *thermal, unsigned long *t)
+static int mtktsbattery_get_temp(struct thermal_zone_device *thermal, int *t)
 {
 	*t = mtktsbattery_get_hw_temp();
 
@@ -320,14 +324,14 @@ static int mtktsbattery_get_trip_type(struct thermal_zone_device *thermal, int t
 }
 
 static int mtktsbattery_get_trip_temp(struct thermal_zone_device *thermal, int trip,
-				      unsigned long *temp)
+				      int *temp)
 {
 	*temp = trip_temp[trip];
 	return 0;
 }
 
 static int mtktsbattery_get_crit_temp(struct thermal_zone_device *thermal,
-				      unsigned long *temperature)
+				      int *temperature)
 {
 	*temperature = mtktsbattery_TEMP_CRIT;
 	return 0;
@@ -347,19 +351,19 @@ static struct thermal_zone_device_ops mtktsbattery_dev_ops = {
 
 /*
 static int dis_charge_get_max_state(struct thermal_cooling_device *cdev,
-				 unsigned long *state)
+				 int *state)
 {
 		*state = 1;
 		return 0;
 }
 static int dis_charge_get_cur_state(struct thermal_cooling_device *cdev,
-				 unsigned long *state)
+				 int *state)
 {
 		*state = cl_dev_dis_charge_state;
 		return 0;
 }
 static int dis_charge_set_cur_state(struct thermal_cooling_device *cdev,
-				 unsigned long state)
+				 int state)
 {
     cl_dev_dis_charge_state = state;
     if(cl_dev_dis_charge_state == 1) {
@@ -390,8 +394,7 @@ static int tsbat_sysrst_set_cur_state(struct thermal_cooling_device *cdev, unsig
 		pr_debug("*****************************************");
 		pr_debug("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 
-/* BUG(); */
-		/* arch_reset(0,NULL); */
+		BUG();
 #if !defined(CONFIG_FIH_PSE_TEST) && !defined(CONFIG_FIH_PROJECT_NE1)
 		*(unsigned int *)0x0 = 0xdead;	/* To trigger data abort to reset the system for thermal protection. */
 #endif
@@ -439,7 +442,7 @@ static void mtktsbattery_unregister_thermal(void);
 
 static ssize_t mtktsbattery_write(struct file *file, const char __user *buffer, size_t count,
 				  loff_t *data)
-/* static ssize_t mtktsbattery_write(struct file *file, const char *buffer, unsigned long count, void *data) */
+/* static ssize_t mtktsbattery_write(struct file *file, const char *buffer, int count, void *data) */
 {
 	int len = 0, i;
 	struct mtktsbattery_data {

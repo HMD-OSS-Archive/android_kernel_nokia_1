@@ -37,6 +37,7 @@ int gM4U_4G_DRAM_Mode = 0;
 static spinlock_t gM4u_reg_lock;
 int gM4u_port_num = M4U_PORT_UNKNOWN;
 
+
 int m4u_invalid_tlb(int m4u_id, int L2_en, int isInvAll, unsigned int mva_start, unsigned int mva_end)
 {
 	unsigned int reg = 0;
@@ -256,7 +257,7 @@ int config_mau(M4U_MAU_STRUCT mau)
 	int i;
 	int free_id = -1;
 	int m4u_id = m4u_port_2_m4u_id(mau.port);
-	int larb = m4u_port_2_larb_id(mau.port);
+	int larb = m4u_port_2_larbid(mau.port);
 	unsigned int MVAStart = mau.mva;
 	unsigned int MVAEnd = mau.mva + mau.size;
 
@@ -855,7 +856,7 @@ static int larb_clock_on(int larb)
 	case 2:
 		enable_clock(MT_CG_IMAGE_LARB2_SMI, "m4u_larb2");
 	break;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6753)
 	case 3:
 		enable_clock(MT_CG_VENC_VENC, "m4u_larb3");
 		enable_clock(MT_CG_VENC_LARB, "m4u_larb3");
@@ -911,7 +912,7 @@ static int larb_clock_on(int larb)
 		if (ret)
 			M4UMSG("error: prepare clk %s fail!.\n", smi_clk_name[LARB2_SMI_CLK]);
 	break;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6753)
 	case 3:
 		ret = clk_prepare_enable(gM4uDev->smi_clk[MTCMOS_LARB3]);
 		if (ret)
@@ -950,7 +951,7 @@ static int larb_clock_off(int larb)
 	case 2:
 		disable_clock(MT_CG_IMAGE_LARB2_SMI, "m4u_larb2");
 	break;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6753)
 	case 3:
 		disable_clock(MT_CG_VENC_VENC, "m4u_larb3");
 		disable_clock(MT_CG_VENC_LARB, "m4u_larb3");
@@ -980,7 +981,7 @@ static int larb_clock_off(int larb)
 
 		clk_disable_unprepare(gM4uDev->smi_clk[MTCMOS_LARB2]);
 	break;
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_MACH_MT6753)
 	case 3:
 		clk_disable_unprepare(gM4uDev->smi_clk[VENC_VENC_CLK]);
 		clk_disable_unprepare(gM4uDev->smi_clk[VENC_LARB_CLK]);
@@ -1067,7 +1068,6 @@ void smi_larb0_clock_off(void)
 
 EXPORT_SYMBOL(smi_common_clock_off);
 
-
 int m4u_insert_seq_range(M4U_PORT_ID port, unsigned int MVAStart, unsigned int MVAEnd)
 {
 	int i, free_id = -1;
@@ -1104,7 +1104,7 @@ int m4u_insert_seq_range(M4U_PORT_ID port, unsigned int MVAStart, unsigned int M
 				continue;
 			else {
 				M4ULOG_HIGH("insert range overlap!: larb=%d,module=%s\n",
-						m4u_port_2_larb_id(port), m4u_get_port_name(port));
+						m4u_port_2_larbid(port), m4u_get_port_name(port));
 				M4ULOG_HIGH(
 						"warning: insert tlb range is overlapped with previous ranges, current process=%s,!\n",
 						current->comm);
@@ -1218,7 +1218,7 @@ static int _m4u_config_port(int port, int virt, int sec, int dis, int dir)
 	int mmu_en = 0;
 
 	m4u_index = m4u_port_2_m4u_id(port);
-	larb = m4u_port_2_larb_id(port);
+	larb = m4u_port_2_larbid(port);
 	larb_port = m4u_port_2_larb_port(port);
 	if ((m4u_index == -1) || (larb == -1) || (larb_port == M4U_PORT_UNKNOWN)) {
 		m4u_aee_print(" %s invalid parameter: port=%d\n", __func__, port);
@@ -1230,7 +1230,7 @@ static int _m4u_config_port(int port, int virt, int sec, int dis, int dir)
 	M4ULOG_HIGH("config_port:%s,v%d,s%d\n",
 	m4u_get_port_name(port), virt, sec);
 
-	/* MMProfileLogEx(M4U_MMP_Events[M4U_MMP_CONFIG_PORT], MMProfileFlagStart, port, virt); */
+	/* mmprofile_log_ex(M4U_MMP_Events[M4U_MMP_CONFIG_PORT], MMPROFILE_FLAG_START, port, virt); */
 
 	spin_lock(&gM4u_reg_lock);
 	/* Direction, one bit for each port, 1:-, 0:+ */
@@ -1271,7 +1271,7 @@ static int _m4u_config_port(int port, int virt, int sec, int dis, int dir)
 
 	spin_unlock(&gM4u_reg_lock);
 
-	/* MMProfileLogEx(M4U_MMP_Events[M4U_MMP_CONFIG_PORT], MMProfileFlagEnd, dis, dir); */
+	/* mmprofile_log_ex(M4U_MMP_Events[M4U_MMP_CONFIG_PORT], MMPROFILE_FLAG_END, dis, dir); */
 
 	return ret;
 }
@@ -1280,7 +1280,7 @@ static inline void _m4u_port_clock_toggle(int m4u_index, int larb, int on)
 {
 	unsigned long long start, end;
 
-	/* MMProfileLogEx(M4U_MMP_Events[M4U_MMP_TOGGLE_CG], MMProfileFlagStart, larb, on); */
+	/* mmprofile_log_ex(M4U_MMP_Events[M4U_MMP_TOGGLE_CG], MMPROFILE_FLAG_START, larb, on); */
 	if (m4u_index == 0) {
 		start = sched_clock();
 		if (on) {
@@ -1295,7 +1295,7 @@ static inline void _m4u_port_clock_toggle(int m4u_index, int larb, int on)
 		if (end-start > 50000000ULL) /* unit is ns */
 			M4ULOG_HIGH("warn: larb%d clock %d time: %lld ns\n", larb, on, end-start);
 	}
-	/* MMProfileLogEx(M4U_MMP_Events[M4U_MMP_TOGGLE_CG], MMProfileFlagEnd, 0, 0); */
+	/* mmprofile_log_ex(M4U_MMP_Events[M4U_MMP_TOGGLE_CG], MMPROFILE_FLAG_END, 0, 0); */
 }
 
 int m4u_config_port(M4U_PORT_STRUCT *pM4uPort) /* native */
@@ -1313,7 +1313,7 @@ int m4u_config_port(M4U_PORT_STRUCT *pM4uPort) /* native */
 	}
 	PortID = pM4uPort->ePortID;
 	m4u_index = m4u_port_2_m4u_id(PortID);
-	larb = m4u_port_2_larb_id(PortID);
+	larb = m4u_port_2_larbid(PortID);
 
 	_m4u_port_clock_toggle(m4u_index, larb, 1);
 
@@ -1385,7 +1385,7 @@ int m4u_config_port_array(struct m4u_port_array *port_array)
 		if (port_array->ports[port] && M4U_PORT_ATTR_EN != 0) {
 			unsigned int value;
 
-			larb = m4u_port_2_larb_id(port);
+			larb = m4u_port_2_larbid(port);
 			larb_port = m4u_port_2_larb_port(port);
 
 			if ((larb == -1) || (larb_port == M4U_PORT_UNKNOWN)) {
@@ -1721,14 +1721,14 @@ void m4u_print_port_status(struct seq_file *seq, int only_print_active)
 	int m4u_index, larb, larb_port;
 	unsigned long larb_base;
 
-	M4U_PRINT_LOG_OR_SEQ(seq, "m4u_print_port_status ========>\n");
+	M4U_PRINT_SEQ(seq, "m4u_print_port_status ========>\n");
 
 	smi_common_clock_on();
 	larb_clock_all_on();
 
 	for (port = 0; port < gM4u_port_num; port++) {
 		m4u_index = m4u_port_2_m4u_id(port);
-		larb = m4u_port_2_larb_id(port);
+		larb = m4u_port_2_larbid(port);
 		larb_port = m4u_port_2_larb_port(port);
 
 		if ((m4u_index == -1) || (larb == -1) || (larb_port == M4U_PORT_UNKNOWN)) {
@@ -1749,13 +1749,13 @@ void m4u_print_port_status(struct seq_file *seq, int only_print_active)
 		if (only_print_active && !mmu_en)
 			continue;
 
-		M4U_PRINT_LOG_OR_SEQ(seq, "%s(%d),", m4u_get_port_name(port), !!mmu_en);
+		M4U_PRINT_SEQ(seq, "%s(%d),", m4u_get_port_name(port), !!mmu_en);
 	}
 
 	larb_clock_all_off();
 	smi_common_clock_off();
 
-	M4U_PRINT_LOG_OR_SEQ(seq, "\n");
+	M4U_PRINT_SEQ(seq, "\n");
 }
 
 /*
@@ -1990,7 +1990,7 @@ irqreturn_t MTK_M4U_isr(int irq, void *dev_id)
 				m4u_get_port_name(m4u_port), fault_mva, fault_pa, layer, write, regval);
 
 			if (M4U_PORT_DISP_OVL0 == m4u_port
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 				|| M4U_PORT_DISP_OVL1 == m4u_port
 #endif
 			) {
@@ -2032,7 +2032,7 @@ irqreturn_t MTK_M4U_isr(int irq, void *dev_id)
 				}
 			}
 
-			MMProfileLogEx(M4U_MMP_Events[M4U_MMP_M4U_ERROR], MMProfileFlagPulse, m4u_port, fault_mva);
+			mmprofile_log_ex(M4U_MMP_Events[M4U_MMP_M4U_ERROR], MMPROFILE_FLAG_PULSE, m4u_port, fault_mva);
 		}
 
 		if (IntrSrc & F_INT_MAIN_MULTI_HIT_FAULT(m4u_slave_id))

@@ -208,16 +208,20 @@ static void trusty_virtio_reset(struct virtio_device *vdev)
 			  tvdev->notifyid, 0, 0);
 }
 
-static u32 trusty_virtio_get_features(struct virtio_device *vdev)
+static u64 trusty_virtio_get_features(struct virtio_device *vdev)
 {
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
 	return tvdev->vdev_descr->dfeatures;
 }
 
-static void trusty_virtio_finalize_features(struct virtio_device *vdev)
+static int trusty_virtio_finalize_features(struct virtio_device *vdev)
 {
 	struct trusty_vdev *tvdev = vdev_to_tvdev(vdev);
-	tvdev->vdev_descr->gfeatures = vdev->features[0];
+
+	/* Make sure we don't have any features > 32 bits! */
+	BUG_ON((u32)vdev->features != vdev->features);
+	tvdev->vdev_descr->gfeatures = vdev->features;
+	return 0;
 }
 
 static void trusty_virtio_get_config(struct virtio_device *vdev,
@@ -335,7 +339,7 @@ err_new_virtqueue:
 static int trusty_virtio_find_vqs(struct virtio_device *vdev, unsigned nvqs,
 				  struct virtqueue *vqs[],
 				  vq_callback_t *callbacks[],
-				  const char *names[])
+				  const char * const names[])
 {
 	uint i;
 	int ret;

@@ -88,12 +88,16 @@ static void notify_touch(int action)
 		render_aware_valid = 1;
 		is_touch_boost = 1;
 		disable_render_aware_timer();
-		pr_debug(TAG"enable UI boost, touch down, is_touch_boost:%d\n", is_touch_boost);
+		/*
+		pr_err(TAG"enable UI boost, touch down, is_touch_boost:%d\n", is_touch_boost);
+		*/
 		perfmgr_boost(is_render_aware_boost | is_touch_boost, tboost_core, tboost_freq);
 	} else if (action == 0) {
 		enable_render_aware_timer();
 		is_touch_boost = 0;
-		pr_debug(TAG"enable UI boost, touch up, is_touch_boost:%d\n", is_touch_boost);
+		/*
+		pr_err(TAG"enable UI boost, touch up, is_touch_boost:%d\n", is_touch_boost);
+		*/
 		perfmgr_boost(is_render_aware_boost | is_touch_boost, tboost_core, tboost_freq);
 	}
 }
@@ -104,7 +108,9 @@ static void notify_ui_update_timeout(void)
 	if (!is_touch_boost)
 		render_aware_valid = 0;
 	is_render_aware_boost = 0;
-	pr_debug(TAG"enable UI boost, frame noupdate, is_render_aware_boost:%d\n", is_render_aware_boost);
+	/*
+	pr_err(TAG"enable UI boost, frame noupdate, is_render_aware_boost:%d\n", is_render_aware_boost);
+	*/
 	perfmgr_boost(is_render_aware_boost | is_touch_boost, tboost_core, tboost_freq);
 
 	mutex_unlock(&notify_lock);
@@ -116,13 +122,15 @@ static void notify_render_aware_timeout(void)
 	mutex_lock(&notify_lock);
 	render_aware_valid = 0;
 	is_render_aware_boost = 0;
-	pr_debug(TAG"enable UI boost, render aware time out, is_render_aware_boost:%d\n", is_render_aware_boost);
+	/*
+	pr_err(TAG"enable UI boost, render aware time out, is_render_aware_boost:%d\n", is_render_aware_boost);
+	*/
 	perfmgr_boost(is_render_aware_boost | is_touch_boost, tboost_core, tboost_freq);
 
 	mutex_unlock(&notify_lock);
 }
 
-void notify_frame_complete(long frame_time)
+void notify_frame_complete(void)
 {
 	/* lock is mandatory*/
 	WARN_ON(!mutex_is_locked(&notify_lock));
@@ -132,7 +140,9 @@ void notify_frame_complete(long frame_time)
 
 	enable_ui_update_timer();
 	is_render_aware_boost = 1;
-	pr_debug(TAG"enable UI boost, frame update, is_render_aware_boost:%d", is_render_aware_boost);
+	/*
+	pr_err(TAG"enable UI boost, frame update, is_render_aware_boost:%d", is_render_aware_boost);
+	*/
 	perfmgr_boost(is_render_aware_boost | is_touch_boost, tboost_core, tboost_freq);
 }
 
@@ -209,12 +219,21 @@ long device_ioctl(struct file *filp,
 		break;
 
 	/*receive frame_time info*/
-	case FPSGO_FRAME_COMPLETE:
-		notify_frame_complete(msgKM->frame_time);
+	case FPSGO_QUEUE:
+		notify_frame_complete();
+		break;
+
+	case FPSGO_DEQUEUE:
+		/* FALLTHROUGH */
+	case FPSGO_QUEUE_CONNECT:
+		/* FALLTHROUGH */
+	case FPSGO_VSYNC:
+		/* FALLTHROUGH */
+	case FPSGO_BQID:
 		break;
 
 	default:
-		pr_debug(TAG "non-game unknown cmd %u\n", cmd);
+		pr_err(TAG "non-game unknown cmd %u\n", cmd);
 		ret = -1;
 		goto ret_ioctl;
 	}
@@ -235,13 +254,13 @@ static const struct file_operations Fops = {
 };
 
 /*--------------------INIT------------------------*/
-static int __init init_fbc(void)
+static int __init init_perfctl(void)
 {
 	struct proc_dir_entry *pe;
 	int ret_val = 0;
 
 
-	pr_debug(TAG"Start to init perf_ioctl driver\n");
+	pr_err(TAG"Start to init perf_ioctl driver\n");
 
 	tboost_core = perfmgr_get_target_core();
 	tboost_freq = perfmgr_get_target_freq();
@@ -250,7 +269,7 @@ static int __init init_fbc(void)
 
 	wq = create_singlethread_workqueue("mt_fbc_work");
 	if (!wq) {
-		pr_debug(TAG"work create fail\n");
+		pr_err(TAG"work create fail\n");
 		return -ENOMEM;
 	}
 
@@ -261,7 +280,7 @@ static int __init init_fbc(void)
 
 	ret_val = register_chrdev(DEV_MAJOR, DEV_NAME, &Fops);
 	if (ret_val < 0) {
-		pr_debug(TAG"%s failed with %d\n",
+		pr_err(TAG"%s failed with %d\n",
 				"Registering the character device ",
 				ret_val);
 		goto out_wq;
@@ -273,7 +292,7 @@ static int __init init_fbc(void)
 		goto out_chrdev;
 	}
 
-	pr_debug(TAG"init FBC driver done\n");
+	pr_err(TAG"init FBC driver done\n");
 
 	return 0;
 
@@ -283,5 +302,5 @@ out_wq:
 	destroy_workqueue(wq);
 	return ret_val;
 }
-late_initcall(init_fbc);
+late_initcall(init_perfctl);
 

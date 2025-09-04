@@ -4,7 +4,9 @@
 #ifdef CONFIG_MTK_DTBO_FEATURE
 /plugin/;
 #include "mt6735m-pinfunc.h"
-#include <dt-bindings/mmc/mt67xx-msdc.h>
+#include <dt-bindings/mmc/mt6735-msdc.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/interrupt-controller/irq.h>
 #else
 #include "mt6735m.dts"
 #endif
@@ -175,7 +177,7 @@
 	alsps_intpin_cfg: alspspincfg {
 
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO65__FUNC_GPIO65>;
+			pinmux = <PINMUX_GPIO65__FUNC_GPIO65>;
 			slew-rate = <0>;
 			bias-pull-up = <00>;
 		};
@@ -188,7 +190,7 @@
 	gyro_intpin_cfg: gyropincfg {
 
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO67__FUNC_GPIO67>;
+			pinmux = <PINMUX_GPIO67__FUNC_GPIO67>;
 			slew-rate = <0>;
 			bias-pull-down = <00>;
 		};
@@ -245,35 +247,35 @@
 	};
 	CTP_pins_eint_as_int: eint@0 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO10__FUNC_GPIO10>;
+			pinmux = <PINMUX_GPIO10__FUNC_GPIO10>;
 			slew-rate = <0>;
 			bias-disable;
 		};
 	};
 	CTP_pins_eint_output0: eintoutput0 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO10__FUNC_GPIO10>;
+			pinmux = <PINMUX_GPIO10__FUNC_GPIO10>;
 			slew-rate = <1>;
 			output-low;
 		};
 	};
 	CTP_pins_eint_output1: eintoutput1 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO10__FUNC_GPIO10>;
+			pinmux = <PINMUX_GPIO10__FUNC_GPIO10>;
 			slew-rate = <1>;
 			output-high;
 		};
 	};
 	CTP_pins_rst_output0: rstoutput0 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO62__FUNC_GPIO62>;
+			pinmux = <PINMUX_GPIO62__FUNC_GPIO62>;
 			slew-rate = <1>;
 			output-low;
 		};
 	};
 	CTP_pins_rst_output1: rstoutput1 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO62__FUNC_GPIO62>;
+			pinmux = <PINMUX_GPIO62__FUNC_GPIO62>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -284,70 +286,70 @@
 &pio {
 	camera_pins_cam0_rst0: cam0@0 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO44__FUNC_GPIO44>;/*GPIO_CAMERA_CMRST_PIN*/
+			pinmux = <PINMUX_GPIO44__FUNC_GPIO44>;/*GPIO_CAMERA_CMRST_PIN*/
 			slew-rate = <1>; /*direction 0:in, 1:out*/
 			output-low;/*direction out used only. output_low or high*/
 		};
 	};
 	camera_pins_cam0_rst1: cam0@1 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO44__FUNC_GPIO44>;/*GPIO_CAMERA_CMRST_PIN*/
+			pinmux = <PINMUX_GPIO44__FUNC_GPIO44>;/*GPIO_CAMERA_CMRST_PIN*/
 			slew-rate = <1>;
 			output-high;
 		};
 	};
 	camera_pins_cam0_pnd0: cam0@2 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO7__FUNC_GPIO7>;/*GPIO_CAMERA_CMPDN_PIN*/
+			pinmux = <PINMUX_GPIO7__FUNC_GPIO7>;/*GPIO_CAMERA_CMPDN_PIN*/
 			slew-rate = <1>;
 			output-low;
 		};
 	};
 	camera_pins_cam0_pnd1: cam0@3 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO7__FUNC_GPIO7>;/*GPIO_CAMERA_CMPDN_PIN*/
+			pinmux = <PINMUX_GPIO7__FUNC_GPIO7>;/*GPIO_CAMERA_CMPDN_PIN*/
 			slew-rate = <1>;
 			output-high;
 		};
 	};
 	camera_pins_cam1_rst0: cam1@0 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO11__FUNC_GPIO11>;/*GPIO_CAMERA_CMRST1_PIN*/
+			pinmux = <PINMUX_GPIO11__FUNC_GPIO11>;/*GPIO_CAMERA_CMRST1_PIN*/
 			slew-rate = <1>; /*direction 0:in, 1:out*/
 			output-low;/*direction out used only. output_low or high*/
 		};
 	};
 	camera_pins_cam1_rst1: cam1@1 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO11__FUNC_GPIO11>;/*GPIO_CAMERA_CMRST1_PIN*/
+			pinmux = <PINMUX_GPIO11__FUNC_GPIO11>;/*GPIO_CAMERA_CMRST1_PIN*/
 			slew-rate = <1>;
 			output-high;
 		};
 	};
 	camera_pins_cam1_pnd0: cam1@2 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO12__FUNC_GPIO12>;/*GPIO_CAMERA_CMPDN1_PIN*/
+			pinmux = <PINMUX_GPIO12__FUNC_GPIO12>;/*GPIO_CAMERA_CMPDN1_PIN*/
 			slew-rate = <1>;
 			output-low;
 		};
 	};
 	camera_pins_cam1_pnd1: cam1@3 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO12__FUNC_GPIO12>;/*GPIO_CAMERA_CMPDN1_PIN*/
+			pinmux = <PINMUX_GPIO12__FUNC_GPIO12>;/*GPIO_CAMERA_CMPDN1_PIN*/
 			slew-rate = <1>;
 			output-high;
 		};
 	};
 	camera_pins_cam_ldo0_0: cam@0 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO68__FUNC_GPIO68>;/*GPIO_SPI_MOSI_PIN*/
+			pinmux = <PINMUX_GPIO68__FUNC_GPIO68>;/*GPIO_SPI_MOSI_PIN*/
 			slew-rate = <1>;
 			output-low;
 		};
 	};
 	camera_pins_cam_ldo0_1: cam@1 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO68__FUNC_GPIO68>;/*GPIO_SPI_MOSI_PIN*/
+			pinmux = <PINMUX_GPIO68__FUNC_GPIO68>;/*GPIO_SPI_MOSI_PIN*/
 			slew-rate = <1>;
 			output-high;
 		};
@@ -385,7 +387,7 @@
 	gpslna_pins_init: gpslna@0 {
 
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO79__FUNC_GPIO79>;
+			pinmux = <PINMUX_GPIO79__FUNC_GPIO79>;
 			slew-rate = <0>;
 			bias-disable;
 			output-low;
@@ -395,7 +397,7 @@
 	gpslna_pins_oh: gpslna@1 {
 
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO79__FUNC_GPIO79>;
+			pinmux = <PINMUX_GPIO79__FUNC_GPIO79>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -404,7 +406,7 @@
 	gpslna_pins_ol: gpslna@2 {
 
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO79__FUNC_GPIO79>;
+			pinmux = <PINMUX_GPIO79__FUNC_GPIO79>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -423,169 +425,6 @@
 };
 /* CONSYS end */
 
-/* mmc start */
-&mmc0 {
-		clk_src = /bits/ 8 <MSDC50_CLKSRC_400MHZ>;
-		bus-width = <8>;
-		max-frequency = <200000000>;
-		cap-mmc-highspeed;
-		msdc-sys-suspend;
-		mmc-ddr-1_8v;
-		mmc-hs200-1_8v;
-		mmc-hs400-1_8v;
-		non-removable;
-		pinctl = <&mmc0_pins_default>;
-		register_setting = <&mmc0_register_setting_default>;
-		host_function = /bits/ 8 <MSDC_EMMC>;
-		bootable;
-		status = "okay";
-};
-
-&mmc1 {
-		clk_src = /bits/ 8 <MSDC30_CLKSRC_200MHZ>;
-		bus-width = <4>;
-		max-frequency = <200000000>;
-		msdc-sys-suspend;
-		cap-sd-highspeed;
-		sd-uhs-sdr12;
-		sd-uhs-sdr25;
-		sd-uhs-sdr50;
-		sd-uhs-sdr104;
-		sd-uhs-ddr50;
-		pinctl = <&mmc1_pins_default>;
-		pinctl_sdr104 = <&mmc1_pins_sdr104>;
-		pinctl_sdr50 = <&mmc1_pins_sdr50>;
-		pinctl_ddr50 = <&mmc1_pins_ddr50>;
-		register_setting = <&mmc1_register_setting_default>;
-		host_function = /bits/ 8 <MSDC_SD>;
-		cd_level = /bits/ 8 <MSDC_CD_LOW>;
-		cd-gpios = <&pio 5 0>;
-		status = "okay";
-};
-
-&pio {
-	mmc0_pins_default: mmc0@default {
-			pins_cmd {
-				drive-strength = /bits/ 8 <2>;
-			};
-			pins_dat {
-				drive-strength = /bits/ 8 <2>;
-			};
-			pins_clk {
-				drive-strength = /bits/ 8 <2>;
-			};
-			pins_rst {
-				drive-strength = /bits/ 8 <2>;
-			};
-			pins_ds {
-				drive-strength = /bits/ 8 <2>;
-			};
-	};
-
-	mmc0_register_setting_default: mmc0@register_default {
-		dat0rddly	  = /bits/ 8 <0>;
-		dat1rddly	  = /bits/ 8 <0>;
-		dat2rddly	  = /bits/ 8 <0>;
-		dat3rddly	  = /bits/ 8 <0>;
-		dat4rddly	  = /bits/ 8 <0>;
-		dat5rddly	  = /bits/ 8 <0>;
-		dat6rddly	  = /bits/ 8 <0>;
-		dat7rddly	  = /bits/ 8 <0>;
-		datwrddly	  = /bits/ 8 <0>;
-		cmdrrddly	  = /bits/ 8 <0>;
-		cmdrddly	   = /bits/ 8 <0>;
-		cmd_edge = /bits/ 8 <MSDC_SMPL_FALLING>;
-		rdata_edge = /bits/ 8 <MSDC_SMPL_FALLING>;
-		wdata_edge = /bits/ 8 <MSDC_SMPL_FALLING>;
-
-		ett-hs200-cells = <12>;
-		ett-hs200-default = <OFFSET_MSDC_PATCH_BIT0	MSDC_PB0_INT_DAT_LATCH_CK_SEL 0x0
-			OFFSET_MSDC_PATCH_BIT0	MSDC_PB0_CKGEN_MSDC_DLY_SEL   0x0
-			OFFSET_MSDC_PATCH_BIT1	MSDC_PB1_CMD_RSP_TA_CNTR	  0x1
-			OFFSET_MSDC_IOCON		MSDC_IOCON_RSPL			   0x0
-			OFFSET_MSDC_PAD_TUNE0	MSDC_PAD_TUNE0_CMDRDLY		0x7
-			OFFSET_MSDC_PAD_TUNE0	MSDC_PAD_TUNE0_CMDRRDLY	   0xb
-			OFFSET_MSDC_PATCH_BIT1		MSDC_PB1_WRDAT_CRCS_TA_CNTR   0x1
-			OFFSET_MSDC_PAD_TUNE0	MSDC_PAD_TUNE0_DATWRDLY	   0xb
-			OFFSET_MSDC_IOCON			MSDC_IOCON_W_D0SPL			0x0
-			OFFSET_MSDC_DAT_RDDLY0		MSDC_DAT_RDDLY0_D0			0x7
-			OFFSET_MSDC_PAD_TUNE0	MSDC_PAD_TUNE0_DATRRDLY	   0x9
-			OFFSET_MSDC_IOCON		MSDC_IOCON_R_D_SMPL		   0x0>;
-
-		ett-hs400-cells = <8>;
-		ett-hs400-default = <OFFSET_MSDC_PATCH_BIT0	MSDC_PB0_INT_DAT_LATCH_CK_SEL	0x0
-			OFFSET_MSDC_PATCH_BIT0		MSDC_PB0_CKGEN_MSDC_DLY_SEL		0x0
-			OFFSET_EMMC50_PAD_DS_TUNE	MSDC_EMMC50_PAD_DS_TUNE_DLY1	0x2
-			OFFSET_EMMC50_PAD_DS_TUNE	MSDC_EMMC50_PAD_DS_TUNE_DLY3	0x10
-			OFFSET_MSDC_PATCH_BIT1			MSDC_PB1_CMD_RSP_TA_CNTR	0x1
-			OFFSET_MSDC_IOCON		MSDC_IOCON_RSPL				0x0
-			OFFSET_MSDC_PAD_TUNE0			MSDC_PAD_TUNE0_CMDRDLY		0x6
-			OFFSET_MSDC_PAD_TUNE0		MSDC_PAD_TUNE0_CMDRRDLY		0x6>;
-	};
-
-	mmc1_pins_default: mmc1@default {
-			pins_cmd {
-				drive-strength = /bits/ 8 <3>;
-			};
-			pins_dat {
-				drive-strength = /bits/ 8 <3>;
-			};
-			pins_clk {
-				drive-strength = /bits/ 8 <3>;
-			};
-	};
-
-	mmc1_pins_sdr104: mmc1@sdr104 {
-			pins_cmd {
-				drive-strength = /bits/ 8 <2>;
-			};
-			pins_dat {
-				drive-strength = /bits/ 8 <2>;
-			};
-			pins_clk {
-				drive-strength = /bits/ 8 <3>;
-			};
-	};
-
-	mmc1_pins_sdr50: mmc1@sdr50 {
-			pins_cmd {
-				drive-strength = /bits/ 8 <2>;
-			};
-			pins_dat {
-				drive-strength = /bits/ 8 <2>;
-			};
-			pins_clk {
-				drive-strength = /bits/ 8 <3>;
-			};
-	};
-
-	mmc1_pins_ddr50: mmc1@ddr50 {
-			pins_cmd {
-				drive-strength = /bits/ 8 <2>;
-			};
-			pins_dat {
-				drive-strength = /bits/ 8 <2>;
-			};
-			pins_clk {
-				drive-strength = /bits/ 8 <3>;
-			};
-	};
-
-	mmc1_register_setting_default: mmc1@register_default {
-				dat0rddly	  = /bits/ 8 <0>;
-				dat1rddly	  = /bits/ 8 <0>;
-				dat2rddly	  = /bits/ 8 <0>;
-				dat3rddly	  = /bits/ 8 <0>;
-				datwrddly	  = /bits/ 8 <0>;
-				cmdrrddly	  = /bits/ 8 <0>;
-				cmdrddly	   = /bits/ 8 <0>;
-				cmd_edge = /bits/ 8 <MSDC_SMPL_FALLING>;
-				rdata_edge = /bits/ 8 <MSDC_SMPL_FALLING>;
-				wdata_edge = /bits/ 8 <MSDC_SMPL_FALLING>;
-	};
-};
-/* mmc end */
-
 /* NFC GPIO standardization */
 &pio {
 	nfc_default: mtknfc {
@@ -594,7 +433,7 @@
 
 	nfc_ven_high: state_ven_high {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO4__FUNC_GPIO4>;
+			pinmux = <PINMUX_GPIO4__FUNC_GPIO4>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -602,7 +441,7 @@
 
 	nfc_ven_low: state_ven_low {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO4__FUNC_GPIO4>;
+			pinmux = <PINMUX_GPIO4__FUNC_GPIO4>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -610,7 +449,7 @@
 
 	nfc_rst_high: state_rst_high {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO3__FUNC_GPIO3>;
+			pinmux = <PINMUX_GPIO3__FUNC_GPIO3>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -618,7 +457,7 @@
 
 	nfc_rst_low: state_rst_low {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO3__FUNC_GPIO3>;
+			pinmux = <PINMUX_GPIO3__FUNC_GPIO3>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -626,7 +465,7 @@
 
 	nfc_eint_high: state_eint_high {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO1__FUNC_GPIO1>;
+			pinmux = <PINMUX_GPIO1__FUNC_GPIO1>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -634,7 +473,7 @@
 
 	nfc_eint_low: state_eint_low {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO1__FUNC_GPIO1>;
+			pinmux = <PINMUX_GPIO1__FUNC_GPIO1>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -642,7 +481,7 @@
 
 	nfc_irq_init: state_irq_init {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO2__FUNC_GPIO2>;
+			pinmux = <PINMUX_GPIO2__FUNC_GPIO2>;
 			slew-rate = <0>;
 			bias-pull-down = <00>;
 		};
@@ -703,14 +542,16 @@
 	};
 };
 
-&usb0 {
-	iddig_gpio = <0 1>;
+&usbiddig {
 	pinctrl-names = "usb_default", "iddig_irq_init", "drvvbus_init", "drvvbus_low", "drvvbus_high";
 	pinctrl-0 = <&usb_default>;
 	pinctrl-1 = <&gpio0_mode1_iddig>;
 	pinctrl-2 = <&gpio83_mode2_drvvbus>;
 	pinctrl-3 = <&gpio83_mode2_drvvbus_low>;
 	pinctrl-4 = <&gpio83_mode2_drvvbus_high>;
+	interrupt-parent = <&eintc>;
+	interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+	debounce = <9 0>;
 	status = "okay";
 };
 /* USB GPIO Kernal Standardization end */

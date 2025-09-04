@@ -7,4 +7,3 @@
 register unsigned long current_stack_pointer asm ("sp");
 
 #endif /* __ASM_STACK_POINTER_H */
-

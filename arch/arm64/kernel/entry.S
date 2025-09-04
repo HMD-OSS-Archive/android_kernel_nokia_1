@@ -18,6 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <linux/arm-smccc.h>
 #include <linux/init.h>
 #include <linux/linkage.h>
 
@@ -30,11 +31,13 @@
 #include <asm/irq.h>
 #include <asm/memory.h>
 #include <asm/mmu.h>
+#include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/thread_info.h>
 #include <asm/uaccess.h>
 #include <asm/asm-uaccess.h>
 #include <asm/unistd.h>
+#include <asm/kernel-pgtable.h>
 
 /*
  * Context tracking subsystem.  Used to instrument transitions
@@ -95,6 +98,25 @@ alternative_else_nop_endif
 	add	\dst, \dst, #(\sym - .entry.tramp.text)
 	.endm
 
+	// This macro corrupts x0-x3. It is the caller's duty
+	// to save/restore them if required.
+	.macro	apply_ssbd, state, targ, tmp1, tmp2
+#ifdef CONFIG_ARM64_SSBD
+alternative_cb	arm64_enable_wa2_handling
+	b	\targ
+alternative_cb_end
+	ldr_this_cpu	\tmp2, arm64_ssbd_callback_required, \tmp1
+	cbz	\tmp2, \targ
+	ldr	\tmp2, [tsk, #TSK_TI_FLAGS]
+	tbnz	\tmp2, #TIF_SSBD, \targ
+	mov	w0, #ARM_SMCCC_ARCH_WORKAROUND_2
+	mov	w1, #\state
+alternative_cb	arm64_update_smccc_conduit
+	nop					// Patched to SMC/HVC #0
+alternative_cb_end
+#endif
+	.endm
+
 	.macro	kernel_entry, el, regsize = 64
 	.if	\regsize == 32
 	mov	w0, w0				// zero upper 32 bits of x0
@@ -117,34 +139,28 @@ alternative_else_nop_endif
 
 	.if	\el == 0
 	mrs	x21, sp_el0
-#ifdef CONFIG_THREAD_INFO_IN_TASK
 	ldr_this_cpu	tsk, __entry_task, x20	// Ensure MDSCR_EL1.SS is clear,
 	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
-#else
-	mov	tsk, sp
-	and	tsk, tsk, #~(THREAD_SIZE - 1)	// Ensure MDSCR_EL1.SS is clear,
-	ldr	x19, [tsk, #TI_FLAGS]		// since we can unmask debug
-#endif
-
 	disable_step_tsk x19, x20		// exceptions when scheduling.
-	mov	x29, xzr
+
+	apply_ssbd 1, 1f, x22, x23
+
+#ifdef CONFIG_ARM64_SSBD
+	ldp	x0, x1, [sp, #16 * 0]
+	ldp	x2, x3, [sp, #16 * 1]
+#endif
+1:
+
+	mov	x29, xzr			// fp pointed to user-space
 	.else
 	add	x21, sp, #S_FRAME_SIZE
 	get_thread_info tsk
-	/* Save the task's original addr_limit and set USER_DS (TASK_SIZE_64) */
-#ifdef CONFIG_THREAD_INFO_IN_TASK
+	/* Save the task's original addr_limit and set USER_DS */
 	ldr	x20, [tsk, #TSK_TI_ADDR_LIMIT]
-#else
-	ldr	x20, [tsk, #TI_ADDR_LIMIT]
-#endif
 	str	x20, [sp, #S_ORIG_ADDR_LIMIT]
-	mov	x20, #TASK_SIZE_64
-#ifdef CONFIG_THREAD_INFO_IN_TASK
+	mov	x20, #USER_DS
 	str	x20, [tsk, #TSK_TI_ADDR_LIMIT]
-#else
-	str	x20, [tsk, #TI_ADDR_LIMIT]
-#endif
-	ALTERNATIVE(nop, SET_PSTATE_UAO(0), ARM64_HAS_UAO, CONFIG_ARM64_UAO)
+	/* No need to reset PSTATE.UAO, hardware's already set it to 0 for us */
 	.endif /* \el == 0 */
 	mrs	x22, elr_el1
 	mrs	x23, spsr_el1
@@ -193,13 +209,6 @@ alternative_else_nop_endif
 	.endif
 
 	/*
-	 * Set sp_el0 to current thread_info.
-	 */
-	.if	\el == 0
-	msr	sp_el0, tsk
-	.endif
-
-	/*
 	 * Registers that may be useful after this macro is invoked:
 	 *
 	 * x21 - aborted SP
@@ -212,11 +221,8 @@ alternative_else_nop_endif
 	.if	\el != 0
 	/* Restore the task's original addr_limit. */
 	ldr	x20, [sp, #S_ORIG_ADDR_LIMIT]
-#ifdef CONFIG_THREAD_INFO_IN_TASK
 	str	x20, [tsk, #TSK_TI_ADDR_LIMIT]
-#else
-	str	x20, [tsk, #TI_ADDR_LIMIT]
-#endif
+
 	/* No need to restore UAO, it will be restored from SPSR_EL1 */
 	.endif
 
@@ -273,6 +279,8 @@ alternative_if ARM64_WORKAROUND_845719
 alternative_else_nop_endif
 #endif
 3:
+	apply_ssbd 0, 5f, x0, x1
+5:
 	.endif
 
 	msr	elr_el1, x21			// set up the return data
@@ -315,20 +323,15 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
 	mov	x19, sp			// preserve the original sp
 
 	/*
-	 * Compare sp with the current thread_info, if the top
-	 * ~(THREAD_SIZE - 1) bits match, we are on a task stack, and
-	 * should switch to the irq stack.
+	 * Compare sp with the base of the task stack.
+	 * If the top ~(THREAD_SIZE - 1) bits match, we are on a task stack,
+	 * and should switch to the irq stack.
 	 */
-#ifdef CONFIG_THREAD_INFO_IN_TASK
 	ldr	x25, [tsk, TSK_STACK]
 	eor	x25, x25, x19
 	and	x25, x25, #~(THREAD_SIZE - 1)
 	cbnz	x25, 9998f
-#else
-	and	x25, x19, #~(THREAD_SIZE - 1)
-	cmp	x25, tsk
-	b.ne	9998f
-#endif
+
 	adr_this_cpu x25, irq_stack, x26
 	mov	x26, #IRQ_STACK_START_SP
 	add	x26, x25, x26
@@ -344,7 +347,7 @@ alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
 	mov	x29, sp
 
 9998:
- 	.endm
+	.endm
 
 	/*
 	 * x19 should be preserved between irq_stack_entry and
@@ -381,6 +384,7 @@ tsk	.req	x28		// current thread_info
 /*
  * Exception vectors.
  */
+	.pushsection ".entry.text", "ax"
 
 	.align	11
 ENTRY(vectors)
@@ -472,7 +476,7 @@ ENDPROC(el1_error_invalid)
 el1_sync:
 	kernel_entry 1
 	mov	x0, sp
-	get_thread_info x20     // top of stack
+	get_thread_info x20	// top of stack
 	ldr	w4, [x20, #TI_CPU_EXCP]
 	add	w4, w4, #0x1
 	str	w4, [x20, #TI_CPU_EXCP]
@@ -481,8 +485,8 @@ el1_sync:
 	str	x0, [x20, #TI_REGS_ON_EXCP]
 el1_sync_nest:
 	mrs	x1, esr_el1			// read the syndrome register
-	lsr	x24, x1, #ESR_EL1_EC_SHIFT	// exception class
-	cmp	x24, #ESR_EL1_EC_DABT_EL1	// data abort in EL1
+	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
 	b.ne	el1_sync_nest_skip_dec
 	sub	w4, w4, #0x1
 	str	w4, [x20, #TI_CPU_EXCP]
@@ -526,13 +530,14 @@ el1_da:
 	clear_address_tag x0, x3
 	mov	x2, sp				// struct pt_regs
 	bl	do_mem_abort
-	/*
+	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+	b.eq	el1_da_nest_skip_dec
 	mov	x5, sp
-	get_thread_info x20     // top of stack
+	get_thread_info x20	// top of stack
 	ldr	w4, [x20, #TI_CPU_EXCP]
 	sub	w4, w4, #0x1
 	str	w4, [x20, #TI_CPU_EXCP]
-	*/
+el1_da_nest_skip_dec:
 
 	// disable interrupts before pulling preserved data off the stack
 	disable_irq
@@ -551,8 +556,7 @@ el1_undef:
 	 */
 	enable_dbg
 	mov	x0, sp
-	bl	do_undefinstr
-	kernel_exit 1
+	b	do_undefinstr
 el1_dbg:
 	/*
 	 * Debug exception handling
@@ -564,7 +568,7 @@ el1_dbg:
 	mov	x2, sp				// struct pt_regs
 	bl	do_debug_exception
 	mov	x5, sp
-	get_thread_info x20     // top of stack
+	get_thread_info x20	// top of stack
 	ldr	w4, [x20, #TI_CPU_EXCP]
 	sub	w4, w4, #0x1
 	str	w4, [x20, #TI_CPU_EXCP]
@@ -574,8 +578,8 @@ el1_inv:
 	// TODO: add support for undefined instructions in kernel mode
 	enable_dbg
 	mov	x0, sp
+	mov	x2, x1
 	mov	x1, #BAD_SYNC
-	mrs	x2, esr_el1
 	b	bad_mode
 ENDPROC(el1_sync)
 
@@ -586,29 +590,16 @@ el1_irq:
 #ifdef CONFIG_TRACE_IRQFLAGS
 	bl	trace_hardirqs_off
 #endif
-#ifdef CONFIG_MTPROF
-	bl  MT_trace_hardirqs_off
-#endif
+
 	irq_handler
 
 #ifdef CONFIG_PREEMPT
-#ifdef CONFIG_THREAD_INFO_IN_TASK
 	ldr	w24, [tsk, #TSK_TI_PREEMPT]	// get preempt count
-#else
-	ldr	w24, [tsk, #TI_PREEMPT]		// get preempt count
-#endif
 	cbnz	w24, 1f				// preempt count != 0
-#ifdef CONFIG_THREAD_INFO_IN_TASK
 	ldr	x0, [tsk, #TSK_TI_FLAGS]	// get flags
-#else
-	ldr	x0, [tsk, #TI_FLAGS]		// get flags
-#endif
 	tbz	x0, #TIF_NEED_RESCHED, 1f	// needs rescheduling?
 	bl	el1_preempt
 1:
-#endif
-#ifdef CONFIG_MTPROF
-	bl  MT_trace_hardirqs_on
 #endif
 #ifdef CONFIG_TRACE_IRQFLAGS
 	bl	trace_hardirqs_on
@@ -620,11 +611,7 @@ ENDPROC(el1_irq)
 el1_preempt:
 	mov	x24, lr
 1:	bl	preempt_schedule_irq		// irq en/disable is done inside
-#ifdef CONFIG_THREAD_INFO_IN_TASK
 	ldr	x0, [tsk, #TSK_TI_FLAGS]	// get new tasks TI_FLAGS
-#else
-	ldr	x0, [tsk, #TI_FLAGS]		// get new tasks TI_FLAGS
-#endif
 	tbnz	x0, #TIF_NEED_RESCHED, 1b	// needs rescheduling?
 	ret	x24
 #endif
@@ -675,6 +662,8 @@ el0_sync_compat:
 	b.eq	el0_fpsimd_acc
 	cmp	x24, #ESR_ELx_EC_FP_EXC32	// FP/ASIMD exception
 	b.eq	el0_fpsimd_exc
+	cmp	x24, #ESR_ELx_EC_PC_ALIGN	// pc alignment exception
+	b.eq	el0_sp_pc
 	cmp	x24, #ESR_ELx_EC_UNKNOWN	// unknown exception in EL0
 	b.eq	el0_undef
 	cmp	x24, #ESR_ELx_EC_CP15_32	// CP15 MRC/MCR trap
@@ -694,7 +683,7 @@ el0_svc_compat:
 	/*
 	 * AArch32 syscall handling
 	 */
-	adr	stbl, compat_sys_call_table	// load compat syscall table pointer
+	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
 	uxtw	scno, w7			// syscall number in w7 (r7)
 	mov     sc_nr, #__NR_compat_syscalls
 	b	el0_svc_naked
@@ -723,13 +712,15 @@ el0_ia:
 	 * Instruction abort handling
 	 */
 	mrs	x26, far_el1
-	// enable interrupts before calling the main handler
-	enable_dbg_and_irq
+	msr     daifclr, #(8 | 4 | 1)
+#ifdef CONFIG_TRACE_IRQFLAGS
+	bl	trace_hardirqs_off
+#endif
 	ct_user_exit
 	mov	x0, x26
 	mov	x1, x25
 	mov	x2, sp
-	bl	do_mem_abort
+	bl	do_el0_ia_bp_hardening
 	b	ret_to_user
 el0_fpsimd_acc:
 	/*
@@ -756,8 +747,10 @@ el0_sp_pc:
 	 * Stack or PC alignment exception handling
 	 */
 	mrs	x26, far_el1
-	// enable interrupts before calling the main handler
-	enable_dbg_and_irq
+	enable_dbg
+#ifdef CONFIG_TRACE_IRQFLAGS
+	bl	trace_hardirqs_off
+#endif
 	ct_user_exit
 	mov	x0, x26
 	mov	x1, x25
@@ -801,7 +794,7 @@ el0_inv:
 	ct_user_exit
 	mov	x0, sp
 	mov	x1, #BAD_SYNC
-	mrs	x2, esr_el1
+	mov	x2, x25
 	bl	bad_el0_sync
 	b	ret_to_user
 ENDPROC(el0_sync)
@@ -816,6 +809,11 @@ el0_irq_naked:
 #endif
 
 	ct_user_exit
+#ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
+	tbz	x22, #55, 1f
+	bl	do_el0_irq_bp_hardening
+1:
+#endif
 	irq_handler
 
 #ifdef CONFIG_TRACE_IRQFLAGS
@@ -833,7 +831,8 @@ ENDPROC(el0_irq)
  *
  */
 ENTRY(cpu_switch_to)
-	add	x8, x0, #THREAD_CPU_CONTEXT
+	mov	x10, #THREAD_CPU_CONTEXT
+	add	x8, x0, x10
 	mov	x9, sp
 	stp	x19, x20, [x8], #16		// store callee-saved registers
 	stp	x21, x22, [x8], #16
@@ -842,7 +841,7 @@ ENTRY(cpu_switch_to)
 	stp	x27, x28, [x8], #16
 	stp	x29, x9, [x8], #16
 	str	lr, [x8]
-	add	x8, x1, #THREAD_CPU_CONTEXT
+	add	x8, x1, x10
 	ldp	x19, x20, [x8], #16		// restore callee-saved registers
 	ldp	x21, x22, [x8], #16
 	ldp	x23, x24, [x8], #16
@@ -851,12 +850,7 @@ ENTRY(cpu_switch_to)
 	ldp	x29, x9, [x8], #16
 	ldr	lr, [x8]
 	mov	sp, x9
-#ifdef CONFIG_THREAD_INFO_IN_TASK
 	msr	sp_el0, x1
-#else
-	and	x9, x9, #~(THREAD_SIZE - 1)
-	msr	sp_el0, x9
-#endif
 	ret
 ENDPROC(cpu_switch_to)
 
@@ -867,11 +861,7 @@ ENDPROC(cpu_switch_to)
 ret_fast_syscall:
 	disable_irq				// disable interrupts
 	str	x0, [sp, #S_X0]			// returned x0
-#ifdef CONFIG_THREAD_INFO_IN_TASK
 	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for syscall tracing
-#else
-	ldr	x1, [tsk, #TI_FLAGS]		// re-check for syscall tracing
-#endif
 	and	x2, x1, #_TIF_SYSCALL_WORK
 	cbnz	x2, ret_fast_syscall_trace
 	and	x2, x1, #_TIF_WORK_MASK
@@ -886,30 +876,22 @@ ret_fast_syscall_trace:
  * Ok, we need to do extra processing, enter the slow path.
  */
 work_pending:
-	tbnz	x1, #TIF_NEED_RESCHED, work_resched
-	/* TIF_SIGPENDING, TIF_NOTIFY_RESUME or TIF_FOREIGN_FPSTATE case */
 	mov	x0, sp				// 'regs'
-	enable_irq				// enable interrupts for do_notify_resume()
 	bl	do_notify_resume
-	b	ret_to_user
-work_resched:
 #ifdef CONFIG_TRACE_IRQFLAGS
-	bl	trace_hardirqs_off		// the IRQs are off here, inform the tracing code
+	bl	trace_hardirqs_on		// enabled while in userspace
 #endif
-	bl	schedule
-
+	ldr	x1, [tsk, #TSK_TI_FLAGS]	// re-check for single-step
+	b	finish_ret_to_user
 /*
  * "slow" syscall return path.
  */
 ret_to_user:
 	disable_irq				// disable interrupts
-#ifdef CONFIG_THREAD_INFO_IN_TASK
 	ldr	x1, [tsk, #TSK_TI_FLAGS]
-#else
-	ldr	x1, [tsk, #TI_FLAGS]
-#endif
 	and	x2, x1, #_TIF_WORK_MASK
 	cbnz	x2, work_pending
+finish_ret_to_user:
 	enable_step_tsk x1, x2
 	kernel_exit 0
 ENDPROC(ret_to_user)
@@ -938,15 +920,13 @@ el0_svc_naked:					// compat entry point
 	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
 	enable_dbg_and_irq
 	ct_user_exit 1
-#ifdef CONFIG_THREAD_INFO_IN_TASK
+
 	ldr	x16, [tsk, #TSK_TI_FLAGS]	// check for syscall hooks
-#else
-	ldr	x16, [tsk, #TI_FLAGS]		// check for syscall hooks
-#endif
 	tst	x16, #_TIF_SYSCALL_WORK
 	b.ne	__sys_trace
 	cmp     scno, sc_nr                     // check upper syscall limit
 	b.hs	ni_sys
+	mask_nospec64 scno, sc_nr, x19	// enforce bounds for syscall number
 	ldr	x16, [stbl, scno, lsl #3]	// address in the syscall table
 	blr	x16				// call sys_* routine
 	b	ret_fast_syscall
@@ -993,6 +973,8 @@ __ni_sys_trace:
 	bl	do_ni_syscall
 	b	__sys_trace_return
 
+	.popsection				// .entry.text
+
 #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
 /*
  * Exception vectors trampoline.
@@ -1022,16 +1004,9 @@ __ni_sys_trace:
 	orr	\tmp, \tmp, #USER_ASID_FLAG
 	msr	ttbr1_el1, \tmp
 	/*
-	 * We avoid running the post_ttbr_update_workaround here because the
-	 * user and kernel ASIDs don't have conflicting mappings, so any
-	 * "blessing" as described in:
-	 *
-	 *   http://lkml.kernel.org/r/56BB848A.6060603@caviumnetworks.com
-	 *
-	 * will not hurt correctness. Whilst this may partially defeat the
-	 * point of using split ASIDs in the first place, it avoids
-	 * the hit of invalidating the entire I-cache on every return to
-	 * userspace.
+	 * We avoid running the post_ttbr_update_workaround here because
+	 * it's only needed by Cavium ThunderX, which requires KPTI to be
+	 * disabled.
 	 */
 	.endm
 
@@ -1041,6 +1016,11 @@ __ni_sys_trace:
 	.if	\regsize == 64
 	msr	tpidrro_el0, x30	// Restored in kernel_ventry
 	.endif
+	/*
+	 * Defend against branch aliasing attacks by pushing a dummy
+	 * entry onto the return stack and using a RET instruction to
+	 * enter the full-fat kernel vectors.
+	 */
 	bl	2f
 	b	.
 2:

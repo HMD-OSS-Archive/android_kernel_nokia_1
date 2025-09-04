@@ -42,7 +42,6 @@
 #include <linux/syscalls.h>
 #include <linux/timer.h>
 #include <linux/delay.h>
-#include <linux/wakelock.h>
 #include <linux/rtc.h>
 #include <linux/atomic.h>
 #include <linux/random.h>
@@ -53,6 +52,8 @@
 #include <mt-plat/mtk_rtc.h>
 #endif
 #include <ccci_common.h>
+
+#include "ccci_layer.h"
 
 /* ------------------- md control variable define---------------------*/
 struct md_ctl_block_t {
@@ -73,7 +74,7 @@ struct md_ctl_block_t {
 	struct smem_alloc_t *smem_table;
 	struct ccci_mem_layout_t *md_layout;
 	/*  -- TRM wake lock */
-	struct wake_lock trm_wake_lock;
+	struct wakeup_source trm_wake_lock;
 	char wakelock_name[16];
 	/*  -- Timer */
 	struct timer_list md_ex_monitor;
@@ -624,6 +625,7 @@ void ccci_ee_info_dump(int md_id, struct DEBUG_INFO_T *debug_info)
 {
 	char ex_info[EE_BUF_LEN] = "";
 	char i_bit_ex_info[EE_BUF_LEN] = "\n[Others] May I-Bit dis too long\n";
+	int len;
 
 	struct rtc_time tm;
 	struct timeval tv = { 0 };
@@ -740,15 +742,18 @@ void ccci_ee_info_dump(int md_id, struct DEBUG_INFO_T *debug_info)
 	/*  Add additional info */
 	switch (debug_info->more_info) {
 	case MD_EE_CASE_ONLY_EX:
-		strcat(ex_info, "\nTime out case\n");
+		len = strlen(ex_info);
+		snprintf(&ex_info[len], EE_BUF_LEN - len, "\nTime out case\n");
 		break;
 
 	case MD_EE_CASE_ONLY_EX_OK:
-		strcat(ex_info, "\nOnly EX_OK case\n");
+		len = strlen(ex_info);
+		snprintf(&ex_info[len], EE_BUF_LEN - len, "\nOnly EX_OK case\n");
 		break;
 	case MD_EE_CASE_AP_MASK_I_BIT_TOO_LONG:
-		strcat(i_bit_ex_info, ex_info);
-		strcpy(ex_info, i_bit_ex_info);
+		len = strlen(i_bit_ex_info);
+		snprintf(&i_bit_ex_info[len], EE_BUF_LEN - len, "%s", ex_info);
+		snprintf(ex_info, EE_BUF_LEN, "%s", i_bit_ex_info);
 #if defined(CONFIG_MTK_AEE_FEATURE) && defined(ENABLE_AEE_MD_EE)
 		aee_kernel_warning_api(__FILE__, __LINE__, DB_OPT_FTRACE,
 				       "CCCI", i_bit_ex_info);
@@ -760,7 +765,8 @@ void ccci_ee_info_dump(int md_id, struct DEBUG_INFO_T *debug_info)
 		break;
 
 	case MD_EE_CASE_NO_RESPONSE:
-		strcat(ex_info, "\n[Others] MD long time no response\n");
+		len = strlen(ex_info);
+		snprintf(&ex_info[len], EE_BUF_LEN - len, "\n[Others] MD long time no response\n");
 		break;
 
 	default:
@@ -1319,8 +1325,8 @@ void ccci_aed(int md_id, unsigned int dump_flag, char *aed_str)
 				     ex_log_len);
 	}
 #if defined(CONFIG_MTK_AEE_FEATURE) && defined(ENABLE_AEE_MD_EE)
-	aed_md_exception(ex_log_addr, ex_log_len, md_img_addr, md_img_len,
-			 buff);
+	aed_md_exception_api(ex_log_addr, ex_log_len, md_img_addr, md_img_len,
+				buff, DB_OPT_FTRACE);
 #endif
 }
 
@@ -2036,6 +2042,7 @@ int ccci_start_modem(int md_id)
 		CCCI_MSG_INF(md_id, "ctl", "ungate_md fail: %d\n", ret);
 
 	atomic_set(&ctl_b->md_reset_on_going, 0);
+	inject_md_status_event(md_id, MD_STA_EV_HS1, NULL);
 
 	CCCI_MSG_INF(md_id, "ctl", "wait for MD_INIT_START_BOOT\n");
 	return 0;
@@ -2098,6 +2105,7 @@ int ccci_stop_modem(int md_id, unsigned int timeout)
 	ret = logic_layer_reset(md_id);
 	CCCI_MSG_INF(md_id, "ctl", "stop modem, delete boot up check timer\n");
 	ccci_stop_bootup_timer(md_id);
+	inject_md_status_event(md_id, MD_STA_EV_STOP, NULL);
 	CCCI_MSG_INF(md_id, "ctl", "md power off end\n");
 	return ret;
 }
@@ -2118,7 +2126,7 @@ int send_md_reset_notify(int md_id)
 	/* if( (ret < 0)&&(ret != -CCCI_ERR_MD_IN_RESET) ) */
 	if (ret < 0)
 		return ret;
-	wake_lock_timeout(&ctl_b->trm_wake_lock, 10 * HZ);
+	__pm_wakeup_event(&ctl_b->trm_wake_lock, 10 * HZ);
 	ccci_system_message(md_id, CCCI_MD_MSG_RESET, 0);
 
 	return 0;
@@ -2713,8 +2721,7 @@ int ccci_md_ctrl_init(int md_id)
 	}
 	snprintf(ctlb->wakelock_name, sizeof(ctlb->wakelock_name), "ccci%d_trm",
 		 (md_id + 1));
-	wake_lock_init(&ctlb->trm_wake_lock, WAKE_LOCK_SUSPEND,
-		       ctlb->wakelock_name);
+	wakeup_source_init(&ctlb->trm_wake_lock, ctlb->wakelock_name);
 
 	/*  Timer init */
 	init_timer(&ctlb->md_ex_monitor);
@@ -2798,7 +2805,7 @@ void ccci_md_ctrl_exit(int md_id)
 
 	if (ctlb == NULL)
 		return;
-	wake_lock_destroy(&ctlb->trm_wake_lock);
+	__pm_relax(&ctlb->trm_wake_lock);
 	ccci_stop_bootup_timer(md_id);
 	/* ccci_free_smem(md_id); */
 	tasklet_kill(&ctlb->md_notifier.tasklet);

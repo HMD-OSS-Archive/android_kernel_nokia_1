@@ -36,10 +36,9 @@ endif
 	ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v2/$(MTK_PLATFORM)
 	ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v2/mtee
 	ccflags-y += -I$(srctree)/drivers/misc/mediatek/cmdq/v2/inc/cmdq_sec_dr \
-             	 -I$(srctree)/drivers/misc/mediatek/cmdq/v2/inc/cmdq_sec_tl \
+		 -I$(srctree)/drivers/misc/mediatek/cmdq/v2/inc/cmdq_sec_tl \
 	             -I$(srctree)/drivers/misc/mediatek/mach/$(MTK_PLATFORM)/include \
 	             -I$(srctree)/include/trustzone
-
+#endif
 
 obj-y += cmdq_sec.o
-

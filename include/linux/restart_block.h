@@ -3,11 +3,14 @@
  */
 #ifndef __LINUX_RESTART_BLOCK_H
 #define __LINUX_RESTART_BLOCK_H
+
 #include <linux/compiler.h>
 #include <linux/types.h>
+
 struct timespec;
 struct compat_timespec;
 struct pollfd;
+
 /*
  * System call restart block.
  */
@@ -42,6 +45,7 @@ struct restart_block {
 		} poll;
 	};
 };
-extern long do_no_restart_syscall(struct restart_block *parm);
-#endif /* __LINUX_RESTART_BLOCK_H */
 
+extern long do_no_restart_syscall(struct restart_block *parm);
+
+#endif /* __LINUX_RESTART_BLOCK_H */

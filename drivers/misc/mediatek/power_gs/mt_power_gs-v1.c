@@ -104,11 +104,11 @@ static void mt_power_gs_compare(char *scenario, char *pmic_name,
 
 void mt_power_gs_dump_suspend(void)
 {
-#if defined CONFIG_ARCH_MT6580 || defined CONFIG_ARCH_MT6570
+#if defined CONFIG_MACH_MT6580 || defined CONFIG_MACH_MT6570
 	mt_power_gs_compare("Suspend ", "6325",
 			    MT6325_PMIC_REG_gs_flightmode_suspend_mode,
 			    MT6325_PMIC_REG_gs_flightmode_suspend_mode_len);
-#elif defined CONFIG_ARCH_MT6735 || defined CONFIG_ARCH_MT6735M || defined CONFIG_ARCH_MT6753
+#elif defined CONFIG_MACH_MT6735 || defined CONFIG_MACH_MT6735M || defined CONFIG_MACH_MT6753
 	mt_power_gs_compare("Suspend ", "6328",
 			    MT6328_PMIC_REG_gs_flightmode_suspend_mode,
 			    MT6328_PMIC_REG_gs_flightmode_suspend_mode_len);

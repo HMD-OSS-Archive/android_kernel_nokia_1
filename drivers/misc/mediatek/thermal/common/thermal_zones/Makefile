@@ -24,19 +24,19 @@ ccflags-y  += -I$(srctree)/drivers/misc/mediatek/thermal/common/inc/
 ccflags-y  += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
 
 ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6735"))
-ifeq ($(CONFIG_ARCH_MT6735),y)
+ifeq ($(CONFIG_MACH_MT6735),y)
 ccflags-y  += -I$(THERMAL_CHIP_DRIVER_DIR)/inc/D1
 endif
 
-ifeq ($(CONFIG_ARCH_MT6735M),y)
+ifeq ($(CONFIG_MACH_MT6735M),y)
 ccflags-y  += -I$(THERMAL_CHIP_DRIVER_DIR)/inc/D2
 endif
 
-ifeq ($(CONFIG_ARCH_MT6753),y)
+ifeq ($(CONFIG_MACH_MT6753),y)
 ccflags-y  += -I$(THERMAL_CHIP_DRIVER_DIR)/inc/D3
 endif
 
-ifeq ($(CONFIG_ARCH_MT6753),y)
+ifeq ($(CONFIG_MACH_MT6753),y)
 obj-$(CONFIG_THERMAL) += mtk_ts_6311buck.o
 endif
 
@@ -172,4 +172,33 @@ obj-$(CONFIG_THERMAL) += mtk_ts2.o
 obj-$(CONFIG_THERMAL) += mtk_ts3.o
 obj-$(CONFIG_THERMAL) += mtk_ts4.o
 obj-$(CONFIG_THERMAL) += mtk_ts5.o
+endif
+
+ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6763" "mt6739"))
+#obj-$(CONFIG_THERMAL) += mtk_ts_abb.o
+obj-$(CONFIG_THERMAL) += mtk_ts_battery.o
+
+ifneq ($(CONFIG_POWER_EXT),y)
+obj-$(CONFIG_THERMAL) += mtk_ts_bts.o
+obj-$(CONFIG_THERMAL) += mtk_ts_btsmdpa.o
+endif
+
+obj-$(CONFIG_THERMAL) += mtk_ts_cpu_noBank.o
+obj-$(CONFIG_THERMAL) += mtk_ts_pa.o
+obj-$(CONFIG_THERMAL) += mtk_ts_pa_thput.o
+obj-$(CONFIG_THERMAL) += mtk_ts_pmic.o
+#obj-$(CONFIG_THERMAL) += mtk_ts_pmic1.o
+obj-$(CONFIG_THERMAL) += mtk_ts_charger.o
+
+ifneq ($(CONFIG_MTK_COMBO_WIFI),)
+    obj-$(CONFIG_THERMAL) += mtk_ts_wmt.o
+endif
+
+obj-$(CONFIG_THERMAL) += mtk_tsAll.o
+#obj-$(CONFIG_THERMAL) += mtk_ts_Abts.o
+obj-$(CONFIG_THERMAL) += mtk_ts_imgsensor.o
+
+ifneq ($(CONFIG_MTK_BIF_SUPPORT),)
+obj-$(CONFIG_THERMAL) += mtk_ts_bif.o
+endif
 endif

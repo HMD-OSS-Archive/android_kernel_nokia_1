@@ -13,6 +13,7 @@
 #include <linux/delay.h> 
 #include <linux/kthread.h>
 #include <linux/io.h>
+#include <linux/module.h>
 
 #define FALSE 	0
 #define TRUE 	1
@@ -184,32 +185,68 @@ static int draminfo_test_result_wtite(struct file *flip,const char __user *buf,s
 static int fver_show(struct seq_file *s, void *unused)
 {
 	struct file *fver_filp = NULL;
-	mm_segment_t oldfs;
+	mm_segment_t oldfs = 0;
+	loff_t pos = 0;
+	int iCount = 0;
 
-	if(!fver_open_times)
+	//
+	if( ( 0 != fver_open_times) && ( NULL != fver_preload) )
 	{
-		oldfs = get_fs();
-		set_fs(KERNEL_DS);
-		fver_filp = filp_open(FVER_BLOCK, O_RDONLY, 0);
+ 		seq_printf(s, "%s\n", fver_preload);
+		return 0;
+	}
 
-		if(!IS_ERR(fver_filp))
-		{
-			fver_filp->f_op->read(fver_filp, fver_preload, sizeof(char)*fver_len, &fver_filp->f_pos);
-			filp_close(fver_filp, NULL);
-			fver_open_times++;
-		}
-		else
-		{
-			printk("[dw]open %s fail\n", FVER_BLOCK);
-		}
+	//first open
+	if(NULL == fver_preload)
+	{
+		//fver_preload = kmalloc(sizeof(char)*fver_len, GFP_KERNEL);
+		do{
+			fver_preload = kzalloc(sizeof(char)*fver_len, GFP_KERNEL);
+			if( fver_preload != NULL )
+			{
+				printk("alloc memory for fver successfull!\n");
+				break;
+			}
+			else{
+				printk("alloc memory for fver fail!\n");
+				iCount ++;
+				//return -ENOMEM;
+			}
+		}while( (iCount <= 5) && (NULL == fver_preload) ) ;
 
-		set_fs(oldfs);
+		if( (iCount > 5) ||  ( NULL == fver_preload) )
+		{
+			printk("alloc memory for fver fail!\n");
+			return -ENOMEM;
+		}
+	}
+
+
+	//really  handle user request
+	oldfs = get_fs();
+	set_fs(KERNEL_DS);
+	fver_filp = filp_open(FVER_BLOCK, O_RDONLY, 0);
+
+
+	if(!IS_ERR(fver_filp))
+	{
+		iCount = 0;
+		iCount = vfs_read(fver_filp, (char __user *)fver_preload, sizeof(char)*fver_len, &pos);
+		filp_close(fver_filp, NULL);
+		fver_open_times++;
+
+		printk("read fver successfully %d !\n",iCount);
 	}
 	else
 	{
-		seq_printf(s, "%s\n", fver_preload);
+		printk("[dw]open %s fail\n", FVER_BLOCK);
 	}
 
+	set_fs(oldfs);
+	seq_printf(s, "%s\n", fver_preload);
+
+	//kfree(fver_preload);
+	//fver_filp = fver_preload = NULL;
 	return 0;
 }
 
@@ -543,7 +580,7 @@ void fih_info_set_touch(char *info)
 	printk("touch: fih_info_set_touch.\n");
 	strcpy(fih_touch, info);
 }
-
+/*
 static int fih_touch_read_proc(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	int len;
@@ -551,7 +588,7 @@ static int fih_touch_read_proc(char *page, char **start, off_t off, int count, i
 	printk("touch: allhwlist touch virtual file read.\n");
 	return snprintf(page, PAGE_SIZE, "%s\n", fih_touch);
 }
-
+*/
 
 void fih_info_set_lcm(char *info)
 {
@@ -892,8 +929,7 @@ static int pcba_description_show(struct seq_file *s, void *unused)
 
 static int hwidv_show(struct seq_file *s, void *unused)
 {
-	int data[4];
-	int proj, phase, module, rawvalue;
+	int proj, phase, module;
 
 	proj   = (fih_hwid >> 8) & 0x00F;
 	phase  = (fih_hwid >> 4) & 0x00F;
@@ -979,9 +1015,9 @@ static int uicolor_write(struct file *flip,const char __user *buf,size_t count,l
 
 static int sim_card_slot_show(struct seq_file *s,void *unused)
 {
-	printk("sim_card_slot_show enter\n");
         unsigned short project_id = 0;
 
+	printk("sim_card_slot_show enter\n");
         project_id = (fih_hwid >> 8) & 0x00F;
 
 	printk("Current project id = %d, sim_num = %s.\n", project_id, model[project_id].sim_num);
@@ -1023,6 +1059,8 @@ static int hwid_info_show(struct seq_file *s, void *unused)
 	hw_preload = project_id * 100 + phase_id * 10 + module_id;
 
 	seq_printf(s, "%d\n", hw_preload);
+
+	return 0;
 }
 
 static int bandinfo_show(struct seq_file *s,void *unused)
@@ -1084,11 +1122,15 @@ static int efuse_enabled_show(struct seq_file *s, void *unused)
 	printk("efuse_enabled_show() sec_en = %d\n", sec_en);
 
 	seq_printf(s, "%d\n", sec_en);
+
+	return 0;
 }
 
 static int otg_last_flag_show(struct seq_file *s, void *unused)
 {
 	seq_printf(s, "%d\n", otg_last_flag);
+
+	return 0;
 }
 
 static int otg_last_flag_write(struct file *flip, const char __user *buf, size_t count, loff_t *f_pos)
@@ -1967,7 +2009,7 @@ static void __exit proc_info_module_exit(void)
 	//return 0;
 }
 
-module_exit(proc_info_module_exit);
 module_init(proc_info_module_init);
+module_exit(proc_info_module_exit);
 
 

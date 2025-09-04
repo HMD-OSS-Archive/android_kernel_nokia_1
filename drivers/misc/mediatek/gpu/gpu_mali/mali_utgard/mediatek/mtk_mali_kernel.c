@@ -1,10 +1,10 @@
 /*
 * Copyright (C) 2011-2014 MediaTek Inc.
-* 
-* This program is free software: you can redistribute it and/or modify it under the terms of the 
+*
+* This program is free software: you can redistribute it and/or modify it under the terms of the
 * GNU General Public License version 2 as published by the Free Software Foundation.
-* 
-* This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+*
+* This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
 * without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 * See the GNU General Public License for more details.
 *
@@ -24,7 +24,7 @@ void MTKMALI_DumpRegister( void )
 #define DUMP_REG_INFO( addr )   MALIK_MSG("REG: %s = 0x%08x\n", #addr, M_READ32( addr, 0 ))
     unsigned long dummy;
 
-    MALIK_MSG("MTKMALI_DumpRegister-------:\n"); 
+    MALIK_MSG("MTKMALI_DumpRegister-------:\n");
     MALIK_MSG("MT_CG_MFG_G3D is %d\n", clock_is_on(MT_CG_MFG_G3D));
     MALIK_MSG("MT_CG_DISP0_SMI_COMMON is %d\n", clock_is_on(MT_CG_DISP0_SMI_COMMON));
 
@@ -40,11 +40,11 @@ void MTKMALI_DumpRegister( void )
     M_WRITE32( REG_MFG_DEBUG_SEL, 0x0, dummy );
     DUMP_REG_INFO( REG_MFG_DEBUG_SEL );
 
-    MALIK_MSG("---------------------------:\n"); 
+    MALIK_MSG("---------------------------:\n");
 
 
    /*Dump Call stack*/
     dump_stack();
-#endif // 0  
+#endif // 0
 }
 

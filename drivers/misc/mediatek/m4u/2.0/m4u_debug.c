@@ -27,23 +27,22 @@
 #include "trustzone/kree/mem.h"
 #endif
 
-#if defined(CONFIG_TRUSTONIC_TEE_SUPPORT) && defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
-#include "secmem.h"
+#if defined(CONFIG_MTK_SECURE_MEM_SUPPORT) && \
+		defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
+#include "secmem_api.h"
 #endif
-
 
 /* global variables */
 int gM4U_log_to_uart = 2;
 int gM4U_log_level = 2;
 
-unsigned int gM4U_seed_mva = 0;
+unsigned int gM4U_seed_mva;
 
-#if 0
 int m4u_test_alloc_dealloc(int id, unsigned int size)
 {
 	m4u_client_t *client;
 	unsigned long va = 0;
-	unsigned int mva;
+	unsigned int mva = 0;
 	int ret;
 	unsigned long populate;
 
@@ -94,7 +93,7 @@ int m4u_test_alloc_dealloc(int id, unsigned int size)
 m4u_callback_ret_t m4u_test_callback(int alloc_port, unsigned int mva,
 				     unsigned int size, void *data)
 {
-	if (NULL != data)
+	if (data != NULL)
 		M4UMSG("test callback port=%d, mva=0x%x, size=0x%x, data=0x%x\n", alloc_port, mva, size, *(int *)data);
 	else
 		M4UMSG("test callback port=%d, mva=0x%x, size=0x%x\n", alloc_port, mva, size);
@@ -107,7 +106,7 @@ int m4u_test_reclaim(unsigned int size)
 	m4u_client_t *client;
 	unsigned int *va[10];
 	unsigned int buf_size;
-	unsigned int mva;
+	unsigned int mva = 0;
 	int ret, i;
 
 	/* register callback */
@@ -150,9 +149,9 @@ static int m4u_test_map_kernel(void)
 	m4u_client_t *client;
 	unsigned long va;
 	unsigned int size = 1024 * 1024;
-	unsigned int mva;
-	unsigned long kernel_va;
-	unsigned int kernel_size;
+	unsigned int mva = 0;
+	unsigned long kernel_va = 0;
+	unsigned int kernel_size = 0;
 	int i;
 	int ret;
 	unsigned long populate;
@@ -246,7 +245,7 @@ int m4u_test_ddp(unsigned int prot)
 
 m4u_callback_ret_t test_fault_callback(int port, unsigned int mva, void *data)
 {
-	if (NULL != data)
+	if (data != NULL)
 		M4UMSG("fault call port=%d, mva=0x%x, data=0x%x\n", port, mva, *(int *)data);
 	else
 		M4UMSG("fault call port=%d, mva=0x%x\n", port, mva);
@@ -258,8 +257,6 @@ m4u_callback_ret_t test_fault_callback(int port, unsigned int mva, void *data)
 	return M4U_CALLBACK_HANDLED;
 }
 
-static char *data = "ABC";
-
 int m4u_test_tf(unsigned int prot)
 {
 	unsigned int *pSrc = NULL;
@@ -269,9 +266,10 @@ int m4u_test_tf(unsigned int prot)
 	unsigned int size = 64 * 64 * 3;
 	M4U_PORT_STRUCT port;
 	m4u_client_t *client = m4u_create_client();
+	int data = 88;
 
-	m4u_register_fault_callback(M4U_PORT_DISP_OVL0, test_fault_callback, (void *)data);
-	m4u_register_fault_callback(M4U_PORT_DISP_WDMA0, test_fault_callback, (void *)data);
+	m4u_register_fault_callback(M4U_PORT_DISP_OVL0, test_fault_callback, &data);
+	m4u_register_fault_callback(M4U_PORT_DISP_WDMA0, test_fault_callback, &data);
 
 	pSrc = vmalloc(size);
 	pDst = vmalloc(size);
@@ -309,7 +307,6 @@ int m4u_test_tf(unsigned int prot)
 
 	return 0;
 }
-#endif
 
 #if 0
 #include <mtk/ion_drv.h>
@@ -349,7 +346,7 @@ void m4u_test_ion(void)
 	ion_phys(ion_client, src_handle, &src_pa, (size_t *)&tmp_size);
 	ion_phys(ion_client, dst_handle, &dst_pa, (size_t *)&tmp_size);
 
-	M4UMSG("ion alloced: pSrc=0x%p, pDst=0x%p, src_pa=0x%lu, dst_pa=0x%lu\n", pSrc, pDst, src_pa, dst_pa);
+	M4UMSG("ion alloced: pSrc=0x%p, pDst=0x%p, src_pa=%lu, dst_pa=%lu\n", pSrc, pDst, src_pa, dst_pa);
 
 	port.ePortID = M4U_PORT_DISP_OVL0;
 	port.Direction = 0;
@@ -375,7 +372,6 @@ void m4u_test_ion(void)
 #define m4u_test_ion(...)
 #endif
 
-#if 0
 static int m4u_debug_set(void *data, u64 val)
 {
 	m4u_domain_t *domain = data;
@@ -514,13 +510,13 @@ static int m4u_debug_set(void *data, u64 val)
 	{
 		unsigned int mva;
 
-		mva = m4u_do_mva_alloc_fix(0x90000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0x90000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
-		mva = m4u_do_mva_alloc_fix(0xb0000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0xb0000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
-		mva = m4u_do_mva_alloc_fix(0xa0000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0xa0000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
-		mva = m4u_do_mva_alloc_fix(0xa4000000, 0x10000000, NULL);
+		mva = m4u_do_mva_alloc_fix(0, 0xa4000000, 0x10000000, NULL);
 		M4UINFO("mva alloc fix done:mva=0x%x\n", mva);
 		m4u_mvaGraph_dump();
 		m4u_do_mva_free(0x90000000, 0x10000000);
@@ -627,9 +623,9 @@ static int m4u_debug_set(void *data, u64 val)
 	break;
 	case 24:
 	{
-		unsigned int *pSrc = NULL;
-		unsigned int mva = 0;
-		unsigned long pa = 0;
+		unsigned int *pSrc;
+		unsigned int mva;
+		unsigned long pa;
 		m4u_client_t *client = m4u_create_client();
 
 		pSrc = vmalloc(128);
@@ -652,13 +648,11 @@ static int m4u_debug_set(void *data, u64 val)
 		m4u_monitor_stop(0);
 		break;
 	case 27:
-		/*
-		m4u_dump_reg_for_smi_hang_issue();
-		*/
+		/*m4u_dump_reg_for_smi_hang_issue();*/
 		break;
 	case 28:
 	{
-		/*
+#if 0
 		unsigned char *pSrc;
 		unsigned char *pDst;
 		unsigned int mva_rd;
@@ -714,7 +708,7 @@ static int m4u_debug_set(void *data, u64 val)
 		vfree(pDst);
 
 		m4u_monitor_stop(0);
-		*/
+#endif
 		break;
 	}
 
@@ -750,14 +744,14 @@ static int m4u_debug_set(void *data, u64 val)
 		port.Virtuality = 1;
 		M4UMSG("(0) config port: mmu: %d, sec: %d\n", port.Virtuality, port.Security);
 		m4u_config_port(&port);
-		/* port.ePortID = M4U_PORT_MDP_WROT1;
-		m4u_config_port(&port); */
-		/* port.ePortID = M4U_PORT_IMGO;
-		m4u_config_port(&port); */
+		/* port.ePortID = M4U_PORT_MDP_WROT1;*/
+		/*m4u_config_port(&port); */
+		/* port.ePortID = M4U_PORT_IMGO;*/
+		/*m4u_config_port(&port); */
 		port.ePortID = M4U_PORT_VENC_RCPU;
 		m4u_config_port(&port);
-		/* port.ePortID = M4U_PORT_MJC_MV_RD;
-		m4u_config_port(&port); */
+		/* port.ePortID = M4U_PORT_MJC_MV_RD;*/
+		/*m4u_config_port(&port); */
 
 		port.ePortID = M4U_PORT_HW_VDEC_PP_EXT;
 		M4UMSG("(1) config port: mmu: %d, sec: %d\n", port.Virtuality, port.Security);
@@ -774,7 +768,6 @@ static int m4u_debug_set(void *data, u64 val)
 
 	return 0;
 }
-#endif
 
 static int m4u_debug_get(void *data, u64 *val)
 {
@@ -782,13 +775,7 @@ static int m4u_debug_get(void *data, u64 *val)
 	return 0;
 }
 
-static int m4u_debug_set_do_nothing(void *data, u64 val)
-{
-	M4UMSG("%s: data: %p value: %llu\n", __func__, data, val);
-	return 0;
-}
-
-DEFINE_SIMPLE_ATTRIBUTE(m4u_debug_fops, m4u_debug_get, m4u_debug_set_do_nothing, "%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(m4u_debug_fops, m4u_debug_get, m4u_debug_set, "%llu\n");
 
 #if (M4U_DVT != 0)
 static void m4u_test_init(void)
@@ -850,7 +837,7 @@ static void m4u_test_end(int invalid_tlb)
 		m4u_config_port(&rM4uPort);
 	}
 
-	if (1 == invalid_tlb) {
+	if (invalid_tlb == 1) {
 		m4u_invalid_tlb_all(0);
 		m4u_confirm_all_invalidated(0);
 	}
@@ -871,7 +858,7 @@ static int __vCatchTranslationFault(m4u_domain_t *domain, unsigned int layer,
 
 	M4UMSG("__vCatchTranslationFault, layer = %d, seed_mva = 0x%x.\n", layer, seed_mva);
 
-	if (0 == seed_mva) {
+	if (seed_mva == 0) {
 		M4UMSG("seed_mva = 0 !!!!!!!!!!!\n");
 		return 0;
 	}
@@ -919,7 +906,7 @@ static int __vCatchInvalidPhyFault(m4u_domain_t *domain, int g4_mode, unsigned i
 	unsigned int fault_pa;
 	int count;
 
-	if (0 == seed_mva) {
+	if (seed_mva == 0) {
 		M4UMSG("seed_mva = 0 !!!!!!!!!!!\n");
 		return 0;
 	}

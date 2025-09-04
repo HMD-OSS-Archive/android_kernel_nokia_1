@@ -18,14 +18,20 @@
 #include <linux/smp.h>
 #include <linux/delay.h>
 #include <linux/atomic.h>
+
+#if 0
 #include <linux/irqchip/mt-gic.h>
+#else
+#include <linux/irqchip/mtk-gic-extend.h>
+#endif
+
 #include <mt-plat/aee.h>
 #include <mt-plat/mt_chip.h>
 #include <mach/mt_spm_mtcmos_internal.h>
 
 #include "mt_spm_idle.h"
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 #include <irq.h>
 #endif
 
@@ -45,7 +51,7 @@ void __weak aee_kernel_warning_api(const char *file, const int line, const int d
 {
 }
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 #define ENABLE_DYNA_LOAD_PCM
 #endif
 
@@ -72,7 +78,7 @@ static struct dentry *spm_file;
 static struct platform_device *pspmdev;
 static int dyna_load_pcm_done __nosavedata;
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 static char *dyna_load_pcm_path[] = {
 	[DYNA_LOAD_PCM_SUSPEND] = "pcm_suspend_1.bin",
 	[DYNA_LOAD_PCM_SODI] = "pcm_sodi_1.bin",
@@ -85,7 +91,7 @@ MODULE_FIRMWARE(dyna_load_pcm_path[DYNA_LOAD_PCM_SUSPEND]);
 MODULE_FIRMWARE(dyna_load_pcm_path[DYNA_LOAD_PCM_SODI]);
 MODULE_FIRMWARE(dyna_load_pcm_path[DYNA_LOAD_PCM_DEEPIDLE]);
 MODULE_FIRMWARE(dyna_load_pcm_path[DYNA_LOAD_PCM_VCORE_DVFS]);
-#elif defined(CONFIG_ARCH_MT6735M)
+#elif defined(CONFIG_MACH_MT6735M)
 static char *dyna_load_pcm_path[] = {
 	[DYNA_LOAD_PCM_SUSPEND] = "pcm_suspend_2.bin",
 	[DYNA_LOAD_PCM_SODI] = "pcm_sodi_2.bin",
@@ -98,7 +104,7 @@ MODULE_FIRMWARE(dyna_load_pcm_path[DYNA_LOAD_PCM_SUSPEND]);
 MODULE_FIRMWARE(dyna_load_pcm_path[DYNA_LOAD_PCM_SODI]);
 MODULE_FIRMWARE(dyna_load_pcm_path[DYNA_LOAD_PCM_DEEPIDLE]);
 MODULE_FIRMWARE(dyna_load_pcm_path[DYNA_LOAD_PCM_VCORE_DVFS]);
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 static char *dyna_load_pcm_path[] = {
 	[DYNA_LOAD_PCM_SUSPEND] = "pcm_suspend_3.bin",
 	[DYNA_LOAD_PCM_SODI] = "pcm_sodi_3.bin",
@@ -131,14 +137,14 @@ static struct cdev gSPMDetectCdev;
 
 
 #ifdef CONFIG_OF
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 void __iomem *spm_base;
 void __iomem *scp_i2c0_base;
 void __iomem *scp_i2c1_base;
 void __iomem *scp_i2c2_base;
 void __iomem *i2c4_base;
-#include <mt_dramc.h> /* for ucDram_Register_Read () */
-#if defined(CONFIG_ARCH_MT6753)
+#include <mtk_dramc.h> /* for ucDram_Register_Read () */
+#if defined(CONFIG_MACH_MT6753)
 void __iomem *_mcucfg_base;
 void __iomem *_mcucfg_phys_base;
 #endif
@@ -162,7 +168,7 @@ u32 spm_irq_0 = 120;
 u32 spm_irq_1 = 121;
 u32 spm_irq_2 = 122;
 u32 spm_irq_3 = 123;
-#endif /* !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580) */
+#endif /* !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580) */
 #endif /* CONFIG_OF */
 
 /*
@@ -294,7 +300,7 @@ static int spm_irq_register(void)
 		mt_gic_cfg_irq2cpu(irqdesc[i].irq, i, 1);
 #endif
 	}
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	mt_gic_set_priority(SPM_IRQ0_ID);
 #endif
 	return r;
@@ -303,10 +309,10 @@ static int spm_irq_register(void)
 static void spm_register_init(void)
 {
 	unsigned long flags;
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	unsigned int code = mt_get_chip_hw_code();
 #endif
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	struct resource r;
 #endif
 
@@ -317,8 +323,10 @@ static void spm_register_init(void)
 	if (!node)
 		spm_err("find SLEEP node failed\n");
 	spm_base = of_iomap(node, 0);
-	if (!spm_base)
+	if (!spm_base) {
 		spm_err("base spm_base failed\n");
+		return;
+	}
 
 	spm_irq_0 = irq_of_parse_and_map(node, 0);
 	if (!spm_irq_0)
@@ -334,7 +342,7 @@ static void spm_register_init(void)
 	if (!spm_irq_3)
 		spm_err("get spm_irq_3 failed\n");
 #endif
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 #define MCUCFG_NODE "mediatek,MCUCFG"
 
 	node = of_find_compatible_node(NULL, NULL, MCUCFG_NODE);
@@ -355,7 +363,7 @@ static void spm_register_init(void)
 	}
 #endif
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	node = of_find_compatible_node(NULL, NULL, "mediatek,SCP_I2C0");
 	if (!node)
 		spm_err("find SCP_I2C0 node failed\n");
@@ -429,7 +437,7 @@ static void spm_register_init(void)
 		spm_cksys_base, spm_mcucfg_base, spm_ddrphy_base);
 	spm_err("spm_irq_0 = %d, spm_irq_1 = %d, spm_irq_2 = %d, spm_irq_3 = %d\n", spm_irq_0,
 		spm_irq_1, spm_irq_2, spm_irq_3);
-#endif /*!defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)*/
+#endif /*!defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)*/
 #endif /*CONFIG_OF*/
 
 	spin_lock_irqsave(&__spm_lock, flags);
@@ -461,7 +469,7 @@ static void spm_register_init(void)
 	spm_write(SPM_PCM_IM_PTR, 0);
 	spm_write(SPM_PCM_IM_LEN, 0);
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	/*
 	 * SRCLKENA0: POWER_ON_VAL1 (PWR_IO_EN[7]=0) or
 	 *            E1: r7|SRCLKENAI0|SRCLKENAI1|MD1_SRCLKENA (PWR_IO_EN[7]=1)
@@ -524,7 +532,7 @@ int __init spm_module_init(void)
 {
 	int r = 0;
 	/* This following setting is moved to LK by WDT init, because of DTS init level issue */
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	struct wd_api *wd_api;
 	int wd_ret;
 #endif
@@ -536,15 +544,15 @@ int __init spm_module_init(void)
 
 #ifndef CONFIG_MTK_FPGA
 #if defined(CONFIG_PM)
-#if defined(CONFIG_ARCH_MT6735) || defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580) \
-	|| defined(CONFIG_ARCH_MT6735M) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6735) || defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580) \
+	|| defined(CONFIG_MACH_MT6735M) || defined(CONFIG_MACH_MT6753)
 	if (spm_fs_init() != 0)
 		r = -EPERM;
 #endif
 #endif
 #endif
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	wd_ret = get_wd_api(&wd_api);
 	if (!wd_ret) {
 		if (wd_api->wd_spmwdt_mode_config) {
@@ -561,7 +569,7 @@ int __init spm_module_init(void)
 	spm_sodi_init();
 	/* spm_mcdi_init(); */
 #endif
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	spm_deepidle_init();
 #endif
 #endif
@@ -571,7 +579,7 @@ int __init spm_module_init(void)
 		aee_kernel_warning("SPM Warring", "dram golden setting mismach");
 	}
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	spm_set_pcm_init_flag();
 #endif
 
@@ -579,7 +587,7 @@ int __init spm_module_init(void)
 #ifdef SPM_VCORE_EN
 	spm_go_to_vcore_dvfs(SPM_VCORE_DVFS_EN, 0);
 #else
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 	/* only for common solution, no DVS */
 	spm_go_to_vcore_dvfs(0, 0);
 #endif
@@ -1030,11 +1038,11 @@ struct ddrphy_golden_cfg {
 };
 
 static struct ddrphy_golden_cfg ddrphy_setting[] = {
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 #ifdef CONFIG_OF
 	{0x5c0, 0x063c0000},
 	{0x5c4, 0x00000000},
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	{0x5c8, 0x0000f410},	/* temp remove mempll2/3 control for golden setting refine */
 #else
 	{0x5c8, 0x0000fC10},	/* temp remove mempll2/3 control for golden setting refine */
@@ -1043,14 +1051,14 @@ static struct ddrphy_golden_cfg ddrphy_setting[] = {
 #else
 	{0xf02135c0, 0x063c0000},
 	{0xf02135c4, 0x00000000},
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	{0xf02135c8, 0x0000fC10},	/* temp remove mempll2/3 control for golden setting refine */
 #else
 	{0xf02135c8, 0x0000fC10},	/* temp remove mempll2/3 control for golden setting refine */
 #endif
 	{0xf02135cc, 0x40101000},
 #endif
-#else /* CONFIG_ARCH_MT6570 || CONFIG_ARCH_MT6580 */
+#else /* CONFIG_ARCH_MT6570 || CONFIG_MACH_MT6580 */
 #ifdef CONFIG_OF
 	{0x5c0, 0x063c0000},
 	{0x5c4, 0x00000000},
@@ -1062,7 +1070,7 @@ static struct ddrphy_golden_cfg ddrphy_setting[] = {
 	{0xf02085c8, 0x0000fC10},	/* temp remove mempll2/3 control for golden setting refine */
 	{0xf02085cc, 0x40101000},
 #endif
-#endif /* !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580) */
+#endif /* !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580) */
 };
 
 int spm_golden_setting_cmp(bool en)
@@ -1076,7 +1084,7 @@ int spm_golden_setting_cmp(bool en)
 	ddrphy_num = sizeof(ddrphy_setting) / sizeof(ddrphy_setting[0]);
 	for (i = 0; i < ddrphy_num; i++) {
 #ifdef CONFIG_OF
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 		if (ucDram_Register_Read(ddrphy_setting[i].addr) != ddrphy_setting[i].value) {
 			spm_err("dramc setting mismatch addr: 0x%x, val: 0x%x\n",
 				ddrphy_setting[i].addr,
@@ -1103,7 +1111,7 @@ int spm_golden_setting_cmp(bool en)
 	return r;
 }
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 /*
  * SPM AP-BSI Protocol Generator
  */

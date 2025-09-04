@@ -12,5 +12,5 @@
 #
 
 
-obj-$(CONFIG_MTK_DRAMC) := mt_dramc.o
+obj-$(CONFIG_MTK_DRAMC) := mtk_dramc.o
 

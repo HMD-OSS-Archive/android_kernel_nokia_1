@@ -14,7 +14,7 @@
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 #include "mt6735m-pinfunc.h"
-#include <dt-bindings/mmc/mt67xx-msdc.h>
+#include <dt-bindings/mmc/mt6735-msdc.h>
 #include <generated/autoconf.h>
 
 #ifdef CONFIG_MTK_DTBO_FEATURE
@@ -30,39 +30,25 @@
 
 	/* chosen */
 	chosen: chosen {
-		bootargs = "console=tty0 console=ttyMT3,921600n1 vmalloc=496M \
-androidboot.hardware=mt6735 slub_max_order=0 slub_debug=OFZPU \
+		bootargs = "console=tty0 console=ttyMT3,921600n1 vmalloc=400M \
+androidboot.hardware=mt6735 slub_max_order=0 slub_debug=OFZPU swiotlb=noforce \
 firmware_class.path=/vendor/firmware";
 	};
 
-	/* Do not put any bus before mtk-msdc, because it should be mtk-msdc.0 for partition device node usage */
-	/*workaround for .0*/
-	mtk-msdc.0 {
-				compatible = "simple-bus";
-				#address-cells = <1>;
-				#size-cells = <1>;
-				ranges = <0 0 0 0xffffffff>;
-
-				mmc0: msdc0@11230000{
-						compatible = "mediatek,mt6735m-mmc";
-						reg = <0x11230000 0x10000  /* MSDC0_BASE   */
-							0x10000e84 0x2>;    /* FPGA PWR_GPIO, PWR_GPIO_EO */
-						interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
-						status = "disabled";
-				};
-
-				mmc1: msdc1@11240000{
-						compatible = "mediatek,mt6735m-mmc";
-						reg = <0x11240000 0x10000  /* MSDC1_BASE   */
-							0x10000e84 0x2>;    /* FPGA PWR_GPIO, PWR_GPIO_EO */
-						interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_LOW>;
-						status = "disabled";
-				};
-
-	/* only used for old way of DCT, can be removed in new platform */
-	msdc1_ins: default {
-		compatible = "mediatek, msdc1_ins-eint";
+	msdc0:msdc@11230000 {
+		compatible = "mediatek,msdc";
+		reg = <0 0x11230000 0 0x10000>;
+		interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_LOW>;
 	};
+
+	msdc1:msdc@11240000 {
+		compatible = "mediatek,msdc";
+		reg = <0 0x11240000 0 0x10000>;
+		interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_LOW>;
+	};
+
+	msdc1_ins:msdc1_ins@0 {
+		compatible = "mediatek,mt6735-sdcard-ins";
 	};
 
 	/* ATF logger SW IRQ number 281 = 32 + 249 */
@@ -182,21 +168,6 @@ firmware_class.path=/vendor/firmware";
 					alignment = <0 0x10000>;
 					alloc-ranges = <0 0x40000000 0 0x60000000>;
 				};
-
-				ram_console-reserved-memory@43f00000 {
-						compatible = "mediatek,ram_console";
-						reg = <0 0x43f00000 0 0x10000>;
-				};
-
-				minirdump-reserved-memory@43ff0000 {
-						compatible = "mediatek, minirdump";
-						reg = <0 0x43ff0000 0 0x10000>;
-				};
-
-				pstore-reserved-memory@43f10000 {
-						compatible = "mediatek,pstore";
-						reg = <0 0x43f10000 0 0xe0000>;
-				};
 		};
 
 		gic: interrupt-controller@10220000 {
@@ -256,7 +227,7 @@ firmware_class.path=/vendor/firmware";
 		};
 
 		apxgpt: apxgpt@10004000 {
-			compatible = "mediatek,mt6735-apxgpt";
+			compatible = "mediatek,APXGPT";
 			reg = <0x10004000 0x1000>;
 			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
 			clock-frequency = <13000000>;
@@ -533,6 +504,7 @@ firmware_class.path=/vendor/firmware";
 				vio18-supply = <&mt_pmic_vio18_ldo_reg>;
 				vsram-supply = <&mt_pmic_vsram_ldo_reg>;
 				vm-supply = <&mt_pmic_vm_ldo_reg>;
+				vgp1-supply = <&mt_pmic_vgp1_ldo_reg>;
 
 			};/* End of regulators_supply */
 		};/* End of mt_pmic_regulator */
@@ -573,13 +545,6 @@ firmware_class.path=/vendor/firmware";
 			clock-names = "infra-cqdma";
 		};
 
-		keypad: keypad@10003000 {
-			compatible = "mediatek,mt6735-keypad",
-					"mediatek,mt6735m-keypad";
-			reg = <0x10003000 0x1000>;
-			interrupts = <GIC_SPI 164 IRQ_TYPE_EDGE_FALLING>;
-		};
-
 		apirtx:irtx@11011000 {
 			compatible = "mediatek,irtx";
 			reg = <0x11011000 0x1000>;
@@ -590,6 +555,7 @@ firmware_class.path=/vendor/firmware";
 		apuart0: apuart0@11002000 {
 			cell-index = <0>;
 			compatible = "mediatek,mt6735-uart";
+			skip_pinmux_clk = <1>;
 			reg = <0x11002000 0x1000>, /* UART base */
 				  <0x11000380 0x1000>, /* DMA Tx base */
 				  <0x11000400 0x80>; /* DMA Rx base */
@@ -601,6 +567,7 @@ firmware_class.path=/vendor/firmware";
 		apuart1: apuart1@11003000 {
 			cell-index = <1>;
 			compatible = "mediatek,mt6735-uart";
+			skip_pinmux_clk = <1>;
 			reg = <0x11003000 0x1000>, /* UART base */
 				  <0x11000480 0x80>, /* DMA Tx base */
 				  <0x11000500 0x80>; /* DMA Rx base */
@@ -612,6 +579,7 @@ firmware_class.path=/vendor/firmware";
 		apuart2: apuart2@11004000 {
 			cell-index = <2>;
 			compatible = "mediatek,mt6735-uart";
+			skip_pinmux_clk = <1>;
 			reg = <0x11004000 0x1000>, /* UART base */
 				  <0x11000580 0x80>, /* DMA Tx base */
 				  <0x11000600 0x80>; /* DMA Rx base */
@@ -623,6 +591,7 @@ firmware_class.path=/vendor/firmware";
 		apuart3: apuart3@11005000 {
 			cell-index = <3>;
 			compatible = "mediatek,mt6735-uart";
+			skip_pinmux_clk = <1>;
 			reg = <0x11005000 0x1000>, /* UART base */
 				  <0x11000680 0x80>, /* DMA Tx base */
 				  <0x11000700 0x80>; /* DMA Rx base */
@@ -637,22 +606,6 @@ firmware_class.path=/vendor/firmware";
 			reg = <0x1100a000 0x1000>;
 			interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_LOW>;
 		};
-
-		btif_tx:btif_tx@11000780 {
-			compatible = "mediatek,btif_tx";
-			reg = <0x11000780 0x80>;
-			interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_LOW>;
-		};
-		btif_rx:btif_rx@11000800 {
-			compatible = "mediatek,btif_rx";
-			reg = <0x11000800 0x80>;
-			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_LOW>;
-		};
-		btif:btif@1100c000 {
-			compatible = "mediatek,btif";
-			reg = <0x1100c000 0x1000>;
-			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_LOW>;
-		};/* End of btif */
 
 		consys:consys@18070000 {
 			compatible = "mediatek,mt6735m-consys",
@@ -699,6 +652,10 @@ firmware_class.path=/vendor/firmware";
 			compatible = "mediatek, DSI_TE_1-eint";
 			status = "disabled";
 		};
+
+		hwrng: hwrng {
+			compatible = "mediatek,mt67xx-rng";
+		};
 	};
 
 	bus: bus {
@@ -732,13 +689,14 @@ firmware_class.path=/vendor/firmware";
 			compatible = "mediatek,FHCTL";
 			reg = <0x10209F00 0x100>;
 		};
-		KP@0x10003000 {
-			compatible = "mediatek,KP";
+
+		keypad: keypad@10003000 {
+			compatible = "mediatek,kp",
+				"mediatek,mt6735-keypad",
+				"mediatek,mt6735m-keypad";
 			reg = <0x10003000 0x1000>;
-			interrupts = <0 164 0x2>;
+			interrupts = <GIC_SPI 164 IRQ_TYPE_EDGE_FALLING>;
 		};
-
-
 
 		eintc: eintc@10005000 {
 			compatible = "mediatek,mt-eic";
@@ -929,7 +887,7 @@ firmware_class.path=/vendor/firmware";
 		};
 
 		sys_cirq: sys_cirq@10204000 {
-			compatible = "mediatek,mt6735-sys_cirq";
+			compatible = "mediatek,sys_cirq";
 			reg = <0x10204000 0x1000>;
 			interrupts = <GIC_SPI 231 IRQ_TYPE_LEVEL_LOW>;
 			mediatek,cirq_num = <159>;
@@ -1087,13 +1045,15 @@ firmware_class.path=/vendor/firmware";
 		};
 
 		smi_larb0@14016000 {
-			compatible = "mediatek,smi_larb0";
+			cell-index = <0>;
+			compatible = "mediatek,smi_larb0", "mediatek,smi_larb";
 			reg = <0x14016000 0x1000>;
 			interrupts = <GIC_SPI 176 IRQ_TYPE_LEVEL_LOW>;
 		};
 
 		smi_larb2@15001000 {
-			compatible = "mediatek,smi_larb2";
+			cell-index = <2>;
+			compatible = "mediatek,smi_larb2", "mediatek,smi_larb";
 			reg = <0x15001000 0x1000>;
 			interrupts = <GIC_SPI 178 IRQ_TYPE_LEVEL_LOW>;
 		};
@@ -1104,11 +1064,14 @@ firmware_class.path=/vendor/firmware";
 				<0x14016000 0x1000>,  /* LARB 0 */
 				<0x16010000 0x1000>,  /* LARB 1 */
 				<0x15001000 0x1000>;  /* LARB 2 */
+			nr_larbs = <3>;
+			mmsys_config = <&mmsys_config>;
 		};
 
 		smi_larb1@16010000 {
-			compatible = "mediatek,smi_larb1";
-			reg = <0x16010000 0x10000>;
+			cell-index = <1>;
+			compatible = "mediatek,smi_larb1", "mediatek,smi_larb";
+			reg = <0x16010000 0x1000>;
 			interrupts = <GIC_SPI 177 IRQ_TYPE_LEVEL_LOW>;
 		};
 
@@ -1189,7 +1152,7 @@ firmware_class.path=/vendor/firmware";
 		};
 
 		PWM@0x11006000 {
-			compatible = "mediatek,PWM";
+			compatible = "mediatek,pwm";
 			reg = <0x11006000 0x1000>;
 			interrupts = <0 77 0x8>;
 		};
@@ -1263,8 +1226,7 @@ firmware_class.path=/vendor/firmware";
 		};
 
 		touch: touch@ {
-			compatible = "mediatek,mt6735-touch",
-						"mediatek,mt6735m-touch";
+			compatible = "mediatek,touch";
 			vtouch-supply = <&mt_pmic_vgp1_ldo_reg>;
 		};
 
@@ -1287,8 +1249,7 @@ firmware_class.path=/vendor/firmware";
 		};
 
 		accdet: accdet@ {
-			compatible = "mediatek,mt6735-accdet",
-						"mediatek,mt6735m-accdet";
+			compatible = "mediatek,pmic-accdet";
 		};
 
 		THERM_CTRL@0x1100B000 {
@@ -1303,22 +1264,16 @@ firmware_class.path=/vendor/firmware";
 			interrupts = <GIC_SPI 125 IRQ_TYPE_LEVEL_LOW>;
 		};
 
-		AP_DMA_BTIF_TX@0x11000780 {
-			compatible = "mediatek,AP_DMA_BTIF_TX";
-			reg = <0x11000780 0x80>;
-			interrupts = <0 111 0x8>;
-		};
-
-		AP_DMA_BTIF_RX@0x11000800 {
-			compatible = "mediatek,AP_DMA_BTIF_RX";
-			reg = <0x11000800 0x80>;
-			interrupts = <0 112 0x8>;
-		};
-
-		BTIF@0x1100C000 {
-			compatible = "mediatek,BTIF";
-			reg = <0x1100C000 0x1000>;
-			interrupts = <0 90 0x8>;
+		btif@0x1100C000 {
+			compatible = "mediatek,btif";
+			#address-cells = <2>;
+			#size-cells = <2>;
+			reg = <0x1100C000 0x1000>,	/*btif base*/
+				  <0x11000780 0x80>,	/*btif tx dma base*/
+				  <0x11000800 0x80>;	/*btif rx dma base*/
+			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_LOW>,	/*btif base*/
+						 <GIC_SPI 111 IRQ_TYPE_LEVEL_LOW>,	/*btif tx dma base*/
+						 <GIC_SPI 112 IRQ_TYPE_LEVEL_LOW>;	/*btif rx dma base*/
 		};
 
 		/* NFC start */
@@ -1383,6 +1338,10 @@ firmware_class.path=/vendor/firmware";
 			num_eps = <16>;
 			dma_channels = <8>;
 			drvvbus_gpio = <83 2>;
+		};
+
+		usbiddig:usbiddig {
+			compatible = "mediatek,usb_iddig_eint";
 		};
 
 		audio@11220000 {
@@ -1536,10 +1495,7 @@ firmware_class.path=/vendor/firmware";
 			interrupts = <0 73 0x8>;
 		};
 
-		MSDC3@0x11260000 {
-			compatible = "mediatek,MSDC3";
-			reg = <0x11260000 0x10000>;
-		};
+
 
 		WCN_AHB@0x11270000 {
 			compatible = "mediatek,WCN_AHB";
@@ -1576,7 +1532,7 @@ firmware_class.path=/vendor/firmware";
 			clock-frequency = <450000000>;
 		};
 
-		mmsys_config@14000000 {
+		mmsys_config: mmsys_config@14000000 {
 			compatible = "mediatek,mmsys_config";
 			reg = <0x14000000 0x1000>;
 			interrupts = <GIC_SPI 206 IRQ_TYPE_LEVEL_LOW>;
@@ -1837,6 +1793,21 @@ firmware_class.path=/vendor/firmware";
 								ISP_PIPEM@0x15000000 {
 			compatible = "mediatek,ISP_PIPEM";
 		};
+
+		flashlight_core: flashlight_core {
+			compatible = "mediatek,flashlight_core";
+		};
+
+		flashlights_lm3642: flashlights_lm3642 {
+			compatible = "mediatek,flashlights_lm3642";
+			decouple = <1>;
+			channel@1 {
+				type = <0>;
+				ct = <0>;
+				part = <0>;
+			};
+		};
+
 		SENINF_TOP@0x15008000 {
 			compatible = "mediatek,SENINF_TOP";
 			reg = <0x15008000 0x1000>;
@@ -1955,62 +1926,6 @@ firmware_class.path=/vendor/firmware";
 		mediatek,clkbuf-config = <2 1 1 1>;
 	};
 
-	firmware {
-		android {
-			compatible = "android,firmware";
-			fstab {
-				compatible = "android,fstab";
-#if !defined(CONFIG_SYSTEM_AS_ROOT) && !defined(CONFIG_MTK_AB_OTA_UPDATER)
-				system {
-					compatible = "android,system";
-					dev = "/dev/block/platform/mtk-msdc.0/11230000.msdc0/by-name/system";
-					type = "ext4";
-					mnt_flags = "ro";
-					#ifndef CONFIG_MTK_DM_VERITY_OFF
-					fsmgr_flags = "wait,verify";
-					#else
-					fsmgr_flags = "wait";
-					#endif
-				};
-#endif
-#ifndef CONFIG_MTK_LATE_MOUNT
-				vendor {
-					compatible = "android,vendor";
-					dev = "/dev/block/platform/mtk-msdc.0/11230000.msdc0/by-name/vendor";
-					type = "ext4";
-					mnt_flags = "ro";
-#ifndef CONFIG_MTK_AB_OTA_UPDATER
-					#ifndef CONFIG_MTK_DM_VERITY_OFF
-					fsmgr_flags = "wait,verify";
-					#else
-					fsmgr_flags = "wait";
-					#endif
-#else
-					#ifndef CONFIG_MTK_DM_VERITY_OFF
-					fsmgr_flags = "wait,slotselect,verify";
-					#else
-					fsmgr_flags = "wait,slotselect";
-					#endif
-#endif
-				};
-#endif
-#ifdef CONFIG_TARGET_COPY_OUT_ODM
-				odm {
-					compatible = "android,odm";
-					dev = "/dev/block/platform/mtk-msdc.0/11230000.msdc0/by-name/odm";
-					type = "ext4";
-					mnt_flags = "ro";
-#ifndef CONFIG_MTK_AB_OTA_UPDATER
-					fsmgr_flags = "wait";
-#else
-					fsmgr_flags = "wait,slotselect";
-#endif
-				};
-#endif
-			};
-		};
-	};
-
 	odm: odm{
 		compatible = "simple-bus";
 		/* reserved for overlay by odm */
@@ -2033,55 +1948,55 @@ firmware_class.path=/vendor/firmware";
 	ssw_hot_plug_mode1:ssw@1 {
 
 		pins_cmd0_dat {
-			pins = <PINMUX_GPIO8__FUNC_MD_EINT1>;
+			pinmux = <PINMUX_GPIO8__FUNC_MD_EINT1>;
 		};
 
 		pins_cmd1_dat {
-			pins = <PINMUX_GPIO9__FUNC_MD_EINT2>;
+			pinmux = <PINMUX_GPIO9__FUNC_MD_EINT2>;
 		};
 	};
 
 	ssw_hot_plug_mode2:ssw@2 {
 
 		pins_cmd0_dat {
-			pins = <PINMUX_GPIO8__FUNC_C2K_UIM0_HOT_PLUG_IN>;
+			pinmux = <PINMUX_GPIO8__FUNC_C2K_UIM0_HOT_PLUG_IN>;
 		};
 
 		pins_cmd1_dat {
-			pins = <PINMUX_GPIO9__FUNC_MD_EINT2>;
+			pinmux = <PINMUX_GPIO9__FUNC_MD_EINT2>;
 		};
 	};
 
 	ssw_two_sims_bound_to_md1:ssw@3 {
 		pins_cmd0_dat {
-			pins = <PINMUX_GPIO163__FUNC_MD_SIM1_SCLK>;
+			pinmux = <PINMUX_GPIO163__FUNC_MD_SIM1_SCLK>;
 			slew-rate = <1>;
 		};
 
 		pins_cmd1_dat {
-			pins = <PINMUX_GPIO164__FUNC_MD_SIM1_SRST>;
+			pinmux = <PINMUX_GPIO164__FUNC_MD_SIM1_SRST>;
 			slew-rate = <1>;
 		};
 
 		pins_cmd2_dat {
-			pins = <PINMUX_GPIO165__FUNC_MD_SIM1_SDAT>;
+			pinmux = <PINMUX_GPIO165__FUNC_MD_SIM1_SDAT>;
 			slew-rate = <0>;
 			bias-pull-up = <00>;
 
 		};
 
 		pins_cmd3_dat {
-			pins = <PINMUX_GPIO160__FUNC_MD_SIM2_SCLK>;
+			pinmux = <PINMUX_GPIO160__FUNC_MD_SIM2_SCLK>;
 			slew-rate = <1>;
 		};
 
 		pins_cmd4_dat {
-			pins = <PINMUX_GPIO161__FUNC_MD_SIM2_SRST>;
+			pinmux = <PINMUX_GPIO161__FUNC_MD_SIM2_SRST>;
 			slew-rate = <1>;
 		};
 
 		pins_cmd5_dat {
-			pins = <PINMUX_GPIO162__FUNC_MD_SIM2_SDAT>;
+			pinmux = <PINMUX_GPIO162__FUNC_MD_SIM2_SDAT>;
 			slew-rate = <0>;
 			bias-pull-up = <00>;
 		};
@@ -2089,27 +2004,27 @@ firmware_class.path=/vendor/firmware";
 
 	ssw_sim1_md3_sim2_md1:ssw@4 {
 		pins_cmd0_dat {
-			pins = <PINMUX_GPIO163__FUNC_UIM0_CLK>;
+			pinmux = <PINMUX_GPIO163__FUNC_UIM0_CLK>;
 		};
 
 		pins_cmd1_dat {
-			pins = <PINMUX_GPIO164__FUNC_UIM0_RST>;
+			pinmux = <PINMUX_GPIO164__FUNC_UIM0_RST>;
 		};
 
 		pins_cmd2_dat {
-			pins = <PINMUX_GPIO165__FUNC_UIM0_IO>;
+			pinmux = <PINMUX_GPIO165__FUNC_UIM0_IO>;
 		};
 
 		pins_cmd3_dat {
-			pins = <PINMUX_GPIO160__FUNC_MD_SIM2_SCLK>;
+			pinmux = <PINMUX_GPIO160__FUNC_MD_SIM2_SCLK>;
 		};
 
 		pins_cmd4_dat {
-			pins = <PINMUX_GPIO161__FUNC_MD_SIM2_SRST>;
+			pinmux = <PINMUX_GPIO161__FUNC_MD_SIM2_SRST>;
 		};
 
 		pins_cmd5_dat {
-			pins = <PINMUX_GPIO162__FUNC_MD_SIM2_SDAT>;
+			pinmux = <PINMUX_GPIO162__FUNC_MD_SIM2_SDAT>;
 		};
 	};
 };
@@ -2132,7 +2047,7 @@ firmware_class.path=/vendor/firmware";
 
 	vsram_output_low: vsram@1 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO140__FUNC_GPIO140>;
+			pinmux = <PINMUX_GPIO140__FUNC_GPIO140>;
 			slew-rate = <1>;
 			output-low;
 		};
@@ -2140,7 +2055,7 @@ firmware_class.path=/vendor/firmware";
 
 	vsram_output_high: vsram@2 {
 		pins_cmd_dat {
-			pins = <PINMUX_GPIO140__FUNC_GPIO140>;
+			pinmux = <PINMUX_GPIO140__FUNC_GPIO140>;
 			slew-rate = <1>;
 			output-high;
 		};
@@ -2149,51 +2064,54 @@ firmware_class.path=/vendor/firmware";
 	RFIC0_01_mode: clockbuf@1{
 
 		pins_cmd0_dat {
-			pins = <PINMUX_GPIO110__FUNC_RFIC0_BSI_EN>;
+			pinmux = <PINMUX_GPIO110__FUNC_RFIC0_BSI_EN>;
 		};
 
 		pins_cmd1_dat {
-			pins = <PINMUX_GPIO111__FUNC_RFIC0_BSI_CK>;
+			pinmux = <PINMUX_GPIO111__FUNC_RFIC0_BSI_CK>;
 		};
 
 		pins_cmd2_dat {
-			pins = <PINMUX_GPIO112__FUNC_RFIC0_BSI_D2>;
+			pinmux = <PINMUX_GPIO112__FUNC_RFIC0_BSI_D2>;
 		};
 
 
 		pins_cmd3_dat {
-			pins = <PINMUX_GPIO113__FUNC_RFIC0_BSI_D1>;
+			pinmux = <PINMUX_GPIO113__FUNC_RFIC0_BSI_D1>;
 		};
 
 		pins_cmd4_dat {
-			pins = <PINMUX_GPIO114__FUNC_RFIC0_BSI_D0>;
+			pinmux = <PINMUX_GPIO114__FUNC_RFIC0_BSI_D0>;
 		};
 	};
 
 	RFIC0_04_mode: clockbuf@2{
 
 		pins_cmd0_dat {
-			pins = <PINMUX_GPIO110__FUNC_SPM_BSI_EN>;
+			pinmux = <PINMUX_GPIO110__FUNC_SPM_BSI_EN>;
 		};
 
 		pins_cmd1_dat {
-			pins = <PINMUX_GPIO111__FUNC_SPM_BSI_CLK>;
+			pinmux = <PINMUX_GPIO111__FUNC_SPM_BSI_CLK>;
 		};
 
 		pins_cmd2_dat {
-			pins = <PINMUX_GPIO112__FUNC_SPM_BSI_D2>;
+			pinmux = <PINMUX_GPIO112__FUNC_SPM_BSI_D2>;
 		};
 
 		pins_cmd3_dat {
-			pins = <PINMUX_GPIO113__FUNC_SPM_BSI_D1>;
+			pinmux = <PINMUX_GPIO113__FUNC_SPM_BSI_D1>;
 		};
 
 		pins_cmd4_dat {
-			pins = <PINMUX_GPIO114__FUNC_SPM_BSI_D0>;
+			pinmux = <PINMUX_GPIO114__FUNC_SPM_BSI_D0>;
 		};
 
 	};
 };
+
+
+#include "cust_mt6735_msdc.dtsi"
 /*CLDMA end*/
 
 #include <trusty.dtsi>

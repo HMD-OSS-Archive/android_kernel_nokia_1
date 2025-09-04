@@ -73,6 +73,9 @@ void wmt_export_platform_bridge_register(struct wmt_platform_bridge *cb)
 	if (unlikely(!cb))
 		return;
 	bridge.thermal_query_cb = cb->thermal_query_cb;
+#if MTK_WCN_CMB_FOR_SDIO_1V_AUTOK
+	bridge.autok_cb = cb->autok_cb;
+#endif
 	bridge.clock_fail_dump_cb = cb->clock_fail_dump_cb;
 	CONNADP_INFO_FUNC("\n");
 }
@@ -95,6 +98,18 @@ int mtk_wcn_cmb_stub_query_ctrl(void)
 		return bridge.thermal_query_cb();
 }
 
+#if MTK_WCN_CMB_FOR_SDIO_1V_AUTOK
+int mtk_wcn_cmb_stub_1vautok_for_dvfs(void)
+{
+	CONNADP_DBG_FUNC("\n");
+	if (unlikely(!bridge.autok_cb)) {
+		CONNADP_WARN_FUNC("1v autok not registered\n");
+		return -1;
+	} else
+		return bridge.autok_cb();
+}
+#endif
+
 void mtk_wcn_cmb_stub_clock_fail_dump(void)
 {
 	CONNADP_DBG_FUNC("\n");
@@ -107,7 +122,8 @@ void mtk_wcn_cmb_stub_clock_fail_dump(void)
 /*******************************************************************************
  * SDIO integration with platform MMC driver
  ******************************************************************************/
-static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler, void *data);
+static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler,
+					  void *data);
 static void mtk_wcn_cmb_sdio_enable_eirq(void);
 static void mtk_wcn_cmb_sdio_disable_eirq(void);
 static void mtk_wcn_cmb_sdio_register_pm(pm_callback_t pm_cb, void *data);
@@ -143,7 +159,8 @@ static int _mtk_wcn_sdio_irq_flag_set(int flag)
 	else
 		atomic_set(&sdio_claim_irq_enable_flag, 0);
 
-	CONNADP_DBG_FUNC("sdio_claim_irq_enable_flag:%d\n", atomic_read(&sdio_claim_irq_enable_flag));
+	CONNADP_DBG_FUNC("sdio_claim_irq_enable_flag:%d\n",
+			atomic_read(&sdio_claim_irq_enable_flag));
 
 	return atomic_read(&sdio_claim_irq_enable_flag);
 }
@@ -156,12 +173,14 @@ EXPORT_SYMBOL(wmt_export_mtk_wcn_sdio_irq_flag_set);
 
 static irqreturn_t mtk_wcn_cmb_sdio_eirq_handler_stub(int irq, void *data)
 {
-	if ((mtk_wcn_cmb_sdio_eirq_handler != NULL) && (atomic_read(&sdio_claim_irq_enable_flag) != 0))
+	if ((mtk_wcn_cmb_sdio_eirq_handler != NULL) &&
+	    (atomic_read(&sdio_claim_irq_enable_flag) != 0))
 		mtk_wcn_cmb_sdio_eirq_handler(mtk_wcn_cmb_sdio_eirq_data);
 	return IRQ_HANDLED;
 }
 
-static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler, void *data)
+static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler,
+					  void *data)
 {
 #ifdef CONFIG_OF
 	struct device_node *node;
@@ -173,17 +192,18 @@ static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler, v
 	mtk_wcn_cmb_sdio_eirq_data = data;
 	mtk_wcn_cmb_sdio_eirq_handler = irq_handler;
 
-	node = (struct device_node *)of_find_compatible_node(NULL, NULL, "mediatek,connectivity-combo");
+	node = (struct device_node *)of_find_compatible_node(NULL, NULL,
+					"mediatek,connectivity-combo");
 	if (node) {
 		wifi_irq = irq_of_parse_and_map(node, 0);/* get wifi eint num */
-		ret = request_irq(wifi_irq, mtk_wcn_cmb_sdio_eirq_handler_stub, IRQF_TRIGGER_LOW,
-				"WIFI-eint", NULL);
+		ret = request_irq(wifi_irq, mtk_wcn_cmb_sdio_eirq_handler_stub,
+				IRQF_TRIGGER_LOW, "WIFI-eint", NULL);
 		CONNADP_DBG_FUNC("WIFI EINT irq %d !!\n", wifi_irq);
 
 		if (ret)
-			CONNADP_WARN_FUNC("WIFI EINT IRQ LINE NOT AVAILABLE!!\n");
+			CONNADP_WARN_FUNC("WIFI EINT LINE NOT AVAILABLE!!\n");
 		else
-			mtk_wcn_cmb_sdio_disable_eirq();/*not ,chip state is power off*/
+			mtk_wcn_cmb_sdio_disable_eirq();/*state:power off*/
 	} else
 		CONNADP_WARN_FUNC("can't find connectivity compatible node\n");
 
@@ -195,7 +215,7 @@ static void mtk_wcn_cmb_sdio_request_eirq(msdc_sdio_irq_handler_t irq_handler, v
 
 static void mtk_wcn_cmb_sdio_register_pm(pm_callback_t pm_cb, void *data)
 {
-	CONNADP_DBG_FUNC("mtk_wcn_cmb_sdio_register_pm (0x%p, 0x%p)\n", pm_cb, data);
+	CONNADP_DBG_FUNC("cmb_sdio_register_pm (0x%p, 0x%p)\n", pm_cb, data);
 	/* register pm change callback */
 	mtk_wcn_cmb_sdio_pm_cb = pm_cb;
 	mtk_wcn_cmb_sdio_pm_data = data;
@@ -209,7 +229,7 @@ static void mtk_wcn_cmb_sdio_enable_eirq(void)
 		atomic_set(&irq_enable_flag, 1);
 		if (wifi_irq != 0xfffffff) {
 			enable_irq(wifi_irq);
-			CONNADP_DBG_FUNC(" enable WIFI EINT irq %d !!\n", wifi_irq);
+			CONNADP_DBG_FUNC(" enable WIFI EINT %d!\n", wifi_irq);
 		}
 	}
 }
@@ -221,7 +241,7 @@ static void mtk_wcn_cmb_sdio_disable_eirq(void)
 	else {
 		if (wifi_irq != 0xfffffff) {
 			disable_irq_nosync(wifi_irq);
-			CONNADP_DBG_FUNC("disable WIFI EINT irq %d !!\n", wifi_irq);
+			CONNADP_DBG_FUNC("disable WIFI EINT %d!\n", wifi_irq);
 		}
 		atomic_set(&irq_enable_flag, 0);
 	}

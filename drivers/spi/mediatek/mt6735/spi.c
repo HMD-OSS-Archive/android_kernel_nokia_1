@@ -32,7 +32,6 @@
 #include <linux/io.h>
 #include <linux/spinlock.h>
 #include <linux/sched.h>
-#include <linux/wakelock.h>
 #ifdef CONFIG_OF
 #include <linux/of.h>
 #include <linux/of_irq.h>
@@ -718,7 +717,7 @@ static int mt_spi_next_xfer(struct mt_spi_t *ms, struct spi_message *msg)
 	if (unlikely(!ms)) {
 		dev_err(&msg->spi->dev, "master wrapper is invalid\n");
 		ret = -EINVAL;
-		goto fail;
+		return ret;
 	}
 	if (unlikely(!msg)) {
 		dev_err(&msg->spi->dev, "msg is invalid\n");
@@ -885,7 +884,7 @@ static void mt_spi_msg_done(struct mt_spi_t *ms, struct spi_message *msg, int st
 		disable_clk(ms);
 		/*schedule_work(&mt_spi_msgdone_workqueue);//disable clock */
 
-		wake_unlock(&ms->wk_lock);
+        __pm_relax(ms->wk_lock);
 	} else
 		mt_spi_next_message(ms);
 }
@@ -942,7 +941,8 @@ static int mt_spi_transfer(struct spi_device *spidev, struct spi_message *msg)
 
 	if (unlikely(!msg)) {
 		dev_err(&spidev->dev, "msg is NULL pointer.\n");
-		msg->status = -EINVAL;
+		//No need to dereference msg when it is NULL
+		//msg->status = -EINVAL;
 		goto out;
 	}
 	if (unlikely(list_empty(&msg->transfers))) {
@@ -999,7 +999,7 @@ static int mt_spi_transfer(struct spi_device *spidev, struct spi_message *msg)
 	list_add_tail(&msg->queue, &ms->queue);
 	SPI_DBG("add msg %p to queue\n", msg);
 	if (!ms->cur_transfer) {
-		wake_lock(&ms->wk_lock);
+		__pm_relax(ms->wk_lock);
 		spi_gpio_set(ms);
 		/*enable_clk(); */
 
@@ -1403,7 +1403,7 @@ static int mt_spi_probe(struct platform_device *pdev)
 	ms->running = IDLE;
 	ms->cur_transfer = NULL;
 	ms->next_transfer = NULL;
-	wake_lock_init(&ms->wk_lock, WAKE_LOCK_SUSPEND, "spi_wakelock");
+	ms->wk_lock = wakeup_source_register("spi_wakelock");
 
 	spin_lock_init(&ms->lock);
 	INIT_LIST_HEAD(&ms->queue);

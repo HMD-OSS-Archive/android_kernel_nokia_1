@@ -17,7 +17,7 @@
 #include <linux/proc_fs.h>
 
 #include "platform/mtk_platform_common.h"
-#include "mt_gpufreq.h"
+#include "mtk_gpufreq.h"
 #include <mali_kbase_pm_internal.h>
 
 #include <ged_log.h>
@@ -428,25 +428,17 @@ void proc_mali_unregister(void)
 #define proc_mali_unregister() do{}while(0)
 #endif /* CONFIG_PROC_FS */
 
-static int last_fail_commit_id = -1;
-
 int mtk_get_vgpu_power_on_flag(void)
 {
-	return g_vgpu_power_on_flag;
+    return g_vgpu_power_on_flag;
 }
 
 int mtk_set_vgpu_power_on_flag(int power_on_id)
 {
 	mutex_lock(&g_flag_lock);
-
-	if (power_on_id && last_fail_commit_id != -1) {
-		mt_gpufreq_target(last_fail_commit_id);
-		last_fail_commit_id = -1;
-	}
-
-	g_vgpu_power_on_flag = power_on_id;
+    g_vgpu_power_on_flag = power_on_id;
 	mutex_unlock(&g_flag_lock);
-	return 0;
+    return 0;
 }
 
 int mtk_set_mt_gpufreq_target(int freq_id)
@@ -454,10 +446,17 @@ int mtk_set_mt_gpufreq_target(int freq_id)
 	int ret = 0;
 
 	mutex_lock(&g_flag_lock);
-	if (MTK_VGPU_POWER_ON == mtk_get_vgpu_power_on_flag())
+	if (mtk_get_vgpu_power_on_flag() == MTK_VGPU_POWER_ON) {
+#ifdef GPUFREQ_ENABLE_KICK_PBM
+		/* For MT6757, we can't power off GPU since HW limitation */
+		/* And this will cause power budge issue, so we add an extra para to support skipping PBM operation */
+		ret = mt_gpufreq_target(freq_id, true);
+#else
 		ret = mt_gpufreq_target(freq_id);
-	else
-		last_fail_commit_id = freq_id;
+#endif
+	}
 	mutex_unlock(&g_flag_lock);
 	return ret;
+
+    return 0;
 }

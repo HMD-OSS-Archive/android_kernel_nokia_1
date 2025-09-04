@@ -11,8 +11,11 @@
 # GNU General Public License for more details.
 #
 
-ifeq ($(CONFIG_MTK_COMMON_EMI), y)
-obj-y += mt8127/
-else
-obj-y += $(subst ",,$(CONFIG_MTK_PLATFORM))/
-endif
+MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM)
+
+obj-$(CONFIG_MACH_MT6761) += dramc.o
+obj-$(CONFIG_MACH_MT6765) += dramc.o
+obj-$(CONFIG_MACH_MT6758) += dramc.o
+obj-$(CONFIG_MTK_DRAMC) := mtk_lastdramc.o mtk_memtest.o mtk_rshmoo.o
+obj-$(CONFIG_MTK_DRAMC) += $(subst ",,$(CONFIG_MTK_PLATFORM))/

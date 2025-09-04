@@ -47,7 +47,7 @@
 //  Local Variables
 // ---------------------------------------------------------------------------
 
-static LCM_UTIL_FUNCS lcm_util = {0};
+static struct LCM_UTIL_FUNCS lcm_util = {0};
 
 #define SET_RESET_PIN(v)    								(lcm_util.set_reset_pin((v)))
 
@@ -180,15 +180,15 @@ static void push_table(struct LCM_setting_table *table, unsigned int count, unsi
 //  LCM Driver Implementations
 // ---------------------------------------------------------------------------
 
-static void lcm_set_util_funcs(const LCM_UTIL_FUNCS *util)
+static void lcm_set_util_funcs(const struct LCM_UTIL_FUNCS *util)
 {
-    memcpy(&lcm_util, util, sizeof(LCM_UTIL_FUNCS));
+    memcpy(&lcm_util, util, sizeof(struct LCM_UTIL_FUNCS));
 }
 
 
-static void lcm_get_params(LCM_PARAMS *params)
+static void lcm_get_params(struct LCM_PARAMS *params)
 {
-		memset(params, 0, sizeof(LCM_PARAMS));
+		memset(params, 0, sizeof(struct LCM_PARAMS));
 	
 		params->type   = LCM_TYPE_DSI;
 
@@ -407,7 +407,7 @@ static unsigned int lcm_esd_recover(void)
 }
 #endif
 
-LCM_DRIVER nt35512_fwvga_dsi_vdo_zgd_lcm_drv = 
+struct LCM_DRIVER nt35512_fwvga_dsi_vdo_zgd_lcm_drv = 
 {
     .name			= "nt35512_fwvga_dsi_vdo_zgd_lcm_drv",
 	.set_util_funcs = lcm_set_util_funcs,

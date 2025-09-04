@@ -18,7 +18,12 @@
 #include <linux/delay.h>
 #include <linux/of_fdt.h>
 #include <linux/lockdep.h>
+
+#if 0
 #include <linux/irqchip/mt-gic.h>
+#else
+#include <linux/irqchip/mtk-gic-extend.h>
+#endif
 
 #ifdef CONFIG_OF
 #include <linux/of.h>
@@ -27,7 +32,7 @@
 #endif
 
 #include <mach/wd_api.h>
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 #include <mach/mt_secure_api.h>
 #endif
 #include <mt-plat/upmu_common.h>
@@ -49,7 +54,7 @@
 #define SPM_PWAKE_EN            0
 #define SPM_BYPASS_SYSPWREQ     1
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 #if defined(CONFIG_MICROTRUST_TEE_SUPPORT)
 #define WAKE_SRC_FOR_DPIDLE \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_CONN_WDT | \
@@ -64,7 +69,7 @@
 	WAKE_SRC_SYSPWREQ | WAKE_SRC_MD_WDT | WAKE_SRC_C2K_WDT | WAKE_SRC_CLDMA_MD)
 #endif /* !CONFIG_MICROTRUST_TEE_SUPPORT */
 
-#elif defined(CONFIG_ARCH_MT6735M)
+#elif defined(CONFIG_MACH_MT6735M)
 #if defined(CONFIG_MICROTRUST_TEE_SUPPORT)
 #define WAKE_SRC_FOR_DPIDLE \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_CONN_WDT | \
@@ -79,7 +84,7 @@
 	WAKE_SRC_SYSPWREQ | WAKE_SRC_MD_WDT | WAKE_SRC_CLDMA_MD)
 #endif /* !CONFIG_MICROTRUST_TEE_SUPPORT */
 
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 #if defined(CONFIG_MICROTRUST_TEE_SUPPORT)
 #define WAKE_SRC_FOR_DPIDLE \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_CONN_WDT | \
@@ -94,7 +99,7 @@
 	WAKE_SRC_SYSPWREQ | WAKE_SRC_MD_WDT | WAKE_SRC_C2K_WDT | WAKE_SRC_CLDMA_MD)
 #endif /* !CONFIG_MICROTRUST_TEE_SUPPORT */
 
-#elif defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#elif defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 #define WAKE_SRC_FOR_DPIDLE \
 	(WAKE_SRC_KP | WAKE_SRC_GPT | WAKE_SRC_EINT | WAKE_SRC_CONN_WDT| \
 	WAKE_SRC_CCIF0_MD | WAKE_SRC_CONN2AP | WAKE_SRC_USB_CD | WAKE_SRC_USB_PDN | \
@@ -109,7 +114,7 @@
 
 #define spm_is_wakesrc_invalid(wakesrc)     (!!((u32)(wakesrc) & 0xc0003803))
 
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 #define reg_read(addr)         __raw_readl(IOMEM(addr))
 #define reg_write(addr, val)   mt_reg_sync_writel((val), ((void *)addr))
 
@@ -137,7 +142,7 @@ static unsigned long mcucfg_phys_base;
 #else
 #define MCUSYS_SMC_WRITE(addr, val)  mcusys_smc_write(addr, val)
 #endif
-#endif				/* #if defined(CONFIG_ARCH_MT6753) */
+#endif				/* #if defined(CONFIG_MACH_MT6753) */
 
 #ifdef CONFIG_MTK_RAM_CONSOLE
 #define SPM_AEE_RR_REC 1
@@ -160,7 +165,7 @@ enum spm_deepidle_step {
 };
 #endif
 
-#if defined(CONFIG_ARCH_MT6735)
+#if defined(CONFIG_MACH_MT6735)
 static struct pwr_ctrl dpidle_ctrl = {
 	.wake_src = WAKE_SRC_FOR_DPIDLE,
 	.wake_src_md32 = WAKE_SRC_FOR_MD32,
@@ -181,7 +186,7 @@ static struct pwr_ctrl dpidle_ctrl = {
 	.lte_mask = 1,
 	.syspwreq_mask = 1,
 };
-#elif defined(CONFIG_ARCH_MT6735M)
+#elif defined(CONFIG_MACH_MT6735M)
 static struct pwr_ctrl dpidle_ctrl = {
 	.wake_src = WAKE_SRC_FOR_DPIDLE,
 	.wake_src_md32 = WAKE_SRC_FOR_MD32,
@@ -203,7 +208,7 @@ static struct pwr_ctrl dpidle_ctrl = {
 	.lte_mask = 1,
 	.syspwreq_mask = 1,
 };
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 static struct pwr_ctrl dpidle_ctrl = {
 	.wake_src = WAKE_SRC_FOR_DPIDLE,
 	.wake_src_md32 = WAKE_SRC_FOR_MD32,
@@ -228,7 +233,7 @@ static struct pwr_ctrl dpidle_ctrl = {
 	.md1_req_mask = 0,
 	.md2_req_mask = 0,
 };
-#elif defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#elif defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 /**********************************************************
  * PCM code for deep idle
  **********************************************************/
@@ -392,7 +397,7 @@ static unsigned int dpidle_log_discard_cnt;
 static unsigned int dpidle_log_print_prev_time;
 
 struct spm_lp_scen __spm_dpidle = {
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	.pcmdesc = &dpidle_pcm,
 #endif
 	.pwrctrl = &dpidle_ctrl,
@@ -460,7 +465,7 @@ static long int idle_get_current_time_ms(void)
 
 static void spm_trigger_wfi_for_dpidle(struct pwr_ctrl *pwrctrl)
 {
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	u32 v0, v1;
 #endif
 
@@ -472,9 +477,9 @@ static void spm_trigger_wfi_for_dpidle(struct pwr_ctrl *pwrctrl)
 		 * MT6753:         Have to program it before entering deepidle.
 		 */
 #if defined(CONFIG_ARM_MT6735) || defined(CONFIG_ARM_MT6735M) || defined(CONFIG_ARCH_MT6570) || \
-defined(CONFIG_ARCH_MT6580)
+defined(CONFIG_MACH_MT6580)
 		wfi_with_sync();
-#elif defined(CONFIG_ARCH_MT6753)
+#elif defined(CONFIG_MACH_MT6753)
 		/* backup MPx_AXI_CONFIG */
 		v0 = reg_read(MP0_AXI_CONFIG);
 		v1 = reg_read(MP1_AXI_CONFIG);
@@ -566,7 +571,7 @@ static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct 
 			wr = WR_NONE;
 		}
 	}
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	if (wakesta->r12 & WAKE_SRC_CLDMA_MD)
 		exec_ccci_kern_func_by_md_id(0, ID_GET_MD_WAKEUP_SRC, NULL, 0);
 #endif
@@ -574,21 +579,21 @@ static wake_reason_t spm_output_wake_reason(struct wake_status *wakesta, struct 
 	return wr;
 }
 
-#if defined(CONFIG_ARM_MT6735) || defined(CONFIG_ARM_MT6735M) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_ARM_MT6735) || defined(CONFIG_ARM_MT6735M) || defined(CONFIG_MACH_MT6753)
 static u32 vsram_vosel_on_lb;
 #endif
 static void spm_dpidle_pre_process(void)
 {
 	/* set PMIC WRAP table for deepidle power control */
 	mt_cpufreq_set_pmic_phase(PMIC_WRAP_PHASE_DEEPIDLE);
-#if defined(CONFIG_ARM_MT6735) || defined(CONFIG_ARM_MT6735M) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_ARM_MT6735) || defined(CONFIG_ARM_MT6735M) || defined(CONFIG_MACH_MT6753)
 	vsram_vosel_on_lb = __spm_dpidle_sodi_set_pmic_setting();
 #endif
 }
 
 static void spm_dpidle_post_process(void)
 {
-#if defined(CONFIG_ARM_MT6735) || defined(CONFIG_ARM_MT6735M) || defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_ARM_MT6735) || defined(CONFIG_ARM_MT6735M) || defined(CONFIG_MACH_MT6753)
 	__spm_dpidle_sodi_restore_pmic_setting(vsram_vosel_on_lb);
 #endif
 	/* set PMIC WRAP table for normal power control */
@@ -608,7 +613,7 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 	aee_rr_rec_deepidle_val(1 << SPM_DEEPIDLE_ENTER);
 #endif
 
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	pcmdesc = __spm_dpidle.pcmdesc;
 #else
 	if (dyna_load_pcm[DYNA_LOAD_PCM_DEEPIDLE].ready)
@@ -628,7 +633,7 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 	mt_cirq_clone_gic();
 	mt_cirq_enable();
 
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	__spm_enable_i2c4_clk();
 #endif
 
@@ -636,7 +641,7 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 	aee_rr_rec_deepidle_val(aee_rr_curr_deepidle_val() | (1 << SPM_DEEPIDLE_ENTER_UART_SLEEP));
 #endif
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	if (request_uart_to_sleep()) {
 		wr = WR_UART_BUSY;
 		goto RESTORE_IRQ;
@@ -666,12 +671,12 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 #ifdef SPM_DEEPIDLE_PROFILE_TIME
 	gpt_get_cnt(SPM_PROFILE_APXGPT, &dpidle_profile[1]);
 #endif
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	gic_set_primask();
 #endif
 	spm_trigger_wfi_for_dpidle(pwrctrl);
 
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	gic_clear_primask();
 #endif
 #ifdef SPM_DEEPIDLE_PROFILE_TIME
@@ -692,16 +697,16 @@ wake_reason_t spm_go_to_dpidle(u32 spm_flags, u32 spm_data, u32 dump_log)
 	aee_rr_rec_deepidle_val(aee_rr_curr_deepidle_val() | (1 << SPM_DEEPIDLE_ENTER_UART_AWAKE));
 #endif
 
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 	request_uart_to_wakeup();
 #endif
 
 	wr = spm_output_wake_reason(&wakesta, pcmdesc, dump_log);
 
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 	__spm_disable_i2c4_clk();
 #endif
-#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_ARCH_MT6580)
+#if !defined(CONFIG_ARCH_MT6570) && !defined(CONFIG_MACH_MT6580)
 RESTORE_IRQ:
 #endif
 	mt_cirq_flush();
@@ -739,7 +744,7 @@ wake_reason_t spm_go_to_sleep_dpidle(u32 spm_flags, u32 spm_data)
 	struct pcm_desc *pcmdesc;
 	struct pwr_ctrl *pwrctrl = __spm_dpidle.pwrctrl;
 
-#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_ARCH_MT6580)
+#if defined(CONFIG_ARCH_MT6570) || defined(CONFIG_MACH_MT6580)
 	pcmdesc = __spm_dpidle.pcmdesc;
 #else
 	if (dyna_load_pcm[DYNA_LOAD_PCM_DEEPIDLE].ready)
@@ -842,7 +847,7 @@ static void twam_handler(struct twam_sig *twamsig)
 
 void __init spm_deepidle_init(void)
 {
-#if defined(CONFIG_ARCH_MT6753)
+#if defined(CONFIG_MACH_MT6753)
 #if defined(CONFIG_OF)
 	struct device_node *node;
 	struct resource r;

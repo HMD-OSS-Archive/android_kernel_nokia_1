@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016 TRUSTONIC LIMITED
+ * Copyright (c) 2013-2017 TRUSTONIC LIMITED
  * All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -26,6 +26,10 @@
 #include <linux/of_irq.h>
 #include <linux/freezer.h>
 #include <asm/barrier.h>
+#include <linux/version.h>
+#if KERNEL_VERSION(4, 11, 0) <= LINUX_VERSION_CODE
+#include <linux/sched/clock.h>	/* local_clock */
+#endif
 
 #include "public/mc_user.h"
 #include "public/mc_admin.h"
@@ -246,12 +250,12 @@ static void mcp_dump_mobicore_status(void)
 	if (mcp_ctx.dump.off)
 		ret = -EBUSY;
 
-	mc_dev_info("TEE halted. Status dump:");
+	mc_dev_notice("TEE halted. Status dump:");
 	for (i = 0; i < (size_t)ARRAY_SIZE(status_map); i++) {
 		u32 info;
 
 		if (!mc_fc_info(status_map[i].index, NULL, &info)) {
-			mc_dev_info("  %-20s= 0x%08x\n",
+			mc_dev_notice("  %-20s= 0x%08x\n",
 				   status_map[i].msg, info);
 			if (ret >= 0)
 				ret = kasnprintf(&mcp_ctx.dump,
@@ -274,7 +278,7 @@ static void mcp_dump_mobicore_status(void)
 		}
 	}
 
-	mc_dev_info("  %-20s= 0x%s\n", "mcExcep.uuid", uuid_str);
+	mc_dev_notice("  %-20s= 0x%s\n", "mcExcep.uuid", uuid_str);
 	if (ret >= 0)
 		ret = kasnprintf(&mcp_ctx.dump, "%-20s= 0x%s\n", "mcExcep.uuid",
 				 uuid_str);
@@ -485,14 +489,14 @@ static inline int wait_mcp_notification(void)
 		int ret;
 
 		/*
-		* Wait non-interruptible to keep MCP synchronised even if caller
-		* is interrupted by signal.
-		*/
+		 * Wait non-interruptible to keep MCP synchronised even if
+		 * caller is interrupted by signal.
+		 */
 		ret = wait_for_completion_timeout(&mcp_ctx.complete, timeout);
 		if (ret > 0)
 			return 0;
 
-		mc_dev_err("No answer after %ds\n", mcp_ctx.timeout * try);
+		mc_dev_notice("No answer after %ds\n", mcp_ctx.timeout * try);
 
 		/* If SWd halted, exit now */
 		if (!mc_fc_info(MC_EXT_INFO_ID_MCI_VERSION, &status, NULL) &&
@@ -568,7 +572,7 @@ static int mcp_cmd(union mcp_message *cmd,
 
 	/* Check response ID */
 	if (msg->rsp_header.rsp_id != (cmd_id | FLAG_RESPONSE)) {
-		mc_dev_err("MCP command got invalid response (0x%X)\n",
+		mc_dev_notice("MCP command got invalid response (0x%X)\n",
 			   msg->rsp_header.rsp_id);
 		ret = -EBADE;
 		goto out;
@@ -627,7 +631,7 @@ out:
 	mutex_unlock(&mcp_ctx.last_mcp_cmds_mutex);
 	mutex_unlock(&mcp_ctx.queue_lock);
 	if (ret) {
-		mc_dev_err("%s: sending failed, ret = %d\n",
+		mc_dev_notice("%s: sending failed, ret = %d\n",
 			   mcp_cmd_to_string(cmd_id), ret);
 		return ret;
 	}
@@ -637,7 +641,7 @@ out:
 			mc_dev_devel("%s: try again\n",
 				     mcp_cmd_to_string(cmd_id));
 		else
-			mc_dev_err("%s: res %d/ret %d\n",
+			mc_dev_notice("%s: res %d/ret %d\n",
 				   mcp_cmd_to_string(cmd_id),
 				   msg->rsp_header.result, err);
 		return err;
@@ -1109,7 +1113,7 @@ int mcp_notify(struct mcp_session *session)
 		mcp_notifications_flush_nolock();
 
 		if (mcp_ctx.scheduler_cb(MCP_YIELD)) {
-			mc_dev_err("MC_SMC_N_YIELD failed\n");
+			mc_dev_notice("MC_SMC_N_YIELD failed\n");
 			ret = -EPROTO;
 		}
 	} else {
@@ -1117,7 +1121,7 @@ int mcp_notify(struct mcp_session *session)
 		session->notif_state = MCP_NOTIF_SENT;
 		session->notif_cpu_clk = local_clock();
 		if (mcp_ctx.scheduler_cb(MCP_NSIQ)) {
-			mc_dev_err("MC_SMC_N_SIQ failed\n");
+			mc_dev_notice("MC_SMC_N_SIQ failed\n");
 			ret = -EPROTO;
 		}
 	}
@@ -1212,15 +1216,15 @@ static int irq_bh_worker(void *arg)
 				rx->hdr.read_cnt % rx->hdr.queue_size];
 
 			/*
-			* Ensure read_cnt writing happens after buffer read
-			* We want a ARM dmb() / ARM64 dmb(sy) here
-			*/
+			 * Ensure read_cnt writing happens after buffer read
+			 * We want a ARM dmb() / ARM64 dmb(sy) here
+			 */
 			smp_mb();
 			rx->hdr.read_cnt++;
 			/*
-			* Ensure read_cnt writing finishes before reader
-			* We want a ARM dsb() / ARM64 dsb(sy) here
-			*/
+			 * Ensure read_cnt writing finishes before reader
+			 * We want a ARM dsb() / ARM64 dsb(sy) here
+			 */
 			rmb();
 
 			if (nf.session_id == SID_MCP)
@@ -1230,12 +1234,12 @@ static int irq_bh_worker(void *arg)
 		}
 
 		/*
-		* Finished processing notifications. It does not matter whether
-		* there actually were any notification or not.  S-SIQs can also
-		* be triggered by an SWd driver which was waiting for a FIQ.
-		* In this case the S-SIQ tells NWd that SWd is no longer idle
-		* an will need scheduling again.
-		*/
+		 * Finished processing notifications. It does not matter whether
+		 * there actually were any notification or not.  S-SIQs can also
+		 * be triggered by an SWd driver which was waiting for a FIQ.
+		 * In this case the S-SIQ tells NWd that SWd is no longer idle
+		 * an will need scheduling again.
+		 */
 		if (mcp_ctx.scheduler_cb)
 			mcp_ctx.scheduler_cb(MCP_NSIQ);
 	}
@@ -1283,7 +1287,7 @@ int mcp_start(void)
 #endif
 
 	if (mcp_ctx.irq <= 0) {
-		mc_dev_err("No IRQ number, aborting\n");
+		mc_dev_notice("No IRQ number, aborting\n");
 		return -EINVAL;
 	}
 
@@ -1315,9 +1319,12 @@ int mcp_start(void)
 	if (irq_d) {
 #ifdef CONFIG_MTK_SYSIRQ
 		if (irq_d->parent_data) {
-			mcp_ctx.mcp_buffer->message.init_values.flags |= MC_IV_FLAG_IRQ;
-			mcp_ctx.mcp_buffer->message.init_values.irq = irq_d->parent_data->hwirq;
-			mc_dev_info("irq_d->parent_data->hwirq is 0x%lx\n", irq_d->parent_data->hwirq);
+			mcp_ctx.mcp_buffer->message.init_values.flags |=
+				MC_IV_FLAG_IRQ;
+			mcp_ctx.mcp_buffer->message.init_values.irq =
+				irq_d->parent_data->hwirq;
+			mc_dev_info("irq_d->parent_data->hwirq is 0x%lx\n",
+				irq_d->parent_data->hwirq);
 		}
 #else
 		mcp_ctx.mcp_buffer->message.init_values.flags |= MC_IV_FLAG_IRQ;
@@ -1364,14 +1371,14 @@ int mcp_start(void)
 			break;
 		case MC_STATUS_HALT:
 			mcp_dump_mobicore_status();
-			mc_dev_err("halt during init, state 0x%x\n", status);
+			mc_dev_notice("halt during init, state 0x%x\n", status);
 			return -ENODEV;
 		case MC_STATUS_INITIALIZED:
-			mc_dev_info("ready\n");
+			mc_dev_devel("ready\n");
 			break;
 		default:
 			/* MC_STATUS_BAD_INIT or anything else */
-			mc_dev_err("MCI init failed, state 0x%x\n", status);
+			mc_dev_notice("MCI init failed, state 0x%x\n", status);
 			return -EIO;
 		}
 	} while (ret == EAGAIN);
@@ -1380,9 +1387,10 @@ int mcp_start(void)
 	mcp_ctx.irq_bh_active = true;
 	mcp_ctx.irq_bh_thread = kthread_run(irq_bh_worker, NULL, "tee_irq_bh");
 	if (IS_ERR(mcp_ctx.irq_bh_thread)) {
-		mc_dev_err("irq_bh_worker thread creation failed\n");
+		mc_dev_notice("irq_bh_worker thread creation failed\n");
 		return PTR_ERR(mcp_ctx.irq_bh_thread);
 	}
+	set_user_nice(mcp_ctx.irq_bh_thread, -20);
 	return request_irq(mcp_ctx.irq, irq_handler, IRQF_TRIGGER_RISING,
 			   "trustonic", NULL);
 }
@@ -1420,7 +1428,7 @@ int mcp_init(void)
 			   NQ_NUM_ELEMS * sizeof(struct notification)), 4);
 	if (q_len + sizeof(*mcp_ctx.time) + sizeof(*mcp_ctx.mcp_buffer) >
 	    (u16)-1) {
-		mc_dev_err("queues too large (more than 64k), sorry\n");
+		mc_dev_notice("queues too large (more than 64k), sorry\n");
 		return -EINVAL;
 	}
 

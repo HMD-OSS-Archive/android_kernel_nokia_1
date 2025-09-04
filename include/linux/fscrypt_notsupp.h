@@ -219,10 +219,10 @@ static inline int __fscrypt_encrypt_symlink(struct inode *inode,
 	return -EOPNOTSUPP;
 }
 
-static inline void *fscrypt_get_symlink(struct inode *inode,
+static inline const char *fscrypt_get_symlink(struct inode *inode,
 					      const void *caddr,
 					      unsigned int max_size,
-					      struct nameidata *nd)
+					      struct delayed_call *done)
 {
 	return ERR_PTR(-EOPNOTSUPP);
 }

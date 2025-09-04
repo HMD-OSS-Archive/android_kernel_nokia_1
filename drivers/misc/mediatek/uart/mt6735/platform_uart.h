@@ -56,9 +56,9 @@
 #define UART_MAJOR                  204
 #define UART_MINOR                  209
 
-#ifdef CONFIG_ARCH_MT6735M
+#ifdef CONFIG_MACH_MT6735M
 #define  CONFIG_VERSION_D2
-#endif				/* CONFIG_ARCH_MT6735M */
+#endif				/* CONFIG_MACH_MT6735M */
 
 #if defined(CONFIG_MTK_FPGA)
 #define UART_NR                     2
@@ -280,7 +280,7 @@ enum {
 #define UART_IER_ERBFI              (1 << 0)	/* RX buffer conatins data int. */
 #define UART_IER_ETBEI              (1 << 1)	/* TX FIFO threshold trigger int. */
 #define UART_IER_ELSI               (1 << 2)	/* BE, FE, PE, or OE int. */
-#define UART_IER_EDSSI              (1 << 3)	/* CTS change (DCTS) int. */
+#define UART_IER_EDSSI              (1 << 3)	/* CTSx change (DCTS) int. */
 /* When set "1", enable flow control triggered by RX FIFO full when VFIFO_EN is set. */
 #define UART_IER_VFF_FC_EN          (1 << 4)
 #define UART_IER_XOFFI              (1 << 5)
@@ -389,7 +389,7 @@ enum {
 #define UART_IIR_THRE               (0x02)	/* Transmit Holding Register Empty */
 #define UART_IIR_MS                 (0x00)	/* Check Modem Status Register */
 #define UART_IIR_SW_FLOW_CTRL       (0x10)	/* Receive XOFF characters */
-#define UART_IIR_HW_FLOW_CTRL       (0x20)	/* CTS or RTS Rising Edge */
+#define UART_IIR_HW_FLOW_CTRL       (0x20)	/* CTSx or RTS Rising Edge */
 #define UART_IIR_FIFO_EN            (0xc0)
 #define UART_IIR_INT_MASK           (0x3f)
 /*---------------------------------------------------------------------------*/
@@ -434,12 +434,12 @@ enum {
 #define UART_CLK_OFF_ACK			(1 << 0)
 /*---------------------------------------------------------------------------*/
 /* Debugging */
-typedef struct {
+struct uart_iir_reg {
 	u32 NINT:1;
 	u32 ID:5;
 	u32 FIFOE:2;
 	u32 dummy:24;
-} UART_IIR_REG;
+};
 /*---------------------------------------------------------------------------*/
 #ifndef CONFIG_OF
 #define VFF_BASE_CH_S           (6)

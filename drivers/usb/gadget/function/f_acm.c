@@ -21,9 +21,8 @@
 #include <linux/err.h>
 
 #include "u_serial.h"
-#include "gadget_chips.h"
 
-#define ACM_LOG "USB_ACM"
+
 /*
  * This CDC ACM function support just wraps control functions and
  * notifications around the generic serial-over-usb code.
@@ -335,9 +334,12 @@ static void acm_complete_set_line_coding(struct usb_ep *ep,
 		 */
 		acm->port_line_coding = *value;
 
-		pr_notice("[XLOG_INFO][USB_ACM] %s: rate=%d, stop=%d, parity=%d, data=%d\n", __func__,
-				acm->port_line_coding.dwDTERate, acm->port_line_coding.bCharFormat,
-				acm->port_line_coding.bParityType, acm->port_line_coding.bDataBits);
+		pr_notice("[USB_ACM] %s:rate=%d, stop=%d, parity=%d, data=%d\n",
+			__func__,
+			acm->port_line_coding.dwDTERate,
+			acm->port_line_coding.bCharFormat,
+			acm->port_line_coding.bParityType,
+			acm->port_line_coding.bDataBits);
 	}
 }
 
@@ -350,6 +352,10 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	u16			w_index = le16_to_cpu(ctrl->wIndex);
 	u16			w_value = le16_to_cpu(ctrl->wValue);
 	u16			w_length = le16_to_cpu(ctrl->wLength);
+	static DEFINE_RATELIMIT_STATE(ratelimit, 1 * HZ, 10);
+	static int skip_cnt;
+	static DEFINE_RATELIMIT_STATE(ratelimit1, 1 * HZ, 10);
+	static int skip_cnt1;
 
 	/* composite driver infrastructure handles everything except
 	 * CDC class messages; interface activation uses set_alt().
@@ -360,8 +366,17 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	 * (not that useful) and SEND_BREAK.
 	 */
 
-	pr_notice("[XLOG_INFO][USB_ACM]%s: ttyGS%d req%02x.%02x v%04x i%04x len=%d\n", __func__,
-			acm->port_num, ctrl->bRequestType, ctrl->bRequest, w_value, w_index, w_length);
+
+	if (__ratelimit(&ratelimit)) {
+		pr_notice("[ACM]%s: ttyGS%d req%02x.%02x v%04x i%04x len=%d, skip_cnt:%d\n",
+			__func__,
+			acm->port_num, ctrl->bRequestType,
+			ctrl->bRequest,
+			w_value, w_index, w_length, skip_cnt);
+		skip_cnt = 0;
+	} else
+		skip_cnt++;
+
 
 	switch ((ctrl->bRequestType << 8) | ctrl->bRequest) {
 
@@ -387,9 +402,16 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 				sizeof(struct usb_cdc_line_coding));
 		memcpy(req->buf, &acm->port_line_coding, value);
 
-		pr_notice("[XLOG_INFO][USB_ACM]%s: rate=%d,stop=%d,parity=%d,data=%d\n", __func__,
+
+		if (__ratelimit(&ratelimit1)) {
+			pr_notice("[USB_ACM]%s: rate=%d,stop=%d,parity=%d,data=%d, skip_cnt:%d\n",
+				__func__,
 				acm->port_line_coding.dwDTERate, acm->port_line_coding.bCharFormat,
-				acm->port_line_coding.bParityType, acm->port_line_coding.bDataBits);
+				acm->port_line_coding.bParityType, acm->port_line_coding.bDataBits,
+				skip_cnt1);
+			skip_cnt1 = 0;
+		} else
+			skip_cnt1++;
 
 		break;
 
@@ -442,21 +464,18 @@ static int acm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	/* we know alt == 0, so this is an activation or a reset */
 
 	if (intf == acm->ctrl_id) {
-		if (acm->notify->driver_data) {
-			dev_vdbg(&cdev->gadget->dev,
-				 "reset acm control interface %d\n", intf);
-			usb_ep_disable(acm->notify);
-		}
+		dev_vdbg(&cdev->gadget->dev,
+				"reset acm control interface %d\n", intf);
+		usb_ep_disable(acm->notify);
 
 		if (!acm->notify->desc)
 			if (config_ep_by_speed(cdev->gadget, f, acm->notify))
 				return -EINVAL;
 
 		usb_ep_enable(acm->notify);
-		acm->notify->driver_data = acm;
 
 	} else if (intf == acm->data_id) {
-		if (acm->port.in->driver_data) {
+		if (acm->notify->enabled) {
 			dev_dbg(&cdev->gadget->dev,
 				"reset acm ttyGS%d\n", acm->port_num);
 			gserial_disconnect(&acm->port);
@@ -490,7 +509,6 @@ static void acm_disable(struct usb_function *f)
 	dev_dbg(&cdev->gadget->dev, "acm ttyGS%d deactivated\n", acm->port_num);
 	gserial_disconnect(&acm->port);
 	usb_ep_disable(acm->notify);
-	acm->notify->driver_data = NULL;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -672,19 +690,16 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 	if (!ep)
 		goto fail;
 	acm->port.in = ep;
-	ep->driver_data = cdev;	/* claim */
 
 	ep = usb_ep_autoconfig(cdev->gadget, &acm_fs_out_desc);
 	if (!ep)
 		goto fail;
 	acm->port.out = ep;
-	ep->driver_data = cdev;	/* claim */
 
 	ep = usb_ep_autoconfig(cdev->gadget, &acm_fs_notify_desc);
 	if (!ep)
 		goto fail;
 	acm->notify = ep;
-	ep->driver_data = cdev;	/* claim */
 
 	/* allocate notification */
 	acm->notify_req = gs_alloc_req(ep,
@@ -709,7 +724,7 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 	acm_ss_out_desc.bEndpointAddress = acm_fs_out_desc.bEndpointAddress;
 
 	status = usb_assign_descriptors(f, acm_fs_function, acm_hs_function,
-			acm_ss_function);
+			acm_ss_function, NULL);
 	if (status)
 		goto fail;
 
@@ -717,7 +732,8 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 			__func__, acm->port_num,
 			gadget_is_superspeed(c->cdev->gadget) ? "super" :
 			gadget_is_dualspeed(c->cdev->gadget) ? "dual" : "full",
-			acm->port.in->name, acm->port.out->name, acm->notify->name);
+			acm->port.in->name, acm->port.out->name,
+			acm->notify->name);
 
 	dev_dbg(&cdev->gadget->dev,
 		"acm ttyGS%d: %s speed IN/%s OUT/%s NOTIFY/%s\n",
@@ -731,14 +747,6 @@ acm_bind(struct usb_configuration *c, struct usb_function *f)
 fail:
 	if (acm->notify_req)
 		gs_free_req(acm->notify, acm->notify_req);
-
-	/* we might as well release our claims on endpoints */
-	if (acm->notify)
-		acm->notify->driver_data = NULL;
-	if (acm->port.out)
-		acm->port.out->driver_data = NULL;
-	if (acm->port.in)
-		acm->port.in->driver_data = NULL;
 
 	ERROR(cdev, "%s/%p: can't bind, err %d\n", f->name, f, status);
 
@@ -799,21 +807,6 @@ static inline struct f_serial_opts *to_f_serial_opts(struct config_item *item)
 			func_inst.group);
 }
 
-CONFIGFS_ATTR_STRUCT(f_serial_opts);
-static ssize_t f_acm_attr_show(struct config_item *item,
-				 struct configfs_attribute *attr,
-				 char *page)
-{
-	struct f_serial_opts *opts = to_f_serial_opts(item);
-	struct f_serial_opts_attribute *f_serial_opts_attr =
-		container_of(attr, struct f_serial_opts_attribute, attr);
-	ssize_t ret = 0;
-
-	if (f_serial_opts_attr->show)
-		ret = f_serial_opts_attr->show(opts, page);
-	return ret;
-}
-
 static void acm_attr_release(struct config_item *item)
 {
 	struct f_serial_opts *opts = to_f_serial_opts(item);
@@ -823,20 +816,17 @@ static void acm_attr_release(struct config_item *item)
 
 static struct configfs_item_operations acm_item_ops = {
 	.release                = acm_attr_release,
-	.show_attribute		= f_acm_attr_show,
 };
 
-static ssize_t f_acm_port_num_show(struct f_serial_opts *opts, char *page)
+static ssize_t f_acm_port_num_show(struct config_item *item, char *page)
 {
-	return sprintf(page, "%u\n", opts->port_num);
+	return sprintf(page, "%u\n", to_f_serial_opts(item)->port_num);
 }
 
-static struct f_serial_opts_attribute f_acm_port_num =
-	__CONFIGFS_ATTR_RO(port_num, f_acm_port_num_show);
-
+CONFIGFS_ATTR_RO(f_acm_, port_num);
 
 static struct configfs_attribute *acm_attrs[] = {
-	&f_acm_port_num.attr,
+	&f_acm_attr_port_num,
 	NULL,
 };
 
@@ -869,6 +859,9 @@ static struct usb_function_instance *acm_alloc_instance(void)
 		kfree(opts);
 		return ERR_PTR(ret);
 	}
+
+	pr_info("%s opts->port_num=%d\n", __func__, opts->port_num);
+
 	config_group_init_type_name(&opts->func_inst.group, "",
 			&acm_func_type);
 	return &opts->func_inst;

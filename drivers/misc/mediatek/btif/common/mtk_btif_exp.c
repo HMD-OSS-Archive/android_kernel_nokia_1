@@ -21,28 +21,30 @@
 
 /*---------------------------------Function----------------------------------*/
 
-p_mtk_btif btif_exp_srh_id(unsigned long u_id)
+struct _mtk_btif_ *btif_exp_srh_id(unsigned long u_id)
 {
 	int index = 0;
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 	struct list_head *p_list = NULL;
 	struct list_head *tmp = NULL;
-	p_mtk_btif_user p_user = NULL;
+	struct _mtk_btif_user_ *p_user = NULL;
 
-	for (index = 0; (index < BTIF_PORT_NR) && (NULL == p_btif); index++) {
+	for (index = 0; (index < BTIF_PORT_NR) && (p_btif == NULL); index++) {
 		p_list = &(g_btif[index].user_list);
 		list_for_each(tmp, p_list) {
-			p_user = container_of(tmp, mtk_btif_user, entry);
+			p_user = container_of(tmp,
+					      struct _mtk_btif_user_,
+					      entry);
 			if (u_id == p_user->u_id) {
 				p_btif = p_user->p_btif;
 				BTIF_DBG_FUNC
-				    ("BTIF's user id(0x%p), p_btif(0x%p)\n",
+				    ("BTIF's user id(%lu), p_btif(%p)\n",
 				     p_user->u_id, p_btif);
 				break;
 			}
 		}
 	}
-	if (NULL == p_btif) {
+	if (p_btif == NULL) {
 		BTIF_INFO_FUNC
 		    ("no btif structure found for BTIF's user id(0x%lx)\n",
 		     u_id);
@@ -75,8 +77,8 @@ int mtk_wcn_btif_open(char *p_owner, unsigned long *p_id)
 {
 	int i_ret = -1;
 	unsigned int index = 0;
-	p_mtk_btif_user p_new_user = NULL;
-	p_mtk_btif p_btif = &g_btif[index];
+	struct _mtk_btif_user_ *p_new_user = NULL;
+	struct _mtk_btif_ *p_btif = &g_btif[index];
 	struct list_head *p_user_list = &(p_btif->user_list);
 
 	BTIF_DBG_FUNC("++");
@@ -86,7 +88,7 @@ int mtk_wcn_btif_open(char *p_owner, unsigned long *p_id)
 		BTIF_ERR_FUNC("mutex_lock_killable return failed\n");
 		return E_BTIF_INTR;
 	}
-	if ((NULL == p_owner) || (NULL == p_id)) {
+	if ((p_owner == NULL) || (p_id == NULL)) {
 		if (p_id)
 			*p_id = 0;
 		BTIF_ERR_FUNC("parameter invalid, p_owner(0x%p), p_id(0x%p)\n",
@@ -98,11 +100,13 @@ int mtk_wcn_btif_open(char *p_owner, unsigned long *p_id)
 /*check if btif is already opened or not, if yes, just return fail*/
 	if (!list_empty(p_user_list)) {
 		struct list_head *pos;
-		p_mtk_btif_user p_user;
+		struct _mtk_btif_user_ *p_user;
 
 		BTIF_ERR_FUNC("BTIF's user list is not empty\n");
 		list_for_each(pos, p_user_list) {
-			p_user = container_of(pos, mtk_btif_user, entry);
+			p_user = container_of(pos,
+					      struct _mtk_btif_user_,
+					      entry);
 			BTIF_INFO_FUNC("BTIF's user id(0x%lx), name(%s)\n",
 				       p_user->u_id, p_user->u_name);
 		}
@@ -110,9 +114,9 @@ int mtk_wcn_btif_open(char *p_owner, unsigned long *p_id)
 		BTIF_MUTEX_UNLOCK(&(p_btif->ops_mtx));
 		return E_BTIF_ALREADY_OPEN;
 	}
-	p_new_user = vmalloc(sizeof(mtk_btif_user));
+	p_new_user = vmalloc(sizeof(struct _mtk_btif_user_));
 
-	if (NULL != p_new_user) {
+	if (p_new_user != NULL) {
 		INIT_LIST_HEAD(&(p_new_user->entry));
 		p_new_user->enable = false;
 		p_new_user->p_btif = p_btif;
@@ -140,7 +144,7 @@ int mtk_wcn_btif_open(char *p_owner, unsigned long *p_id)
 	} else {
 		*p_id = 0;
 		i_ret = -ENOMEM;
-		BTIF_ERR_FUNC("allocate memory for mtk_btif_user failed\n");
+		BTIF_ERR_FUNC("alloc memory struct _mtk_btif_user_ failed\n");
 	}
 	BTIF_MUTEX_UNLOCK(&(p_btif->ops_mtx));
 	BTIF_DBG_FUNC("--");
@@ -164,14 +168,14 @@ EXPORT_SYMBOL(mtk_wcn_btif_open);
 int mtk_wcn_btif_close(unsigned long u_id)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 	struct list_head *pos = NULL;
 	struct list_head *p_user_list = NULL;
 
 	BTIF_DBG_FUNC("++");
 	p_btif = btif_exp_srh_id(u_id);
 
-	if (NULL == p_btif)
+	if (p_btif == NULL)
 		return E_BTIF_INVAL_PARAM;
 
 	if (mutex_lock_killable(&(p_btif->ops_mtx))) {
@@ -180,8 +184,8 @@ int mtk_wcn_btif_close(unsigned long u_id)
 	}
 	p_user_list = &(p_btif->user_list);
 	list_for_each(pos, p_user_list) {
-		p_mtk_btif_user p_user =
-		    container_of(pos, mtk_btif_user, entry);
+		struct _mtk_btif_user_ *p_user =
+		    container_of(pos, struct _mtk_btif_user_, entry);
 
 		if (p_user->u_id == u_id) {
 			BTIF_INFO_FUNC
@@ -240,18 +244,18 @@ int mtk_wcn_btif_write(unsigned long u_id,
 		       const unsigned char *p_buf, unsigned int len)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 
 	BTIF_DBG_FUNC("++");
 	p_btif = btif_exp_srh_id(u_id);
 
-	if (NULL == p_btif)
+	if (p_btif == NULL)
 		return E_BTIF_INVAL_PARAM;
-	if (NULL == p_buf) {
+	if (p_buf == NULL) {
 		BTIF_ERR_FUNC("invalid p_buf (0x%p)\n", p_buf);
 		return E_BTIF_INVAL_PARAM;
 	}
-	if ((0 == len) || (BTIF_MAX_LEN_PER_PKT < len)) {
+	if ((len == 0) || (len > BTIF_MAX_LEN_PER_PKT)) {
 		BTIF_ERR_FUNC("invalid buffer length(%d)\n", len);
 		return E_BTIF_INVAL_PARAM;
 	}
@@ -289,21 +293,22 @@ int mtk_wcn_btif_read(unsigned long u_id,
 *  control if BTIF module allow system enter deepidle state or not
 * PARAMETERS
 *  p_btif      [IN] pointer returned by mtk_wcn_btif_open
-*  en_flag    [IN] one of ENUM_BTIF_DPIDLE_CTRL
+*  en_flag    [IN] one of enum _ENUM_BTIF_DPIDLE_
 * RETURNS
 *  int          always return 0
 *****************************************************************************/
-int mtk_wcn_btif_dpidle_ctrl(unsigned long u_id, ENUM_BTIF_DPIDLE_CTRL en_flag)
+int mtk_wcn_btif_dpidle_ctrl(unsigned long u_id,
+			     enum _ENUM_BTIF_DPIDLE_ en_flag)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 
 	p_btif = btif_exp_srh_id(u_id);
 
-	if (NULL == p_btif)
+	if (p_btif == NULL)
 		return E_BTIF_INVAL_PARAM;
 
-	if (BTIF_DPIDLE_DISABLE == en_flag)
+	if (en_flag == BTIF_DPIDLE_DISABLE)
 		i_ret = btif_exit_dpidle(p_btif);
 	else
 		i_ret = btif_enter_dpidle(p_btif);
@@ -330,11 +335,11 @@ EXPORT_SYMBOL(mtk_wcn_btif_dpidle_ctrl);
 int mtk_wcn_btif_rx_cb_register(unsigned long u_id, MTK_WCN_BTIF_RX_CB rx_cb)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 
 	p_btif = btif_exp_srh_id(u_id);
 
-	if (NULL == p_btif)
+	if (p_btif == NULL)
 		return E_BTIF_INVAL_PARAM;
 
 	i_ret = btif_rx_cb_reg(p_btif, rx_cb);
@@ -358,11 +363,11 @@ EXPORT_SYMBOL(mtk_wcn_btif_rx_cb_register);
 int mtk_wcn_btif_wakeup_consys(unsigned long u_id)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 
 	p_btif = btif_exp_srh_id(u_id);
 
-	if (NULL == p_btif)
+	if (p_btif == NULL)
 		return E_BTIF_INVAL_PARAM;
 
 /*i_ret = hal_btif_raise_wak_sig(p_btif->p_btif_info);*/
@@ -388,19 +393,20 @@ EXPORT_SYMBOL(mtk_wcn_btif_wakeup_consys);
 * PARAMETERS
 *  p_btif      [IN] pointer returned by mtk_wcn_btif_open
 *  enable     [IN] loopback mode control flag, enable or disable,
-*  shou be one of ENUM_BTIF_LPBK_MODE
+*  shou be one of enum _ENUM_BTIF_LPBK_MODE_
 * RETURNS
 *  int          0 = succeed;
 *  others = fail, for detailed information, please see ENUM_BTIF_OP_ERROR_CODE
 *****************************************************************************/
-int mtk_wcn_btif_loopback_ctrl(unsigned long u_id, ENUM_BTIF_LPBK_MODE enable)
+int mtk_wcn_btif_loopback_ctrl(unsigned long u_id,
+			       enum _ENUM_BTIF_LPBK_MODE_ enable)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 
 	p_btif = btif_exp_srh_id(u_id);
 
-	if (NULL == p_btif)
+	if (p_btif == NULL)
 		return E_BTIF_INVAL_PARAM;
 	i_ret =
 	    btif_lpbk_ctrl(p_btif, enable == BTIF_LPBK_ENABLE ? true : false);
@@ -416,7 +422,7 @@ EXPORT_SYMBOL(mtk_wcn_btif_loopback_ctrl);
 *  control BTIF logger function's behavior
 * PARAMETERS
 *  p_btif      [IN] pointer returned by mtk_wcn_btif_open
-*  flag         [IN] should be one of ENUM_BTIF_DBG_ID
+*  flag         [IN] should be one of enum _ENUM_BTIF_DBG_ID_
 *                      BTIF_DISABLE_LOGGER  - disable btif logger
 *                      BTIF_ENABLE_LOGGER   - enable btif logger
 *                      BTIF_DUMP_LOG           - dump log logged by btif
@@ -426,14 +432,14 @@ EXPORT_SYMBOL(mtk_wcn_btif_loopback_ctrl);
 * RETURNS
 *  int          0 = succeed; others = fail, for detailed information, please see ENUM_BTIF_OP_ERROR_CODE
 *****************************************************************************/
-int mtk_wcn_btif_dbg_ctrl(unsigned long u_id, ENUM_BTIF_DBG_ID flag)
+int mtk_wcn_btif_dbg_ctrl(unsigned long u_id, enum _ENUM_BTIF_DBG_ID_ flag)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 
 	p_btif = btif_exp_srh_id(u_id);
 
-	if (NULL == p_btif)
+	if (p_btif == NULL)
 		return E_BTIF_INVAL_PARAM;
 
 	i_ret = 0;
@@ -497,11 +503,11 @@ bool mtk_wcn_btif_parser_wmt_evt(unsigned long u_id,
 	const char *sub_str, unsigned int str_len)
 {
 	bool b_ret = false;
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 
 	p_btif = btif_exp_srh_id(u_id);
 
-	if (NULL == p_btif)
+	if (p_btif == NULL)
 		return E_BTIF_INVAL_PARAM;
 	b_ret = btif_parser_wmt_evt(p_btif, sub_str, str_len);
 	BTIF_INFO_FUNC("parser wmt evt %s\n", b_ret ? "ok" : "fail");
@@ -515,7 +521,7 @@ EXPORT_SYMBOL(mtk_wcn_btif_parser_wmt_evt);
 int btif_open_no_id(void)
 {
 	int i_ret = 0;
-	p_mtk_btif p_btif = &g_btif[0];
+	struct _mtk_btif_ *p_btif = &g_btif[0];
 
 	i_ret = btif_open(p_btif);
 
@@ -530,7 +536,7 @@ int btif_open_no_id(void)
 int btif_close_no_id(void)
 {
 	int i_ret = 0;
-	p_mtk_btif p_btif = &g_btif[0];
+	struct _mtk_btif_ *p_btif = &g_btif[0];
 
 	i_ret = btif_close(p_btif);
 
@@ -544,15 +550,15 @@ int btif_close_no_id(void)
 int btif_write_no_id(const unsigned char *p_buf, unsigned int len)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = &g_btif[0];
+	struct _mtk_btif_ *p_btif = &g_btif[0];
 
 	BTIF_DBG_FUNC("++");
 
-	if (NULL == p_buf) {
+	if (p_buf == NULL) {
 		BTIF_ERR_FUNC("invalid p_buf (0x%p)\n", p_buf);
 		return E_BTIF_INVAL_PARAM;
 	}
-	if ((0 == len) || (BTIF_MAX_LEN_PER_PKT < len)) {
+	if ((len == 0) || (len > BTIF_MAX_LEN_PER_PKT)) {
 		BTIF_ERR_FUNC("invalid buffer length(%d)\n", len);
 		return E_BTIF_INVAL_PARAM;
 	}
@@ -562,12 +568,12 @@ int btif_write_no_id(const unsigned char *p_buf, unsigned int len)
 	return i_ret;
 }
 
-int btif_dpidle_ctrl_no_id(ENUM_BTIF_DPIDLE_CTRL en_flag)
+int btif_dpidle_ctrl_no_id(enum _ENUM_BTIF_DPIDLE_ en_flag)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = &g_btif[0];
+	struct _mtk_btif_ *p_btif = &g_btif[0];
 
-	if (BTIF_DPIDLE_DISABLE == en_flag)
+	if (en_flag == BTIF_DPIDLE_DISABLE)
 		i_ret = btif_exit_dpidle(p_btif);
 	else
 		i_ret = btif_enter_dpidle(p_btif);
@@ -578,7 +584,7 @@ int btif_dpidle_ctrl_no_id(ENUM_BTIF_DPIDLE_CTRL en_flag)
 int btif_wakeup_consys_no_id(void)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = &g_btif[0];
+	struct _mtk_btif_ *p_btif = &g_btif[0];
 
 /*i_ret = hal_btif_raise_wak_sig(p_btif->p_btif_info);*/
 	i_ret = btif_raise_wak_signal(p_btif);
@@ -586,10 +592,10 @@ int btif_wakeup_consys_no_id(void)
 	return i_ret;
 }
 
-int btif_loopback_ctrl_no_id(ENUM_BTIF_LPBK_MODE enable)
+int btif_loopback_ctrl_no_id(enum _ENUM_BTIF_LPBK_MODE_ enable)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = &g_btif[0];
+	struct _mtk_btif_ *p_btif = &g_btif[0];
 
 	i_ret =
 	    btif_lpbk_ctrl(p_btif, enable == BTIF_LPBK_ENABLE ? true : false);
@@ -597,10 +603,10 @@ int btif_loopback_ctrl_no_id(ENUM_BTIF_LPBK_MODE enable)
 	return i_ret;
 }
 
-int btif_dbg_ctrl_no_id(ENUM_BTIF_DBG_ID flag)
+int btif_dbg_ctrl_no_id(enum _ENUM_BTIF_DBG_ID_ flag)
 {
 	int i_ret = -1;
-	p_mtk_btif p_btif = &g_btif[0];
+	struct _mtk_btif_ *p_btif = &g_btif[0];
 
 	i_ret = 0;
 	switch (flag) {
@@ -724,7 +730,7 @@ int mtk_btif_exp_write_stress_test(unsigned int length, unsigned int max_loop)
 			break;
 		}
 		buf_len--;
-		if (0 >= buf_len)
+		if (buf_len <= 0)
 			buf_len = length > BUF_LEN ? BUF_LEN : length;
 	}
 	kfree(buffer);
@@ -734,7 +740,7 @@ int mtk_btif_exp_write_stress_test(unsigned int length, unsigned int max_loop)
 int mtk_btif_exp_suspend_test(void)
 {
 	int i_ret = 0;
-	p_mtk_btif p_btif = &g_btif[0];
+	struct _mtk_btif_ *p_btif = &g_btif[0];
 
 	i_ret = _btif_suspend(p_btif);
 	return i_ret;
@@ -743,7 +749,7 @@ int mtk_btif_exp_suspend_test(void)
 int mtk_btif_exp_restore_noirq_test(void)
 {
 	int i_ret = 0;
-	p_mtk_btif p_btif = &g_btif[0];
+	struct _mtk_btif_ *p_btif = &g_btif[0];
 
 	i_ret = _btif_restore_noirq(p_btif);
 	return i_ret;
@@ -752,7 +758,7 @@ int mtk_btif_exp_restore_noirq_test(void)
 int mtk_btif_exp_clock_ctrl(int en)
 {
 	int i_ret = 0;
-	p_mtk_btif p_btif = &g_btif[0];
+	struct _mtk_btif_ *p_btif = &g_btif[0];
 
 	i_ret = btif_clock_ctrl(p_btif, en);
 	return i_ret;
@@ -761,7 +767,7 @@ int mtk_btif_exp_clock_ctrl(int en)
 int mtk_btif_exp_resume_test(void)
 {
 	int i_ret = 0;
-	p_mtk_btif p_btif = &g_btif[0];
+	struct _mtk_btif_ *p_btif = &g_btif[0];
 
 	i_ret = _btif_resume(p_btif);
 	return i_ret;
@@ -785,9 +791,14 @@ int mtk_btif_exp_log_debug_test(int flag)
 	return i_ret;
 }
 
+void mtk_btif_read_cpu_sw_rst_debug_exp(void)
+{
+	mtk_btif_read_cpu_sw_rst_debug();
+}
+
 int mtk_btif_exp_rx_has_pending_data(unsigned long u_id)
 {
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 	int has_pending_data = 0;
 
 	p_btif = btif_exp_srh_id(u_id);
@@ -812,7 +823,7 @@ EXPORT_SYMBOL(mtk_btif_exp_rx_has_pending_data);
 
 int mtk_btif_exp_tx_has_pending_data(unsigned long u_id)
 {
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 
 	p_btif = btif_exp_srh_id(u_id);
 	if (p_btif == NULL) {
@@ -826,7 +837,7 @@ EXPORT_SYMBOL(mtk_btif_exp_tx_has_pending_data);
 
 struct task_struct *mtk_btif_exp_rx_thread_get(unsigned long u_id)
 {
-	p_mtk_btif p_btif = NULL;
+	struct _mtk_btif_ *p_btif = NULL;
 
 	p_btif = btif_exp_srh_id(u_id);
 	if (p_btif == NULL) {
