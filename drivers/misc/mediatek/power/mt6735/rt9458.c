@@ -1,7 +1,6 @@
 /*
  * Copyright (C) 2016 MediaTek Inc.
  * ShuFanLee <shufan_lee@richtek.com>
- * Copyright (c) 2017 FIH Mobile Limited.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -1031,10 +1030,14 @@ static int rt_charger_dump_register(struct mtk_charger_info *mchr_info,
 	enum rt9458_charging_status chg_status = RT9458_CHG_STATUS_READY;
 
 	ret = rt9458_get_charging_status(info, &chg_status);
+#if !defined(CONFIG_FIH_PROJECT_NE1)
 	if (chg_status == RT9458_CHG_STATUS_FAULT) {
+#endif
 		for (i = 0; i < ARRAY_SIZE(rt9458_reg_addr); i++)
 			ret = rt9458_i2c_read_byte(info, rt9458_reg_addr[i]);
+#if !defined(CONFIG_FIH_PROJECT_NE1)
 	}
+#endif
 
 	ret = rt_charger_get_ichg(&info->mchr_info, &ichg);
 	ret = rt9458_get_mivr(info, &mivr);
@@ -1174,7 +1177,7 @@ static int rt_charger_run_aicl(struct mtk_charger_info *mchr_info, void *data)
 		aicr = 70000;
 	else if (aicr == 70000) /* from 700mA to 500mA */
 		aicr = 50000;
-//Jason.
+//
 //	else if (aicr == 50000) /* from 500mA to 100mA */
 //		aicr = 10000;
 	else { /* already the smallest value */

@@ -43,6 +43,15 @@ extern int DW9714AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient, spinlock_t 
 extern long DW9714AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command, unsigned long a_u4Param);
 extern int DW9714AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
 
+#ifdef CONFIG_MTK_LENS_GT9762AF_SUPPORT
+#define GT9762AF_SetI2Cclient GT9762AF_SetI2Cclient_Sub
+#define GT9762AF_Ioctl GT9762AF_Ioctl_Sub
+#define GT9762AF_Release GT9762AF_Release_Sub
+extern int GT9762AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient, spinlock_t *pAF_SpinLock, int *pAF_Opened);
+extern long GT9762AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command, unsigned long a_u4Param);
+extern int GT9762AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
+#endif
+
 #define DW9814AF_SetI2Cclient DW9814AF_SetI2Cclient_Sub
 #define DW9814AF_Ioctl DW9814AF_Ioctl_Sub
 #define DW9814AF_Release DW9814AF_Release_Sub

@@ -1,22 +1,25 @@
-/*
- * Copyright (c) 2017 FIH Mobile Limited.
- */
+/* Foxconn added , BokeeLi, 201/10/06 */
+/* Note:
+   (1) Refer to Mulberry project
+   (2) Reserve a partition for store Manufacture data
+*/
 
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/stat.h>
 #include <linux/fs.h>
+
 #include <linux/unistd.h>
 #include "Testflag.h"
 #include <asm/uaccess.h>
 
 #define FAILED -1;
 #define OK 1;
-
-/*add for proinfo partition cache*/
+/*J6000092 add for proinfo partition cache start*/
 static struct manuf_data fih_proinfo_data;
 static int read_flag = 0;
 static int write_flag = 0;
+/*J6000092 add for proinfo partition cache end*/
 
 int write_ef(struct manuf_data * wdata)
 {
@@ -31,13 +34,14 @@ int write_ef(struct manuf_data * wdata)
 
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	pid_filp = filp_open(MANUF_FILE_LOCATION, O_RDWR, 0);
+	pid_filp = filp_open(MANUF_FILE_LOCATION, O_RDWR, 0);//O_RDONLY
 
 	if(!IS_ERR(pid_filp))
 	{
 		strncpy(wdata->sync_info, MANUF_SYNC_INFO_STRING, strlen(MANUF_SYNC_INFO_STRING));
 		len = pid_filp->f_op->write(pid_filp, &wdata->magic,sizeof(struct manuf_data), &pid_filp->f_pos);
 
+		// added by sinkin after write action
 		vfs_fsync(pid_filp, 0);
 		printk("write_ef() len = %d\n", len);
 
@@ -45,20 +49,21 @@ int write_ef(struct manuf_data * wdata)
 
 		if (len != sizeof(struct manuf_data))
 		{
-			set_fs(oldfs);
 			return FILE_CORRUPTED;
 		}
 	}
 	else
 	{
 		printk("write_ef() open file fail %s\n", MANUF_FILE_LOCATION);
-		set_fs(oldfs);
 		return FILE_NOT_FOUND;
 	}
 
 	set_fs(oldfs);
+
+	/*J6000092 add for proinfo partition cache start*/
 	memcpy(&fih_proinfo_data, wdata, sizeof(struct manuf_data));
 	write_flag = 1;
+	/*J6000092 add for proinfo partition cache end*/
 
 	return 0;
 }
@@ -75,6 +80,7 @@ int read_ef(struct manuf_data * rdata)
 
 	printk("read_ef() read_flag = %d, write_flag = %d\n", read_flag, write_flag);
 
+	/*J6000092 modify for proinfo partition cache start*/
 	if(read_flag == 0 || write_flag == 1)
 	{
 		oldfs = get_fs();
@@ -89,14 +95,13 @@ int read_ef(struct manuf_data * rdata)
 
 			if (len != sizeof(struct manuf_data))
 			{
-				set_fs(oldfs);
 				return FILE_CORRUPTED;
 			}
 		}
 		else
 		{
 			printk("read_ef() failed to open PTR_ERR(pid_filp) = %ld\n", PTR_ERR(pid_filp));
-			set_fs(oldfs);
+
 			return FILE_NOT_FOUND;
 		}
 		set_fs(oldfs);
@@ -107,8 +112,9 @@ int read_ef(struct manuf_data * rdata)
 	}
 	else
 	{
-		memcpy(rdata, &fih_proinfo_data, sizeof(struct manuf_data));
+		memcpy(rdata, &fih_proinfo_data, sizeof(struct manuf_data));        
 	}
+	/*J6000092 modify for proinfo partition cache end*/
 
 	return 0;
 }
@@ -247,6 +253,7 @@ int fih_write_CAVIS(char* pid_str, int i)
 {
 	struct manuf_data manuf_data;
 	int access;
+
 	int temp_len = 0;
 
 	//printk("[DW]fih_write_CAVIS with cavis=%s, len=%d, num=%d\n", pid_str, strlen(pid_str),i);
@@ -467,6 +474,7 @@ int fih_write_tp_rawdata_range(struct manuf_tp_rawdata_range_t *p)
 
 	return OK;
 };
+/* add gsensor calibration for alex 20141205 begin*/
 
 int fih_read_gsensor_cali(struct manuf_gsensor_cali *p)
 {
@@ -526,6 +534,8 @@ int fih_write_gsensor_cali(struct manuf_gsensor_cali *p)
 
 	return OK;
 };
+/* add gsensor calibration for alex 20141205 end*/
+
 
 int fih_read_skuid(char* skuid)
 {
@@ -551,3 +561,4 @@ int fih_read_skuid(char* skuid)
 
 	return OK;
 }
+

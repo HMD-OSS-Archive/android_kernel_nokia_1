@@ -33,6 +33,18 @@ static const unsigned default_disksize_perc_ram = 50;
 /* Is totalram_pages less than SUPPOSED_TOTALRAM, promote its default size */
 #define SUPPOSED_TOTALRAM	0x20000	/* 512MB */
 
+/*
+ * Pages that compress to size greater than this are stored
+ * uncompressed in memory.
+ */
+static const size_t max_zpage_size = PAGE_SIZE / 4 * 3;
+
+/*
+ * NOTE: max_zpage_size must be less than or equal to:
+ *   ZS_MAX_ALLOC_SIZE. Otherwise, zs_malloc() would
+ * always return failure.
+ */
+
 /*-- End of configurable params */
 
 #define SECTOR_SHIFT		9
@@ -43,7 +55,6 @@ static const unsigned default_disksize_perc_ram = 50;
 #define ZRAM_SECTOR_PER_LOGICAL_BLOCK	\
 	(1 << (ZRAM_LOGICAL_BLOCK_SHIFT - SECTOR_SHIFT))
 
-#define MAX_SECONDARY_ALGORITHM_RATE		100
 
 /*
  * The lower ZRAM_FLAG_SHIFT bits of table.value is for
@@ -74,7 +85,6 @@ enum zram_pageflags {
 	/* Page consists entirely of zeros */
 	ZRAM_ZERO = ZRAM_FLAG_SHIFT + 1,
 	ZRAM_ACCESS,	/* page in now accessed */
-	ZRAM_COMP_BACKUP,
 	__NR_ZRAM_PAGEFLAGS,
 };
 #endif
@@ -104,8 +114,6 @@ struct zram_stats {
 	atomic64_t compr_data_size;	/* compressed size of pages stored */
 	atomic64_t num_reads;	/* failed + successful */
 	atomic64_t num_writes;	/* --do-- */
-        atomic64_t num_primary_compress;  /* --do-- */
-	atomic64_t num_secondary_compress;  /* --do-- */
 	atomic64_t failed_reads;	/* can happen when memory is too low */
 	atomic64_t failed_writes;	/* can happen when memory is too low */
 	atomic64_t invalid_io;	/* non-page-aligned I/O requests */
@@ -145,27 +153,6 @@ struct zram {
 	unsigned long limit_pages;
 
 	char compressor[10];
-
-	/*
-	 * Pages that compress to size greater than this are stored
-	 * uncompressed in memory.
-	 * NOTE: max_zpage_size must be less than or equal to:
-	 *   ZS_MAX_ALLOC_SIZE. Otherwise, zs_malloc() would
-	 * always return failure.
-	 */
-	u32 max_zpage_size;
-
-        /*
-	 * The percent of pages to be compressed using the "secondary" algorithm,
-         * represented as an integer from 0-100
-	 */
-	u32 secondary_algorithm_rate;
-
-	/*
-	 * Pages that compress to size greater than this are recompressed using
-	 * the secondary algorithm.
-	 */
-	u32 secondary_algorithm_threshold;
 };
 
 /* mlog */

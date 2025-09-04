@@ -13,6 +13,7 @@
 #define MISC_MEDIATEK_RT_REGMAP_H
 
 #include <linux/debugfs.h>
+#include <linux/i2c.h>
 
 #define RT_REGMAP_VERSION	"1.1.8_G"
 
@@ -203,10 +204,20 @@ struct rt_regmap_fops {
 };
 
 extern struct rt_regmap_device*
+	rt_regmap_device_register_ex(struct rt_regmap_properties *props,
+				struct rt_regmap_fops *rops,
+				struct device *parent,
+				void *client, int slv_addr, void *drvdata);
+
+static inline struct rt_regmap_device*
 	rt_regmap_device_register(struct rt_regmap_properties *props,
 				struct rt_regmap_fops *rops,
 				struct device *parent,
-				void *client, void *drvdata);
+				struct i2c_client *client, void *drvdata)
+{
+	return rt_regmap_device_register_ex(props, rops, parent,
+		client, client->addr, drvdata);
+}
 
 extern void rt_regmap_device_unregister(struct rt_regmap_device *rd);
 

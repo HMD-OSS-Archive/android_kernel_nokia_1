@@ -16,9 +16,8 @@
 #include <dt-bindings/interrupt-controller/irq.h>
 #include "mt6735m-pinfunc.h"
 #include <dt-bindings/mmc/mt67xx-msdc.h>
-#ifdef CONFIG_MTK_DTBO_FEATURE
+
 /dts-v1/;
-#endif
 
 / {
 	model = "MT6735M";
@@ -29,8 +28,9 @@
 
 	/* chosen */
 	chosen: chosen {
-		bootargs = "console=tty0 console=ttyMT0,921600n1 root=/dev/ram \
-initrd=0x44000000,0x1000000 loglevel=8 androidboot.hardware=mt6735";
+		bootargs = "console=tty0 console=ttyMT3,921600n1 vmalloc=496M \
+androidboot.hardware=mt6735 slub_max_order=0 slub_debug=OFZPU \
+firmware_class.path=/vendor/firmware";
 	};
 
 /* Do not put any bus before mtk-msdc, because it should be mtk-msdc.0 for partition device node usage */
@@ -67,6 +67,9 @@ initrd=0x44000000,0x1000000 loglevel=8 androidboot.hardware=mt6735";
 	compatible = "microtrust,utos";
 	interrupts = <GIC_SPI 252 IRQ_TYPE_EDGE_RISING>,
 		<GIC_SPI 253 IRQ_TYPE_EDGE_RISING>;
+	};
+	utos_tester {
+		compatible = "microtrust,tester-v1";
 	};
 
 	cpus: cpus {
@@ -167,6 +170,15 @@ initrd=0x44000000,0x1000000 loglevel=8 androidboot.hardware=mt6735";
 						size = <0 0x100000>;
 						alignment = <0 0x200000>;
 				};
+
+#ifdef CONFIG_MICROTRUST_TEE_SUPPORT
+		soter-shared-mem {
+			compatible = "microtrust,shared_mem";
+			no-map;
+			size = <0 0x200000>;
+			alloc-ranges = <0 0x40000000 0 0x50000000>;
+		};
+#endif
 
 				spm-reserve-memory {
 					compatible = "mediatek,spm-reserve-memory";
@@ -665,6 +677,11 @@ initrd=0x44000000,0x1000000 loglevel=8 androidboot.hardware=mt6735";
 			compatible = "mediatek,hacc";
 			reg = <0x10008000 0x1000>;
 			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_LOW>;
+		};
+
+		/* hall sensor*/
+		kpd_slide: kpd_slide {
+			compatible = "mediatek, kpd_slide-eint";
 		};
 
 		als: als {
@@ -1207,6 +1224,31 @@ initrd=0x44000000,0x1000000 loglevel=8 androidboot.hardware=mt6735";
 			vtouch-supply = <&mt_pmic_vgp1_ldo_reg>;
 		};
 
+		/* charger IC start */
+		charger_bq: charger_bq@ {
+			compatible = "mediatek,charger_bq24157";
+		};
+		/* charger IC end */
+
+		/*.*/
+		rt9458@6a {
+			compatible = "richtek,rt9458";
+			reg = <0x6a>;
+			charger_name = "primary_charger";
+			ichg = <50000>;		/* 10uA */
+			/*
+			* For AICR, only support 100/500/700/1000mA/no limit
+			* Value higher than 1000mA stands for no limit
+			*/
+			aicr = <50000>;		/* 10uA */
+			mivr = <4500>;		/* mV */
+			cv = <4350000>;		/* uV */
+			ieoc = <150000>;	/* uA */
+			status = "okay";
+			enable_te;
+			enable_wdt;
+		};
+
 		accdet: accdet@ {
 			compatible = "mediatek,mt6735-accdet",
 						"mediatek,mt6735m-accdet";
@@ -1318,7 +1360,7 @@ initrd=0x44000000,0x1000000 loglevel=8 androidboot.hardware=mt6735";
 			audmiso-gpio = <144 0>;
 			audmosi-gpio = <145 0>;
 			vowclk-gpio = <148 0>;
-			extspkamp-gpio = <117 0>;
+			extspkamp-gpio = <78 0>;
 			i2s1clk-gpio = <80 0>;
 			i2s1dat-gpio = <78 0>;
 			i2s1mclk-gpio = <9 0>;
@@ -1421,7 +1463,7 @@ initrd=0x44000000,0x1000000 loglevel=8 androidboot.hardware=mt6735";
 			compatible = "mediatek,Mt_soc_pcm_hp_impedance";
 		};
 
-		mt_soc_codec_name {
+		extPAen:mt_soc_codec_name {
 			compatible = "mediatek,mt_soc_codec_63xx";
 		};
 
@@ -1912,7 +1954,7 @@ initrd=0x44000000,0x1000000 loglevel=8 androidboot.hardware=mt6735";
 			compatible = "android,firmware";
 			fstab {
 				compatible = "android,fstab";
-#ifndef CONFIG_MTK_AB_OTA_UPDATER
+#if !defined(CONFIG_SYSTEM_AS_ROOT) && !defined(CONFIG_MTK_AB_OTA_UPDATER)
 				system {
 					compatible = "android,system";
 					dev = "/dev/block/platform/mtk-msdc.0/11230000.msdc0/by-name/system";

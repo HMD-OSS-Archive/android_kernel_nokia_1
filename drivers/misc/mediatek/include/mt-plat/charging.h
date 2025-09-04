@@ -1,6 +1,5 @@
 /*
  * Copyright (C) 2015 MediaTek Inc.
- * Copyright (c) 2017 FIH Mobile Limited.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -114,6 +113,11 @@ typedef enum {
 	CHARGING_CMD_GET_CSDAC_FALL_FLAG,
 	CHARGING_CMD_SET_TA_CURRENT_PATTERN,
 	CHARGING_CMD_SET_ERROR_STATE,
+#if defined(CONFIG_FIH_PROJECT_NE1)
+	CHARGING_CMD_SET_SCV, // add for DPM.
+	CHARGING_CMD_GET_V_SAFE, //
+	CHARGING_CMD_GET_CHARGING_ENABLE, //
+#endif
 	CHARGING_CMD_DISO_INIT,
 	CHARGING_CMD_GET_DISO_STATE,
 	CHARGING_CMD_SET_VINDPM,
@@ -615,8 +619,17 @@ extern unsigned int g_bcct_flag;
 /* ============================================================ */
 /* External function */
 /* ============================================================ */
-extern signed int chr_control_interface(CHARGING_CTRL_CMD cmd, void *data);
+#if defined(CONFIG_CHARGER_RT9458)
+//add
+#if defined(CONFIG_MTK_BQ24157_SUPPORT)
+extern kal_bool bq24157_chargin_hw_init_done;
+extern signed int bq24157_chr_control_interface(CHARGING_CTRL_CMD cmd, void *data);
+#endif
 extern signed int rt9458_chr_control_interface(CHARGING_CTRL_CMD cmd, void *data);
+#else
+extern signed int chr_control_interface(CHARGING_CTRL_CMD cmd, void *data);
+#endif
+
 extern unsigned int upmu_get_reg_value(unsigned int reg);
 extern void Charger_Detect_Init(void);
 extern void Charger_Detect_Release(void);

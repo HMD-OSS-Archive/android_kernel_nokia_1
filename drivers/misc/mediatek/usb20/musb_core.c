@@ -1353,6 +1353,9 @@ void musb_start(struct musb *musb)
 	}
 
 	musb->is_active = 1;
+#ifdef CONFIG_DUAL_ROLE_USB_INTF
+	mt_usb_dual_role_changed(musb);
+#endif
 }
 
 void musb_generic_disable(struct musb *musb)
@@ -1430,6 +1433,9 @@ void musb_stop(struct musb *musb)
 	 *  - ...
 	 */
 	musb_platform_try_idle(musb, 0);
+#ifdef CONFIG_DUAL_ROLE_USB_INTF
+	mt_usb_dual_role_changed(musb);
+#endif
 }
 
 static void musb_shutdown(struct platform_device *pdev)
@@ -2414,6 +2420,10 @@ static int musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl
 #endif
 
 	status = musb_gadget_setup(musb);
+
+#ifdef CONFIG_DUAL_ROLE_USB_INTF
+	mt_usb_dual_role_init(musb);
+#endif
 
 	/*initial done, turn off usb */
 	musb_platform_disable(musb);

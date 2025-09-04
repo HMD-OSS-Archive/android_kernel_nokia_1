@@ -35,4 +35,8 @@ struct acc_hw {
 };
 
 int get_accel_dts_func(struct device_node *node, struct acc_hw*);
+
+// 
+struct acc_hw *fih_get_accel_dts_func(const char *name, struct acc_hw *hw);
+
 #endif

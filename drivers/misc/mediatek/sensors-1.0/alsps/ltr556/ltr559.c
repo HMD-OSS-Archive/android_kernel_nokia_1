@@ -222,6 +222,7 @@ static int ltr559_i2c_read_reg(u8 regnum)
 	mutex_unlock(&ltr559_mutex);
 	return reg_value[0];
 out:
+	printk("BBox::UEC;8::27\n");
 	mutex_unlock(&ltr559_mutex);
 	return res;
 }
@@ -497,6 +498,7 @@ static int ltr559_ps_read(struct i2c_client *client, u16 *data)
 	psval_lo = ltr559_i2c_read_reg(LTR559_PS_DATA_0);
 	APS_DBG("ps_rawdata_psval_lo = %d\n", psval_lo);
 	if (psval_lo < 0){
+		printk("BBox::UEC;8::75\n");
 	    APS_DBG("psval_lo error\n");
 		psdata = psval_lo;
 		goto out;
@@ -505,6 +507,7 @@ static int ltr559_ps_read(struct i2c_client *client, u16 *data)
 	psval_hi = ltr559_i2c_read_reg(LTR559_PS_DATA_1);
     APS_DBG("ps_rawdata_psval_hi = %d\n", psval_hi);
 	if (psval_hi < 0){
+		printk("BBox::UEC;8::75\n");
 	    APS_DBG("psval_hi error\n");
 		psdata = psval_hi;
 		goto out;
@@ -687,6 +690,8 @@ static int ltr559_als_read(struct i2c_client *client, u16* data)
 	APS_DBG("alsval_ch0_lo = %d,alsval_ch0_hi=%d,alsval_ch0=%d\n",
 			alsval_ch0_lo, alsval_ch0_hi, alsval_ch0);
 #endif
+	if((alsval_ch1_lo < 0) || (alsval_ch1_hi < 0) || (alsval_ch0_lo < 0) || (alsval_ch0_hi < 0))
+		printk("BBox::UEC;8::72\n");
     if((alsval_ch1==0)||(alsval_ch0==0))
     {
         luxdata_int = 0;
@@ -2434,6 +2439,7 @@ static int ltr559_i2c_probe(struct i2c_client *client, const struct i2c_device_i
 	deviceId = ltr559_i2c_read_reg(LTR559_MANUFACTURER_ID);
 	if (0 > deviceId)
 	{
+		printk("BBox::UEC;8::73\n");
 		APS_ERR("read LTR559_MANUFACTURER_ID failed. (%d)\n", deviceId);
 		goto exit_init_failed;
 	}
@@ -2520,6 +2526,7 @@ exit_init_failed:
 	kfree(obj);
 exit:
 	ltr559_i2c_client = NULL;
+	printk("BBox::UEC;8::35\n");
 	APS_ERR("%s: err = %d\n", __func__, err);
 	ltr559_init_flag =-1;
 	return err;

@@ -230,6 +230,7 @@ typedef struct disp_input_config_t {
 
 	uint32_t src_color_key;
 	uint32_t frm_sequence;
+	uint32_t dim_color;
 
 	void *dirty_roi_addr;
 	uint16_t dirty_roi_num;

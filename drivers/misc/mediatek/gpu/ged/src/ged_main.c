@@ -49,7 +49,6 @@
 
 #define GED_DRIVER_DEVICE_NAME "ged"
 
-#ifndef GED_BUFFER_LOG_DISABLE
 #ifdef GED_DEBUG
 #define GED_LOG_BUF_COMMON_GLES "GLES"
 static GED_LOG_BUF_HANDLE ghLogBuf_GLES;
@@ -62,7 +61,6 @@ static GED_LOG_BUF_HANDLE ghLogBuf_HWC;
 static GED_LOG_BUF_HANDLE ghLogBuf_HWC_ERR;
 #define GED_LOG_BUF_COMMON_FENCE "FENCE"
 static GED_LOG_BUF_HANDLE ghLogBuf_FENCE;
-#endif
 
 GED_LOG_BUF_HANDLE ghLogBuf_DVFS;
 GED_LOG_BUF_HANDLE ghLogBuf_ged_srv;
@@ -308,7 +306,6 @@ static struct miscdevice ged_dev = {
 
 static void ged_exit(void)
 {
-#ifndef GED_BUFFER_LOG_DISABLE
 #ifdef GED_DVFS_DEBUG_BUF
 	ged_log_buf_free(ghLogBuf_DVFS);
 	ged_log_buf_free(ghLogBuf_ged_srv);
@@ -327,7 +324,6 @@ static void ged_exit(void)
 	ghLogBuf_HWC = 0;
 	ged_log_buf_free(ghLogBuf_HWC_ERR);
 	ghLogBuf_HWC_ERR = 0;
-#endif
 
 	ged_dvfs_system_exit();
 
@@ -408,7 +404,6 @@ static int ged_init(void)
 		goto ERROR;
 	}
 
-#ifndef GED_BUFFER_LOG_DISABLE
 	/* common gpu info buffer */
 	ged_log_buf_alloc(32, 128 * 32, GED_LOG_BUF_TYPE_QUEUEBUFFER, "gpuinfo", "gpuinfo");
 
@@ -428,8 +423,6 @@ static int ged_init(void)
 	ghLogBuf_DVFS =  ged_log_buf_alloc(20*60*10, 20*60*10*80, GED_LOG_BUF_TYPE_RINGBUFFER, "DVFS_Log", "ged_dvfs_debug");
 #endif
 	ghLogBuf_ged_srv =  ged_log_buf_alloc(32, 32*80, GED_LOG_BUF_TYPE_RINGBUFFER, "ged_srv_Log", "ged_srv_debug");
-#endif
-
 #endif
 
 	return 0;

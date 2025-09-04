@@ -1,7 +1,6 @@
-/*
- * Copyright (c) 2017 FIH Mobile Limited.
- */
-
+/**+===========================================================================
+  File: proc_info.c
+============================================================================+*/
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
 #include <linux/seq_file.h>
@@ -11,14 +10,12 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
-#include <linux/delay.h>
+#include <linux/delay.h> 
 #include <linux/kthread.h>
 #include <linux/io.h>
-#include "../misc/mediatek/include/mt-plat/mt_boot_reason.h"
-#include "../misc/mediatek/aee/common/aee-common.h"
 
-#define FALSE  0
-#define TRUE   1
+#define FALSE 	0
+#define TRUE 	1
 
 #define SIZE_512M  (512*1024)  //kB
 #define SIZE_1GB   (1024*1024) //kB
@@ -28,18 +25,20 @@
 
 #define MEMINFO "/proc/meminfo"
 
+
 extern unsigned short fih_hwid;
-extern char *saved_command_line;
+
 extern int sec_schip_enabled(void);
 
 //extern unsigned short fih_gethwid(void);
 extern unsigned short fih_get_memory_type(void);
-extern unsigned short fih_get_memory_vendor(void);
+extern unsigned short fih_get_memory_vendor(void); 
 extern unsigned long long fih_get_emmc_size(void);
 extern unsigned long long fih_get_emmc_usersize(void);
-extern unsigned int fih_get_ramtest_result(void);
-
+extern unsigned int fih_get_ramtest_result(void); //sunjie +
+#ifdef CONFIG_FIH_PROJECT_FRT
 char nfc_hw_support[16] = {'\0'};
+#endif
 
 static char causeStr[99];
 static char *fver_preload;
@@ -64,7 +63,6 @@ static unsigned long long mtk_emmc_size = 0;
 static char *root_status_load;
 static int root_status_len = 4096;
 static bool open_already = 0;
-static int root_cda_user_flag = 0;
 
 int devmodel_init = 0;
 static char str_project[3];
@@ -72,11 +70,11 @@ static int sim_card_slot;
 
 #define FIH_PROC_DIR   "AllHWList"
 #define FIH_PROC_PATH  "AllHWList/draminfo"
-#define FIH_PROC_TESTRESULT_PATH  "dramtest_result" //"AllHWList/dramtest_result"
+#define FIH_PROC_TESTRESULT_PATH  "dramtest_result" //"AllHWList/dramtest_result"//HCLai add for memory test in RUNIN
 #define FIH_PROC_SIZE  32
 
 static char fih_proc_data[FIH_PROC_SIZE] = "";
-static char fih_proc_test_result[FIH_PROC_SIZE] = {0};
+static char fih_proc_test_result[FIH_PROC_SIZE] = {0};//HCLai add for memory test in RUNIN
 
 #define FIH_MEM_ST_HEAD  0x6400000  /* HFME */
 #define FIH_MEM_ST_TAIL  0x1400000  /* EMFT */
@@ -89,34 +87,39 @@ struct st_fih_mem {
 	unsigned int mfr_id;
 	unsigned int ddr_type;
 	unsigned int size_mb;
-	unsigned int test_result;
+	unsigned int test_result;//HCLai add for memory test in RUNIN
 	unsigned int tail;
 };
 struct st_fih_mem dram;
 
 static void fih_dram_setup_MEM(void)
 {
-	char *buf = fih_proc_data;
-	struct st_fih_mem *p;
 	char size[16];
+	struct st_fih_mem *p;
+	char *buf = fih_proc_data;
 
 	/* get dram in mem which lk write */
 	p = (struct st_fih_mem *)ioremap(FIH_MEM_MEM_ADDR, sizeof(struct st_fih_mem));
-	if (p == NULL) {
+
+	if (p == NULL)
+	{
 		pr_err("%s: ioremap fail\n", __func__);
 		dram.head = FIH_MEM_ST_HEAD;
 		dram.mfr_id = 0;
 		dram.ddr_type = 0;
 		dram.size_mb = 0;
-		dram.test_result = 0;
+		dram.test_result = 0;//HCLai add for memory test in RUNIN
 		dram.tail = FIH_MEM_ST_TAIL;
-	} else {
+	}
+	else
+	{
 		memcpy(&dram, p, sizeof(struct st_fih_mem));
 		iounmap(p);
 	}
 
 	/* check magic of dram */
-	if ((dram.head != FIH_MEM_ST_HEAD)||(dram.tail != FIH_MEM_ST_TAIL)) {
+	if ((dram.head != FIH_MEM_ST_HEAD)||(dram.tail != FIH_MEM_ST_TAIL))
+	{
 		pr_err("%s: bad magic\n", __func__);
 		dram.head = FIH_MEM_ST_HEAD;
 		dram.mfr_id = 0;
@@ -126,7 +129,8 @@ static void fih_dram_setup_MEM(void)
 		dram.tail = FIH_MEM_ST_TAIL;
 	}
 
-	switch (dram.mfr_id) {
+	switch (dram.mfr_id)
+	{
 		case 0x01: strcat(buf, "SAMSUNG"); break;
 		case 0x03: strcat(buf, "ELPIDA"); break;
 		case 0x06: strcat(buf, "SK-HYNIX"); break;
@@ -134,39 +138,49 @@ static void fih_dram_setup_MEM(void)
 		default: strcat(buf, "UNKNOWN"); break;
 	}
 
-	switch (dram.ddr_type) {
+	switch (dram.ddr_type)
+	{
 		case 2: strcat(buf, " LPDDR2"); break;
 		case 5: strcat(buf, " LPDDR3"); break;
 		default: strcat(buf, " LPDDRX"); break;
 	}
 
 	snprintf(size, sizeof(size), " %dMB", dram.size_mb);
-	strcat(buf, size);
+	strcat(buf, size); 
 
+	//HCLai add for memory test in RUNIN START
 	//To-Do: use switch case to identify PASS/FAIL
 	snprintf(fih_proc_test_result, sizeof(fih_proc_test_result), "%d", dram.test_result);
+	//HCLai add for memory test in RUNIN END
 }
+//sunjie + for runin
 
 static int draminfo_test_result_wtite(struct file *flip,const char __user *buf,size_t count,loff_t *f_pos)
 {
 	char temp[32] = {'\0'};
+
 	if(copy_from_user(temp, buf, count))
 		return -EFAULT;
+
 #if 0
-		struct st_fih_mem *mem = (struct st_fih_mem *)FIH_MEM_MEM_ADDR;
+	struct st_fih_mem *mem = (struct st_fih_mem *)FIH_MEM_MEM_ADDR;
 	//dprintf(INFO, "fih_mem_exit and set mem address %p\n",mem);
-	 if (FIH_MEM_MEM_SIZE < sizeof(struct st_fih_mem)) {
+	if (FIH_MEM_MEM_SIZE < sizeof(struct st_fih_mem))
+	{
 		printk("%s: memory is too small\n", __func__);
 		return ;
 	}
-	strcpy(mem->test_result,temp);
+	strcpy(mem->test_result,temp);  
 #endif
+
 	memset(fih_proc_test_result, 0, sizeof(fih_proc_test_result));
 	strcpy(fih_proc_test_result, temp);
+
 	return count;
 	//snprintf(fih_proc_test_result, sizeof(fih_proc_test_result), "%d", simple_strtol(temp,NULL,0));
 }
 
+/**************************************************************************/
 static int fver_show(struct seq_file *s, void *unused)
 {
 	struct file *fver_filp = NULL;
@@ -176,18 +190,17 @@ static int fver_show(struct seq_file *s, void *unused)
 	{
 		oldfs = get_fs();
 		set_fs(KERNEL_DS);
-		fver_filp = filp_open(fver_BLOCK, O_RDONLY, 0);
+		fver_filp = filp_open(FVER_BLOCK, O_RDONLY, 0);
 
 		if(!IS_ERR(fver_filp))
 		{
 			fver_filp->f_op->read(fver_filp, fver_preload, sizeof(char)*fver_len, &fver_filp->f_pos);
 			filp_close(fver_filp, NULL);
 			fver_open_times++;
-			seq_printf(s, "%s\n", fver_preload);
 		}
 		else
 		{
-			printk("[dw]open %s fail\n", fver_BLOCK);
+			printk("[dw]open %s fail\n", FVER_BLOCK);
 		}
 
 		set_fs(oldfs);
@@ -234,12 +247,11 @@ static void get_emmc_vendor_and_size(void)
 {
 	u8 samsung_cid = 0x15;
 	u8 hynix_cid = 0x90;
-	u8 micron_cid = 0xfe;
+	// Sunyongshan
+	u8 micron_cid = 0x13;	// 0xfe
 	u8 sandisk_cid = 0x45;
 	u8 kingston_cid = 0x70;
 	u8 toshiba_cid = 0x11;
-	u8 biwin_cid = 0xF4;
-	u8 longsys_cid = 0x88;
 
 	unsigned short hw_preload = 0, num = 0;
 
@@ -274,18 +286,10 @@ static void get_emmc_vendor_and_size(void)
 	{
 		strcpy(fih_emmc_vendor, "Toshiba");
 	}
-	else if (memcmp(mem_cid, &biwin_cid, 1) == 0)
-	{
-		strcpy(fih_emmc_vendor, "Biwin");
-	}
-	else if (memcmp(mem_cid, &longsys_cid, 1) == 0)
-	{
-		strcpy(fih_emmc_vendor, "Longsys");
-	}
 
 	if(mtk_emmc_size == 0)
 	{
-		mtk_emmc_size = fih_get_emmc_size();
+		mtk_emmc_size = fih_get_emmc_size(); 
 	}
 
 	if(mtk_emmc_size/(SIZE_1GB_EMMC) < 4)
@@ -304,10 +308,10 @@ static void get_emmc_vendor_and_size(void)
 	{
 		strcpy(fih_emmc_size,"32GB");
 	}
-	else if(mtk_emmc_size/(SIZE_1GB_EMMC) > 0x20 && mtk_emmc_size/(SIZE_1GB_EMMC) <= 0x40)
-	{
-		strcpy(fih_emmc_size,"64GB");
-	}
+    else if(mtk_emmc_size/(SIZE_1GB_EMMC) > 0x20 && mtk_emmc_size/(SIZE_1GB_EMMC) <= 0x40)
+    {
+        strcpy(fih_emmc_size,"64GB");
+    }
 
 	strcpy(fih_emmc_info, fih_emmc_vendor);
 	strcat(fih_emmc_info, fih_emmc_size);
@@ -367,6 +371,7 @@ static bool fih_read_meminfo(char *temp, int size)
 	return ret;
 }
 
+/*qyf end*/
 static int dram_show(struct seq_file *s, void *unused)
 {
 	char info[30];
@@ -389,7 +394,7 @@ static int dram_show(struct seq_file *s, void *unused)
 
 	printk("qyf memory_type = 0x%x, ddr_verdor =0x%x\n", memory_type, ddr_verdor);
 
-	/* nuc start for fqc info show*/
+	/* nuc start for fqc info show @07/03/2013 */
 	if((memory_type & 0xF00) != 0)   //for EMCP project:H1M
 	{
 		printk("qyf111 fih_emmc_vendor = %s\n", fih_emmc_vendor);
@@ -407,7 +412,7 @@ static int dram_show(struct seq_file *s, void *unused)
 		}
 		else if(ddr_verdor == 0x3)
 		{
-			strcpy(fih_dram_vendor, "Biwin");
+			strcpy(fih_dram_vendor, "Elpida");
 		}
 		else if(ddr_verdor == 0x5)
 		{
@@ -416,10 +421,6 @@ static int dram_show(struct seq_file *s, void *unused)
 		else if(ddr_verdor == 0x6)
 		{
 			strcpy(fih_dram_vendor, "Hynix");
-		}
-		else if(ddr_verdor == 0xFF)
-		{
-			strcpy(fih_dram_vendor, "Longsys");
 		}
 	}
 
@@ -432,6 +433,7 @@ static int dram_show(struct seq_file *s, void *unused)
 	for(i = 0; i < 30; i++)
 	{
 		//printk("%s: qyf info[%d] = %d \n", __func__,  i, info[i]);
+
 		if(info[i] >= '0' && info[i] <= '9')
 		{
 			size[count] = info[i];
@@ -449,9 +451,7 @@ static int dram_show(struct seq_file *s, void *unused)
 
 	printk("%s: qyf %d \n", __func__, final);
 
-	if(final <= SIZE_512M)
-		strcpy(fih_dram_size, "512");
-	else if(final >= SIZE_512M && final <= SIZE_1GB)
+	if(final >= SIZE_512M && final <= SIZE_1GB)
 		strcpy(fih_dram_size, "1GB");
 	else if(final >= SIZE_1GB && final <= SIZE_2GB)
 		strcpy(fih_dram_size, "2GB");
@@ -476,12 +476,14 @@ static int dram_show(struct seq_file *s, void *unused)
 static int emmc_show(struct seq_file *s, void *unused)
 {
 	extern u8 mem_cid[9];
+
 	unsigned short hw_preload = 0,emmc_num = 0;
 
 	emmc_num = (fih_hwid >> 4) & 0x00F;
 	hw_preload = (fih_hwid >> 8) & 0x00F;
 
-	get_emmc_vendor_and_size();  /* nuc start for fqc info show */
+	get_emmc_vendor_and_size();		/* nuc start for fqc info show */
+
 	seq_printf(s, "%s\n", model[hw_preload].emmc);
 
 	return 0;
@@ -511,6 +513,7 @@ static int cpu_show(struct seq_file *s, void *unused)
 	unsigned short hw_project = (fih_hwid >> 8) & 0x00F;
 
 	printk("%s: cpu_name = %s\n", __func__, model[hw_project].cpu_name);
+
 	seq_printf(s,"%s\n", model[hw_project].cpu_name);
 
 	return 0;
@@ -520,7 +523,7 @@ static char fih_lcm_info[256] = "unknown";
 
 static int lcm_show(struct seq_file *s, void *unused)
 {
-	//add for ZM1 FQC lcm info.
+	//add for ZM1 FQC lcm info by alex 20151106.
 	if (!strcmp(fih_lcm_info, "nt35521_hd720_dsi_vdo_innolux"))
 	{
 		seq_printf(s, "NT35521 5.0' 720P\n");
@@ -758,6 +761,7 @@ static int lcm_info_write(struct file *flip, const char __user *buf, size_t coun
 	return count;
 }
 
+//sunjie +
 #if 0
 static int ram_result_show(struct seq_file *s, void *unused)
 {
@@ -767,6 +771,7 @@ static int ram_result_show(struct seq_file *s, void *unused)
         return 0;
 }
 #endif
+//sunjie +
 
 static int fih_proc_test_result_show(struct seq_file *m, void *v)
 {
@@ -776,7 +781,6 @@ static int fih_proc_test_result_show(struct seq_file *m, void *v)
 	seq_printf(m, "%s\n", fih_proc_test_result);
 	return 0;
 }
-
 static int draminfo_test_result_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, fih_proc_test_result_show, &inode->i_private);
@@ -798,7 +802,6 @@ static int imei_write(struct file *flip, const char __user *buf, size_t count, l
 
 	return count;
 }
-
 static int imei2_write(struct file *flip, const char __user *buf, size_t count, loff_t *f_pos)
 {
 	char temp[25] = {'\0'};
@@ -823,7 +826,7 @@ static int cavis_d_write(struct file *flip, const char __user *buf, size_t count
 	if(copy_from_user(temp, buf, count))
 		return -EFAULT;
 
-	memset(temp+2, 0, sizeof(temp)-2);
+	memset(temp+2, 0, sizeof(temp));
 	fih_write_CAVIS(temp, 1);
 
 	return count;
@@ -836,7 +839,7 @@ static int cavis_r_write(struct file *flip, const char __user *buf, size_t count
 	if(copy_from_user(temp, buf, count))
 		return -EFAULT;
 
-	memset(temp+2,0,sizeof(temp)-2);
+	memset(temp+2,0,sizeof(temp));
 	fih_write_CAVIS(temp,2);
 
 	return count;
@@ -902,8 +905,11 @@ static int hwidv_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
+//jennyxu add audio [
 static int audio_info_show(struct seq_file *s, void *unused)
-{
+{    
+
+//cloudie modify for NE1 [
 #if 0
 	unsigned short project_id = (fih_hwid >> 8) & 0x00F;
 
@@ -912,12 +918,16 @@ static int audio_info_show(struct seq_file *s, void *unused)
 
 	return 0;
 #endif
-	char audio_parameters_version[10] = "5719";
-	printk("audio parameters version: %s\n",audio_parameters_version);
-	seq_printf(s, "%s\n",audio_parameters_version );
+
+ 	char audio_parameters_version[10] = "6445";
+ 	printk("audio parameters version: %s\n",audio_parameters_version);
+	seq_printf(s, "%s\n",audio_parameters_version );	
 	return 0;
+//cloudie modify for NE1 ]
+
 }
 
+/*jennyxu @20150717 add for audio parameter version show*/
 static int audio_info_write(struct file *flip, const char __user *buf, size_t count, loff_t *f_pos)
 {
     unsigned short project_id = (fih_hwid >> 8) & 0x000F;
@@ -926,6 +936,7 @@ static int audio_info_write(struct file *flip, const char __user *buf, size_t co
     int i;
     char *para = model[project_id].audio_para;
 
+    /*jennyxu modify for G42 audio info show bug @20151215*/
     memset(model[project_id].audio_para, 0, 30);
     printk("audio_info_write para=%s,model[project_id].model_name=%s\n", para,model[project_id].model_name);
     //the default count is 6
@@ -940,9 +951,9 @@ static int audio_info_write(struct file *flip, const char __user *buf, size_t co
         *(para + i) = *(kbuf + i);
     }
     *(para + i) = '\0';
-
+ 
     printk("audio_info_write  para=%s\n", para);
-    return count;
+    return count;	
 }
 //jennyxu add audio ]
 static int uicolor_show(struct seq_file *s,void *unused)
@@ -1002,7 +1013,7 @@ static int sim_card_slot_write(struct file *flip,const char __user *buf,size_t c
 };
 
 static int hwid_info_show(struct seq_file *s, void *unused)
-{
+{	
 	unsigned short hw_preload = 0, project_id = 0, phase_id = 0, module_id = 0;
 
 	project_id = (fih_hwid >> 8) & 0x00f;
@@ -1065,7 +1076,7 @@ static int root_status_info_show(struct seq_file *s, void *unused)
 }
 
 static int efuse_enabled_show(struct seq_file *s, void *unused)
-{
+{	
 	int sec_en = 0xff;
 
 	sec_en = sec_schip_enabled();
@@ -1108,6 +1119,7 @@ static int sim_number_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
+#ifdef CONFIG_FIH_PROJECT_FRT
 static int nfc_support_show(struct seq_file *s, void *unused)
 {
 	unsigned short project_id = 0, phase_id = 0, module_id = 0;
@@ -1122,7 +1134,7 @@ static int nfc_support_show(struct seq_file *s, void *unused)
 
 	return 0;
 }
-
+#endif
 static int fqc_xml_path_show(struct seq_file *s, void *unused)
 {
 	unsigned short project_id = 0, phase_id = 0, module_id = 0;
@@ -1133,86 +1145,38 @@ static int fqc_xml_path_show(struct seq_file *s, void *unused)
 
 	printk("%s: %s\n", __func__, model[project_id].sim_num);
 
+#ifdef CONFIG_FIH_PROJECT_NE1
 	if(0 == strncmp(model[project_id].sim_num, "DUAL", strlen("DUAL")))
 	{
-		seq_printf(s, "%s\n", "system/etc/fqc_ds_FRT.xml");
+		seq_printf(s, "%s\n", "vendor/etc/fqc_ds_NE1.xml");
 	}
 	else if(0 == strncmp(model[project_id].sim_num, "Single", strlen("Single")))
 	{
-		seq_printf(s, "%s\n", "system/etc/fqc_ss_FRT.xml");
+		seq_printf(s, "%s\n", "vendor/etc/fqc_ss_NE1.xml");
 	}
 	else
 	{
 		printk("%s: SIM Number Check ERROR\n", __func__);
 
-		seq_printf(s, "%s\n", "system/etc/fqc_ds_FRT.xml");
+		seq_printf(s, "%s\n", "vendor/etc/fqc_ds_NE1.xml");
 	}
-
-	return 0;
-}
-
-static int cda_user_read_show(struct seq_file *m, void *v)
-{
-	seq_printf(m, "%d\n", root_cda_user_flag);
-	return 0;
-}
-
-static int cda_user_proc_write(struct file *file, const char  __user *buffer,
-                                        size_t count, loff_t *data)
-{
-	struct manuf_data fih_proinfo_data;
-	char tmp[16] = {0};
-	int access = 0;
-
-	if ( copy_from_user(tmp, buffer, count) ) {
-		return -EFAULT;
-	}
-
-	memset(&fih_proinfo_data, 0, sizeof(struct manuf_data));
-
-	access = read_ef(&fih_proinfo_data);
-	if ((FILE_NOT_FOUND == access) || (FILE_CORRUPTED == access))
+#else
+	if(0 == strncmp(model[project_id].sim_num, "DUAL", strlen("DUAL")))
 	{
-		printk("cda_user_proc_writ: Read failed\n");
-		return READ_MANUFACTURE_FAIL;
+		seq_printf(s, "%s\n", "vendor/etc/fqc_ds_FRT.xml");
 	}
-
-	root_cda_user_flag = simple_strtoull(tmp, NULL, 0);
-
-	switch (root_cda_user_flag) {
-	case FIH_CDA_KERN_USER:
-		fih_proinfo_data.rootflag.status = FIH_CDA_STAT_USER;
-		break;
-	case FIH_CDA_KERN_ROOT:
-		fih_proinfo_data.rootflag.status = FIH_CDA_STAT_ROOT;
-		break;
-	default:
-		fih_proinfo_data.rootflag.status = FIH_CDA_STAT_ROOT;
-		break;
-	}
-	access = write_ef(&fih_proinfo_data);
-	if ((FILE_NOT_FOUND == access) || (FILE_CORRUPTED == access))
+	else if(0 == strncmp(model[project_id].sim_num, "Single", strlen("Single")))
 	{
-		printk("cda_user_proc_write: write_ef\n");
-		return WRITE_MANUFACTURE_FAIL;
+		seq_printf(s, "%s\n", "vendor/etc/fqc_ss_FRT.xml");
 	}
-	return count;
-}
+	else
+	{
+		printk("%s: SIM Number Check ERROR\n", __func__);
 
-static int skuid_show(struct seq_file *s, void *unused)
-{
-	char fih_skuid[30];
-	char *p, *q;
+		seq_printf(s, "%s\n", "vendor/etc/fqc_ds_FRT.xml");
+	}
+#endif
 
-	p = strstr(saved_command_line, "fih_skuid=");
-	if (p == NULL) return 0;
-	p = p+10;
-	q = p;
-	while(*q != ' ') q++;
-	strncpy(fih_skuid, p, (int)(q-p));
-	printk("%s: fih_skuid=%s\n", __func__, fih_skuid);
-
-	seq_printf(s, "%s\n", fih_skuid);
 
 	return 0;
 }
@@ -1223,12 +1187,12 @@ static int baseband_open(struct inode *inode, struct file *file)
 	return single_open(file, baseband_show, &inode->i_private);
 }
 
-static int baseband_settings_open(struct inode *inode, struct file *file)
+static int baseband_settings_open(struct inode *inode, struct file *file) 
 {
 	return single_open(file, baseband_settings_show, &inode->i_private);
 }
 
-static int pcba_description_open(struct inode *inode, struct file *file)
+static int pcba_description_open(struct inode *inode, struct file *file) 
 {
 	return single_open(file, pcba_description_show, &inode->i_private);
 }
@@ -1335,7 +1299,7 @@ static int audio_info_open(struct inode *inode, struct file *file)
 	return single_open(file, audio_info_show, &inode->i_private);
 }
 
-static int hwid_info_open(struct inode *inode, struct file *file)
+static int hwid_info_open(struct inode *inode, struct file *file)    
 {
 	return single_open(file, hwid_info_show, &inode->i_private);
 }
@@ -1344,11 +1308,6 @@ static int root_status_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, root_status_info_show, &inode->i_private);
 }
-
-static int cda_user_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, cda_user_read_show, &inode->i_private);
-};
 
 static int uicolor_open(struct inode *inode, struct file *file)
 {
@@ -1380,19 +1339,15 @@ static int sim_number_open(struct inode *inode, struct file *file)
 	return single_open(file, sim_number_show, &inode->i_private);
 }
 
+#ifdef CONFIG_FIH_PROJECT_FRT
 static int nfc_support_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, nfc_support_show, &inode->i_private);
 }
-
+#endif		
 static int fqc_xml_path_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, fqc_xml_path_show, &inode->i_private);
-}
-
-static int skuid_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, skuid_show, &inode->i_private);
 }
 
 
@@ -1405,7 +1360,7 @@ static const struct file_operations fver_fops = {
 
 static const struct file_operations model_fops = {
         .open        = model_open,
-        .write       = model_write,
+        .write		 = model_write,
         .read        = seq_read,
         .llseek      = seq_lseek,
         .release     = single_release,
@@ -1427,7 +1382,7 @@ static const struct file_operations emmc_fops = {
 
 static const struct file_operations poweroncause_fops = {
         .open        = poweroncause_open,
-	.write		= poweroncause_write,
+		.write		 = poweroncause_write,
         .read        = seq_read,
         .llseek      = seq_lseek,
         .release     = single_release,
@@ -1538,7 +1493,7 @@ static const struct file_operations module_fops = {
 
 static const struct file_operations pid_fops = {
         .open        = pid_open,
-	.write		 = pid_write,
+		.write		 = pid_write,
         .read        = seq_read,
         .llseek      = seq_lseek,
         .release     = single_release,
@@ -1546,7 +1501,7 @@ static const struct file_operations pid_fops = {
 
 static const struct file_operations touch_fops = {
         .open        = touch_open,
-	.write		 = touch_write,
+		.write		 = touch_write,
         .read        = seq_read,
         .llseek      = seq_lseek,
         .release     = single_release,
@@ -1554,25 +1509,28 @@ static const struct file_operations touch_fops = {
 
 static const struct file_operations lcm_info_fops = {
         .open        = lcm_info_open,
-	.write		= lcm_info_write,
+		.write		 = lcm_info_write,
         .read        = seq_read,
         .llseek      = seq_lseek,
         .release     = single_release,
 };
 
+//jennyxu add audio [
 static const struct file_operations AUDIO_para_info_fops = {
         .open        = audio_info_open,
-	.write= audio_info_write,
+		.write		 = audio_info_write,
         .read        = seq_read,
         .llseek      = seq_lseek,
         .release     = single_release,
 };
+//jennyxu add audio ]
 
+//sunjie + for RUNIN
 static struct file_operations draminfo_test_result_ops = {
 	.owner   = THIS_MODULE,
-	.open    = draminfo_test_result_open,
+	.open    = draminfo_test_result_open,	
 	.read    = seq_read,
-	.write   = draminfo_test_result_wtite,
+	.write		 = draminfo_test_result_wtite,  /*sunjie +*/
 	.llseek  = seq_lseek,
 	.release = single_release
 };
@@ -1591,42 +1549,34 @@ static const struct file_operations root_status_fops = {
 	.release	 = single_release,
 };
 
-static const struct file_operations cda_user_file_ops = {
-	.open    = cda_user_proc_open,
-	.read    = seq_read,
-	.write   = cda_user_proc_write,
-	.llseek  = seq_lseek,
-	.release = single_release
-};
-
 static const struct file_operations uicolor_fops = {
-	.open		 =  uicolor_open,
-	.write		 =  uicolor_write,
-	.read		 =  seq_read,
-	.llseek		 =  seq_lseek,
-	.release	 =  single_release,
+		.open		 =  uicolor_open,
+		.write		 =  uicolor_write,
+		.read		 =  seq_read,
+		.llseek		 =  seq_lseek,
+		.release	 =  single_release,
 };
 
 static const struct file_operations hwid_info_fops = {
-	.open		 =  hwid_info_open,
-	.read		 =  seq_read,
-	.llseek		 =  seq_lseek,
-	.release	 =  single_release,
+		.open		 =  hwid_info_open,
+		.read		 =  seq_read,
+		.llseek		 =  seq_lseek,
+		.release	 =  single_release,
 };
 
 static const struct file_operations sim_card_slot_fops = {
-	.open		 =  sim_card_slot_open,
-	.write		 =  sim_card_slot_write,
-	.read		 =  seq_read,
-	.llseek		 =  seq_lseek,
-	.release	 =  single_release,
+		.open		 =  sim_card_slot_open,
+		.write		 = 	sim_card_slot_write,
+		.read		 =  seq_read,
+		.llseek		 =  seq_lseek,
+		.release	 =  single_release,
 };
 
 static const struct file_operations bandinfo_fops = {
-	.open		 =  bandinfo_open,
-	.read		 =  seq_read,
-	.llseek		 =  seq_lseek,
-	.release	 =  single_release,
+		.open		 =  bandinfo_open,
+		.read		 =  seq_read,
+		.llseek		 =  seq_lseek,
+		.release	 =  single_release,
 };
 
 static const struct file_operations efuse_state_fops = {
@@ -1637,8 +1587,8 @@ static const struct file_operations efuse_state_fops = {
 };
 
 static const struct file_operations otg_last_flag_fops = {
-	.open        = otg_last_flag_open,
-	.write       = otg_last_flag_write,
+		.open        = otg_last_flag_open,
+		.write		 = otg_last_flag_write,
         .read        = seq_read,
         .llseek      = seq_lseek,
         .release     = single_release,
@@ -1651,12 +1601,14 @@ static const struct file_operations sim_number_fops = {
         .release     = single_release,
 };
 
+#ifdef CONFIG_FIH_PROJECT_FRT
 static const struct file_operations nfc_support_fops = {
         .open        = nfc_support_open,
         .read        = seq_read,
         .llseek      = seq_lseek,
         .release     = single_release,
 };
+#endif
 
 static const struct file_operations fqc_xml_path_fops = {
         .open        = fqc_xml_path_open,
@@ -1664,13 +1616,9 @@ static const struct file_operations fqc_xml_path_fops = {
         .llseek      = seq_lseek,
         .release     = single_release,
 };
+	
 
-static const struct file_operations skuid_fops = {
-        .open        = skuid_open,
-        .read        = seq_read,
-        .llseek      = seq_lseek,
-        .release     = single_release,
-};
+/*******************************************************************************************************************************************/
 
 static int dec2hex_under100(int num_dec)
 {
@@ -1686,40 +1634,56 @@ static int fs_get_hwid_num(void)
 {
 	mm_segment_t oldfs;
 	struct file *fdata_filp = NULL;
+	loff_t pos = 0;
+	int i;
 
 	char hwid_num = 0;
 	char hwid_tag[FIH_HWID_TAG_SIZE] = {0};
 
+	printk("fs_get_hwid_num() fih_hwid=0X%x.\n",fih_hwid);
+
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 
-	fdata_filp = filp_open(FIH_HWID_INFO, O_RDONLY, 0);
-
-	if(!IS_ERR(fdata_filp))
+	for(i=0;i<50;i++)
 	{
-		fdata_filp->f_op->llseek(fdata_filp, 0, SEEK_SET);
-		fdata_filp->f_op->read(fdata_filp, hwid_tag, FIH_HWID_TAG_SIZE, &fdata_filp->f_pos);
+		fdata_filp = filp_open(FIH_HWID_INFO, O_RDONLY, 0);
 
-		if(0 == strncmp(hwid_tag, "FIH_HWID_INFO", strlen("FIH_HWID_INFO")))
+		if(!IS_ERR(fdata_filp))
 		{
-			fdata_filp->f_op->llseek(fdata_filp, FIH_HWID_TAG_SIZE, SEEK_SET);
-			fdata_filp->f_op->read(fdata_filp, &hwid_num, 1, &fdata_filp->f_pos);
 
-			hwid_num = dec2hex_under100(hwid_num);
+			//fdata_filp->f_op->llseek(fdata_filp, 0, SEEK_SET);
+
+			//fdata_filp->f_op->read(fdata_filp, hwid_tag, 13, &fdata_filp->f_pos);
+			vfs_read(fdata_filp, (char __user *)hwid_tag, FIH_HWID_TAG_SIZE, &pos);
+			//printk("fs_get_hwid_num() read hwid_tag OK!\n");
+
+			if(0 == strncmp(hwid_tag, "FIH_HWID_INFO", strlen("FIH_HWID_INFO")))
+			{
+
+				//fdata_filp->f_op->llseek(fdata_filp, FIH_HWID_TAG_SIZE, SEEK_SET);
+				pos=0+FIH_HWID_TAG_SIZE;
+				vfs_read(fdata_filp, (char __user *)&hwid_num, 1, &pos);
+				//fdata_filp->f_op->read(fdata_filp, &hwid_num, 1, &fdata_filp->f_pos);
+
+				hwid_num = dec2hex_under100(hwid_num);
+				//printk("fs_get_hwid_num() read hwid_num OK.\n");
+			}
+			else
+			{
+				hwid_num = 0;
+				printk("fs_get_hwid_num() check hwid_info failed! (err=%x)\n", IS_ERR(fdata_filp));
+			}
+			filp_close(fdata_filp, NULL);
+			//printk("fs_get_hwid_num() Read hwid_info Success!\n");
+			break;
 		}
 		else
 		{
 			hwid_num = 0;
-			printk("fs_get_hwid_num() check hwid_info error!\n");
+			printk("fs_get_hwid_num() Read hwid_info failed!\n");
 		}
-
-		filp_close(fdata_filp, NULL);
-		printk("fs_get_hwid_num() Read hwid_info Success!\n");
-	}
-	else
-	{
-		hwid_num = 0;
-		printk("fs_get_hwid_num() Read hwid_info failed!\n");
+		msleep(100);
 	}
 
 	set_fs(oldfs);
@@ -1730,6 +1694,7 @@ static void fs_read_hwid_info(char *temp, int offset, int size)
 {
 	struct file *fdata_filp = NULL;
 	mm_segment_t oldfs;
+	loff_t pos = 0;
 
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
@@ -1738,9 +1703,11 @@ static void fs_read_hwid_info(char *temp, int offset, int size)
 
 	if(!IS_ERR(fdata_filp))
 	{
-		fdata_filp->f_op->llseek(fdata_filp, offset, SEEK_SET);
-		fdata_filp->f_op->read(fdata_filp, temp, size, &fdata_filp->f_pos);
-
+		pos=0+offset;
+		//fdata_filp->f_op->llseek(fdata_filp, offset, SEEK_SET);
+		//fdata_filp->f_op->read(fdata_filp, temp, size, &fdata_filp->f_pos);
+		vfs_read(fdata_filp, (char __user *)temp, size, &pos);
+		//printk("fs_read_hwid_info read OK!!!!!!!\n");
 		filp_close(fdata_filp, NULL);
 		printk("fs_read_hwid_info() Read hwid_info Success!\n");
 	}
@@ -1752,7 +1719,7 @@ static void fs_read_hwid_info(char *temp, int offset, int size)
 	set_fs(oldfs);
 }
 
-static void fih_read_hwid_info(void)
+int fih_read_hwid_info(void *x)
 {
 	int i = 0;
 	char fih_hwid_num = 0;
@@ -1760,7 +1727,7 @@ static void fih_read_hwid_info(void)
 	struct fih_hwid_info *hwid_info_tabel = NULL;
 
 	unsigned short hw_project = 0, hw_phase = 0, hw_module = 0;
-
+	
 	hw_project = (fih_hwid >> 8) & 0xF;
 	hw_phase   = (fih_hwid >> 4) & 0xF;
 	hw_module  = fih_hwid  & 0xF;
@@ -1779,18 +1746,20 @@ static void fih_read_hwid_info(void)
 
 			printk("fih_read_hwid_info() kmalloc Failed!\n");
 
-			return;
+			return 1;
 		}
 
 		memset(hwid_info_tabel, 0, sizeof(struct fih_hwid_info)*fih_hwid_num);
 
-		fs_read_hwid_info(hwid_info_tabel, FIH_HWID_TAG_SIZE*2, sizeof(struct fih_hwid_info)*fih_hwid_num);
+		fs_read_hwid_info((char *)hwid_info_tabel, FIH_HWID_TAG_SIZE*2, sizeof(struct fih_hwid_info)*fih_hwid_num);
 
 		for(i = 0; i < fih_hwid_num; i++, hwid_info_tabel++)
 		{
 			if((hwid_info_tabel->project_id == hw_project) &&
 				(hwid_info_tabel->phase_id == hw_phase) && (hwid_info_tabel->module_id == hw_module))
 			{
+				printk("fih_read_hwid_info() prj=%x phase=%x rf=%x\n",hwid_info_tabel->project_id,hwid_info_tabel->phase_id,hwid_info_tabel->module_id);
+
 				strcpy(model[hw_project].model_name, hwid_info_tabel->project_name);
 				strcpy(model[hw_project].cpu_name, hwid_info_tabel->cpu_name);
 				strcpy(model[hw_project].phase_settings, hwid_info_tabel->phase_sw);
@@ -1801,7 +1770,7 @@ static void fih_read_hwid_info(void)
 				strcpy(model[hw_project].hw_family, hwid_info_tabel->hw_family);
 				strcpy(model[hw_project].hac, hwid_info_tabel->hac);
 				strcpy(model[hw_project].sim_num, hwid_info_tabel->sim_num);
-				strcpy(model[hw_project].nfc_support, hwid_info_tabel->nfc_support);
+
 				break;
 			}
 		}
@@ -1813,44 +1782,32 @@ static void fih_read_hwid_info(void)
 			memset(&model[hw_project], 0, sizeof(struct systeminfo));
 			memcpy(&model[hw_project], &model[0], sizeof(struct systeminfo));
 		}
+#ifdef CONFIG_FIH_PROJECT_FRT		
 		strcpy(nfc_hw_support, model[hw_project].nfc_support);
+#endif		
 	}
 	else
 	{
 		memset(&model[hw_project], 0, sizeof(struct systeminfo));
 		memcpy(&model[hw_project], &model[0], sizeof(struct systeminfo));
 	}
+	return 0;
 }
 
-static void init_poweroncause(void)
-{
-	enum boot_reason_t boot_reason = BR_UNKNOWN;
-	boot_reason = get_boot_reason();
-	switch(boot_reason)
-	{
-		case BR_UNKNOWN:
-			strcpy(causeStr, FIH_PON_APR_UNKNOWN_RESET);break;
-		default:
-			     strcpy(causeStr, "0x00\n");
-	}
-#ifdef CONFIG_MTK_RAM_CONSOLE
-	if (aee_rr_last_fiq_step() != 0)
-		strcpy(causeStr, FIH_PON_APR_KERNEL_PANIC);
-#endif
-}
 
 static int __init proc_info_module_init(void)
 {
 	struct proc_dir_entry *entry;
 	struct proc_dir_entry *baseband_entry;
 	struct proc_dir_entry *baseband_settings_entry;
-	struct proc_dir_entry *pcba_description_entry;
+	struct proc_dir_entry *pcba_description_entry;		
 	struct proc_dir_entry *hwidv_entry;
 	struct proc_dir_entry *poweroncause_entry;
 	struct proc_dir_entry *entry_C;
 
 	//kthread_run(hwid_info_polling, NULL, "hwid_info_polling");
-	fih_read_hwid_info();
+	kthread_run(fih_read_hwid_info, NULL, "fih_read_hwid_info");
+//	fih_read_hwid_info();
 
 	entry = proc_create(FVER_PROC, S_IFREG | S_IRUGO, NULL, &fver_fops);
 	if(entry == NULL)
@@ -1892,8 +1849,7 @@ static int __init proc_info_module_init(void)
 	poweroncause_entry = proc_create(POWERONCAUSE_PROC, S_IFREG | S_IRUGO | S_IWUGO, NULL, &poweroncause_fops);
 	if(poweroncause_entry == NULL)
 		printk("[dw]creat proc %s fail\n", POWERONCAUSE_PROC);
-	init_poweroncause();
-	//strcpy(causeStr, "0x00\n");
+	strcpy(causeStr, "0x00\n");
 
 	entry = proc_create(LCM_PROC, S_IFREG | S_IRUGO, NULL, &lcm_fops);
 	if(entry == NULL)
@@ -1956,11 +1912,10 @@ static int __init proc_info_module_init(void)
 		printk("[dw]creat proc %s fail\n", HWMODEL_PROC);
 
 	fih_dram_setup_MEM();
-	entry = proc_create(FIH_PROC_TESTRESULT_PATH, 0777, entry_C, &draminfo_test_result_ops);
-
+	entry = proc_create(FIH_PROC_TESTRESULT_PATH, 0777, entry_C, &draminfo_test_result_ops); //sunjie + for runin
 	if(entry == NULL)
 		printk("creat AllHWList/dramtest_result proc %s fail\n", RAMRESULT_PROC);
-
+		
 	entry = proc_create(UICOLOR_PROC, S_IFREG | S_IRUGO, NULL, &uicolor_fops);
 	if(entry == NULL)
 		printk("creat proc %s fail\n", UICOLOR_PROC);
@@ -1970,15 +1925,10 @@ static int __init proc_info_module_init(void)
 		printk("[dw]creat proc %s fail\n", PROC_STATUSROOT);
 	root_status_load = kmalloc(sizeof(char)*root_status_len, GFP_KERNEL);
 
-	proc_mkdir(FIH_PROC_CDA_USER_DIR, NULL);
-	entry = proc_create(FIH_PROC_CDA_USER_PATH, 0777, NULL, &cda_user_file_ops);
-	if(entry == NULL)
-		printk("[dw]creat proc %s fail\n", FIH_PROC_CDA_USER_PATH);
-
 	entry = proc_create(HWINFO_PROC, S_IFREG | S_IRUGO, NULL, &hwid_info_fops);
 	if(entry == NULL)
 		printk("creat proc %s fail\n", HWINFO_PROC);
-
+	
 	entry = proc_create(SIM_CARD_SLOT_PROC, S_IFREG | S_IRUGO, NULL, &sim_card_slot_fops);
 	if(entry == NULL)
 		printk("creat proc %s fail\n", SIM_CARD_SLOT_PROC);
@@ -1999,17 +1949,15 @@ static int __init proc_info_module_init(void)
 	if(entry == NULL)
 		printk("creat proc %s fail\n", SIM_NUMBER);
 
+#ifdef CONFIG_FIH_PROJECT_FRT
 	entry = proc_create(NFC_SUPPORT, S_IFREG | S_IRUGO, NULL, &nfc_support_fops);
         if(entry == NULL)
                  printk("creat proc %s fail\n", NFC_SUPPORT);
+#endif
 
 	entry = proc_create(FQCXMLPATH, S_IFREG | S_IRUGO, NULL, &fqc_xml_path_fops);
 	if(entry == NULL)
 		printk("creat proc %s fail\n", FQCXMLPATH);
-
-	entry = proc_create(SKUID_PROC, S_IFREG | S_IRUGO, NULL, &skuid_fops);
-	if(entry == NULL)
-		printk("creat proc %s fail\n", SKUID_PROC);
 
 	return 0;
 }

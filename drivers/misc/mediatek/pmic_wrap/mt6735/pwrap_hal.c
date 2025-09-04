@@ -210,6 +210,12 @@ void pwrap_dump_ap_register(void)
 {
 	u32 i = 0;
 
+	PWRAPREG("Reset PMIC Wrap WACS2 start\n");
+	WRAP_WR32(PMIC_WRAP_WACS2_EN, DISABLE);
+	WRAP_WR32(PMIC_WRAP_WACS2_EN, ENABLE);
+	PWRAPREG("PMIC_WRAP_WACS2_EN = 0x%x\n", WRAP_RD32(PMIC_WRAP_WACS2_EN));
+	PWRAPREG("Reset PMIC Wrap WACS2 done\n");
+
 	PWRAPREG("dump pwrap register, base=0x%p\n", PMIC_WRAP_BASE);
 	PWRAPREG("address     :   3 2 1 0    7 6 5 4    B A 9 8    F E D C\n");
 	#if defined(CONFIG_ARCH_MT6735M)

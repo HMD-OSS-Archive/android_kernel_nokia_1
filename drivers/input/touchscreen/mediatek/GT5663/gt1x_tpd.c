@@ -546,27 +546,34 @@ if (RECOVERY_BOOT == get_boot_mode())   // important
 return 0;
 #endif
 	 */
+	GTP_INFO(TPD_DEVICE "tpd probe\n");
 	gt1x_i2c_client = client;
 	spin_lock_init(&irq_lock);
+	GTP_INFO(TPD_DEVICE "tpd gtlx_init\n");
 	err = gt1x_init();
 	if (err) {
 		/* TP resolution == LCD resolution, no need to match resolution when initialized fail */
+    BBOX_TP_PROBE_FAILED
 		gt1x_abs_x_max = 0;
 		gt1x_abs_y_max = 0;
 		return err;
 	}
 
+	GTP_INFO(TPD_DEVICE "tpd create kernel thread\n");
 	thread = kthread_run(tpd_event_handler, 0, TPD_DEVICE);
 	if (IS_ERR(thread)) {
+    BBOX_TP_PROBE_FAILED
 		err = PTR_ERR(thread);
 		GTP_ERROR(TPD_DEVICE " failed to create kernel thread: %d\n", err);
 	}
 #ifdef CONFIG_GTP_HAVE_TOUCH_KEY
+	GTP_INFO(TPD_DEVICE "tpd set touch key\n");
 	for (idx = 0; idx < GTP_MAX_KEY_NUM; idx++) {
 		input_set_capability(tpd->dev, EV_KEY, gt1x_touch_key_array[idx]);
 	}
 #endif
 #ifdef CONFIG_TPD_HAVE_BUTTON
+	GTP_INFO(TPD_DEVICE "tpd set touch button\n");
 	if (tpd_dts_data.use_tpd_button) {
 		for (idx = 0; idx < tpd_dts_data.tpd_key_num; idx++)
 			input_set_capability(tpd->dev, EV_KEY, tpd_dts_data.tpd_key_local[idx]);
@@ -574,14 +581,17 @@ return 0;
 #endif
 
 #ifdef CONFIG_GTP_ICS_SLOT_REPORT
+	GTP_INFO(TPD_DEVICE "tpd init slots\n");
 	input_mt_init_slots(tpd->dev, tpd_dts_data.touch_max_num, INPUT_MT_DIRECT);
 #endif
 
 #ifdef CONFIG_GTP_GESTURE_WAKEUP
+	GTP_INFO(TPD_DEVICE "tpd set gesture\n");
 	input_set_capability(tpd->dev, EV_KEY, KEY_GES_CUSTOM);
 	input_set_capability(tpd->dev, EV_KEY, KEY_GES_REGULAR);
 #endif
 
+	GTP_INFO(TPD_DEVICE "tpd init gpio\n");
 	GTP_GPIO_AS_INT(GTP_INT_PORT);
 	msleep(50);
 
@@ -591,11 +601,13 @@ return 0;
 
 #ifdef CONFIG_GTP_ESD_PROTECT
 	/*  must before auto update */
+	GTP_INFO(TPD_DEVICE "tpd init esd\n");
 	gt1x_init_esd_protect();
 	gt1x_esd_switch(SWITCH_ON);
 #endif
 
 #ifdef CONFIG_GTP_AUTO_UPDATE
+	GTP_INFO(TPD_DEVICE "tpd init update thread\n");
 	thread = kthread_run(gt1x_auto_update_proc, (void *)NULL, "gt1x auto update");
 	if (IS_ERR(thread)) {
 		err = PTR_ERR(thread);
@@ -603,6 +615,7 @@ return 0;
 	}
 #endif
 
+	GTP_INFO(TPD_DEVICE "tpd probe ok\n");
 	tpd_load_status = 1;
 	return 0;
 }
@@ -936,6 +949,13 @@ static int tpd_local_init(void)
 	if (i2c_add_driver(&tpd_i2c_driver) != 0) {
 		GTP_ERROR("unable to add i2c driver.");
 		return -1;
+	}
+
+	GTP_INFO(TPD_DEVICE "set abs params");
+	if (tpd_load_status == 0)
+	{
+		GTP_INFO(TPD_DEVICE "workaround for init\n");
+		tpd_load_status = 1;
 	}
 
 	if (tpd_load_status == 0)	// disable auto load touch driver for linux3.0 porting

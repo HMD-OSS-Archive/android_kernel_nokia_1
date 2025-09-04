@@ -607,16 +607,10 @@ void arch_reset(char mode, const char *cmd)
 		mtk_wd_SetNonResetReg2(0x0, 1);
 #endif
 	}
-#ifdef ADBREBOOT_FTM_USEIN_USERDEBUG
+	/*Begin: add for ScsiCmdAgent tool, 20190104*/
 	else if(cmd && !strcmp(cmd, "ftm"))      //FTM
 	{
 		rtc_mark_ftm();
-	}
-#endif
-	else if(cmd && !strcmp(cmd, "ftm_n"))      //FTM_N
-	{
-		rtc_mark_ftm_n();
-		reboot = 1;
 	}
 	else if(cmd && !strcmp(cmd, "meta")) 	    //META TOOL
 	{
@@ -626,8 +620,11 @@ void arch_reset(char mode, const char *cmd)
 	{
 		rtc_mark_preloader();
 	}
-        else if(cmd && !strcmp(cmd, "memory_test")) {     //RAMTEST
+    else if(cmd && !strcmp(cmd, "memory_test"))      //RAMTEST
+	{
         rtc_mark_ramtest();
+
+	/*End: add for ScsiCmdAgent tool, 20190104*/
 	} else {
 		reboot = 1;
 	}

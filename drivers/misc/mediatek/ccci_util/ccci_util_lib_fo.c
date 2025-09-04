@@ -1499,6 +1499,26 @@ int get_md_img_type(int md_id)
 	return 0;
 }
 
+int check_md_type(int data)
+{
+	unsigned int val = (unsigned int)data;
+
+	/* check ap view md type */
+	if ((val == 5) || (val == 6))
+		return val;
+
+	/* check md view md type */
+	if ((val & MD_CAP_ENHANCE) == MD_CAP_ENHANCE) {
+		if (val & (MD_CAP_FDD_LTE | MD_CAP_TDD_LTE)) {
+			if (val & MD_CAP_WCDMA)
+				return 5;
+			if (val & MD_CAP_TDS_CDMA)
+				return 6;
+		}
+	}
+	return -1;
+}
+
 int get_legacy_md_type(int md_id)
 {
 	int img_type;

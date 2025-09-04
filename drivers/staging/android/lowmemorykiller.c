@@ -44,6 +44,12 @@
 #include <linux/freezer.h>
 #include <linux/cpu.h>
 
+#define MTK_LMK_USER_EVENT
+
+#ifdef MTK_LMK_USER_EVENT
+#include <linux/miscdevice.h>
+#endif
+
 #if defined(CONFIG_MTK_AEE_FEATURE) && defined(CONFIG_MT_ENG_BUILD)
 #include <mt-plat/aee.h>
 #include <disp_assert_layer.h>
@@ -131,6 +137,56 @@ static unsigned long lowmem_count(struct shrinker *s,
 		global_page_state(NR_INACTIVE_FILE);
 }
 
+#ifdef MTK_LMK_USER_EVENT
+static const struct file_operations mtklmk_fops = {
+	.owner = THIS_MODULE,
+};
+
+static struct miscdevice mtklmk_misc = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "mtklmk",
+	.fops = &mtklmk_fops,
+};
+
+static struct work_struct mtklmk_work;
+static int uevent_adj, uevent_minfree;
+static void mtklmk_async_uevent(struct work_struct *work)
+{
+#define MTKLMK_EVENT_LENGTH	(24)
+	char adj[MTKLMK_EVENT_LENGTH], free[MTKLMK_EVENT_LENGTH];
+	char *envp[3] = { adj, free, NULL };
+
+	snprintf(adj, MTKLMK_EVENT_LENGTH, "OOM_SCORE_ADJ=%d", uevent_adj);
+	snprintf(free, MTKLMK_EVENT_LENGTH, "MINFREE=%d", uevent_minfree);
+	kobject_uevent_env(&mtklmk_misc.this_device->kobj, KOBJ_CHANGE, envp);
+#undef MTKLMK_EVENT_LENGTH
+}
+
+static unsigned int mtklmk_initialized;
+static unsigned int mtklmk_uevent_timeout = 10000; /* ms */
+module_param_named(uevent_timeout, mtklmk_uevent_timeout, uint, 0644);
+static void mtklmk_uevent(int oom_score_adj, int minfree)
+{
+	static unsigned long last_time;
+	unsigned long timeout;
+
+	/* change to use jiffies */
+	timeout = msecs_to_jiffies(mtklmk_uevent_timeout);
+
+	if (!last_time)
+		last_time = jiffies - timeout;
+
+	if (time_before(jiffies, last_time + timeout))
+		return;
+
+	last_time = jiffies;
+
+	uevent_adj = oom_score_adj;
+	uevent_minfree = minfree;
+	schedule_work(&mtklmk_work);
+}
+#endif
+
 static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 {
 	struct task_struct *tsk;
@@ -202,8 +258,8 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 #if defined(CONFIG_SWAP) && defined(CONFIG_MTK_GMO_RAM_OPTIMIZE)
 	swap_pages = atomic_long_read(&nr_swap_pages);
 	/* More than 1/2 swap usage */
-	if (swap_pages * 2 < total_swap_pages)
-		to_be_aggressive++;
+	//if (swap_pages * 2 < total_swap_pages)
+		//to_be_aggressive++;
 	/* More than 3/4 swap usage */
 	if (swap_pages * 4 < total_swap_pages)
 		to_be_aggressive++;
@@ -262,7 +318,13 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 
 	selected_oom_score_adj = min_score_adj;
 
-	/* add debug log */
+#ifdef MTK_LMK_USER_EVENT
+	/* Send uevent if needed */
+	if (mtklmk_initialized && current_is_kswapd() && mtklmk_uevent_timeout)
+		mtklmk_uevent(min_score_adj, minfree);
+#endif
+
+	/* More debug log */
 	if (output_expect(enable_candidate_log)) {
 		if (min_score_adj <= lowmem_debug_adj) {
 			if (time_after_eq(jiffies, lowmem_print_extra_info_timeout)) {
@@ -440,21 +502,19 @@ log_again:
 		long free = other_free * (long)(PAGE_SIZE / 1024);
 		trace_lowmemory_kill(selected, cache_size, cache_limit, free);
 
-		lowmem_print(1, "Killing '%s' (%d), adj %d, score_adj %hd, state(%ld)\n"
-				"   to free %ldkB on behalf of '%s' (%d) because\n"
-				"   cache %ldkB is below limit %ldkB for oom_score_adj %hd\n"
-				"   Free memory is %ldkB above reserved\n"
+		lowmem_print(1, "Killing '%s' (%d), adj %hd to free %ldkB\n"
+				"   cache %ldkB, limit %ldkB, ofree: %ldkB, free pages: %ldkB, file cache: %ldkB\n"
 #if defined(CONFIG_SWAP) && defined(CONFIG_MTK_GMO_RAM_OPTIMIZE)
 				"   swapfree %lukB of SwapTatal %lukB(decrease %d level)\n"
 #endif
 				, selected->comm, selected->pid,
-				REVERT_ADJ(selected_oom_score_adj),
-				selected_oom_score_adj, selected->state,
+				selected_oom_score_adj,
 				selected_tasksize * (long)(PAGE_SIZE / 1024),
-				current->comm, current->pid,
-				cache_size, cache_limit,
-				min_score_adj,
-				free
+				cache_size, cache_limit, free,
+				global_page_state(NR_FREE_PAGES) *
+				(long)(PAGE_SIZE / 1024),
+				global_page_state(NR_FILE_PAGES) *
+				(long)(PAGE_SIZE / 1024)
 #if defined(CONFIG_SWAP) && defined(CONFIG_MTK_GMO_RAM_OPTIMIZE)
 				, swap_pages * 4, total_swap_pages * 4, to_be_aggressive
 #endif
@@ -557,7 +617,11 @@ static int __init lowmem_init(void)
 #endif
 
 #ifdef CONFIG_ZRAM
+#ifndef CONFIG_MTK_GMO_RAM_OPTIMIZE
 	vm_swappiness = 100;
+#else
+	vm_swappiness = 120;
+#endif
 #endif
 
 
@@ -568,6 +632,17 @@ static int __init lowmem_init(void)
 	total_low_ratio = (totalram_pages + normal_pages - 1) / normal_pages;
 	pr_err("[LMK]total_low_ratio[%d] - totalram_pages[%lu] - totalhigh_pages[%lu]\n",
 			total_low_ratio, totalram_pages, totalhigh_pages);
+#endif
+
+#ifdef MTK_LMK_USER_EVENT
+	/* initialize work for uevent */
+	INIT_WORK(&mtklmk_work, mtklmk_async_uevent);
+
+	/* register as misc device */
+	if (!misc_register(&mtklmk_misc)) {
+		pr_info("%s: successful to register misc device!\n", __func__);
+		mtklmk_initialized = 1;
+	}
 #endif
 
 	return 0;
@@ -777,4 +852,3 @@ late_initcall(lowmem_init);
 module_exit(lowmem_exit);
 
 MODULE_LICENSE("GPL");
-

@@ -1,15 +1,3 @@
-/*
- * Copyright (C) 2015 MediaTek Inc.
- *
- * This file is free software; you can redistribute it and/or modify
- * it under the terms of version 2 of the GNU General Public License
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- */
 #include <linux/types.h>
 #include <mt-plat/charging.h>
 #include <mt-plat/upmu_common.h>
@@ -20,18 +8,7 @@
 #include <mach/mt_charging.h>
 #include <mach/mt_pmic.h>
 #include "bq24157.h"
-
-#ifdef CONFIG_ONTIM_DSM
-#include <ontim/ontim_dsm.h>
-
-struct dsm_dev bq24157_dsm_dev = {
-	.type = OMTIM_DSM_DEV_TYPE_POWER,
-	.id = OMTIM_DSM_DEV_ID_CHARGER,
-	.name = "Fan5405_charger",
-	.buff_size = 1024,
-};
-struct dsm_client *bq24157_dsm_client = NULL;
-#endif
+//#include <mt-plat/mt_gpio.h>
 
 /* ============================================================ // */
 /* Define */
@@ -51,7 +28,31 @@ struct dsm_client *bq24157_dsm_client = NULL;
 int wireless_charger_gpio_number = (168 | 0x80000000);
 #endif
 
-const u32 BQ24157_VBAT_CV_VTH[] = {
+//drop 
+/*
+#if 1
+#include <mach/gpio_const.h>
+//modify. E1 GPIO_SWCHARGER_EN_PIN:gpio_80.
+int bq24157_gpio_number   = ( GPIO80 | 0x80000000);  //GPIO_SWCHARGER_EN_PIN;
+int bq24157_gpio_off_mode = GPIO_MODE_GPIO;
+int bq24157_gpio_on_mode  = GPIO_MODE_GPIO;
+
+#else
+int bq24157_gpio_number   = (19 | 0x80000000);
+int bq24157_gpio_off_mode = 0;
+int bq24157_gpio_on_mode  = 0;
+#endif
+int bq24157_gpio_off_dir  = GPIO_DIR_OUT;
+int bq24157_gpio_off_out  = GPIO_OUT_ONE;
+int bq24157_gpio_on_dir   = GPIO_DIR_OUT;
+int bq24157_gpio_on_out   = GPIO_OUT_ZERO;
+*/
+
+/*
+ Charge voltage range is 3.5V to 4.44V with the offset of 3.5V,and
+ steps of 20mV(default 3.54V).using register R2,bits B2-B7.
+*/
+const u32 bq24157_VBAT_CV_VTH[] = {
 	BATTERY_VOLT_03_500000_V, BATTERY_VOLT_03_520000_V, BATTERY_VOLT_03_540000_V,
 	    BATTERY_VOLT_03_560000_V,
 	BATTERY_VOLT_03_580000_V, BATTERY_VOLT_03_600000_V, BATTERY_VOLT_03_620000_V,
@@ -78,19 +79,34 @@ const u32 BQ24157_VBAT_CV_VTH[] = {
 	    BATTERY_VOLT_04_440000_V
 };
 
-const u32 BQ24157_CS_VTH[] = {
+const u32 bq24157_CS_VTH[] = {
 	CHARGE_CURRENT_550_00_MA, CHARGE_CURRENT_650_00_MA, CHARGE_CURRENT_750_00_MA,
 	    CHARGE_CURRENT_850_00_MA,
 	CHARGE_CURRENT_950_00_MA, CHARGE_CURRENT_1050_00_MA, CHARGE_CURRENT_1150_00_MA,
 	    CHARGE_CURRENT_1250_00_MA
 };
 
-const u32 BQ24157_INPUT_CS_VTH[] = {
+/*
+add for volue of Rsense is 56mR.
+	667.8mA		789.2mA		911.6mA 	1032mA
+	1153.5mA	1274.8mA	1396.2mA	1517.6mA
+
+*/
+const u32 bq24157_CS_VTH_E1[] = {
+	CHARGE_CURRENT_650_00_MA, CHARGE_CURRENT_775_00_MA, CHARGE_CURRENT_900_00_MA,
+	    CHARGE_CURRENT_1000_00_MA,
+	CHARGE_CURRENT_1150_00_MA, CHARGE_CURRENT_1250_00_MA, CHARGE_CURRENT_1375_00_MA,
+	    CHARGE_CURRENT_1500_00_MA
+};
+
+
+
+const u32 bq24157_INPUT_CS_VTH[] = {
 	CHARGE_CURRENT_100_00_MA, CHARGE_CURRENT_500_00_MA, CHARGE_CURRENT_800_00_MA,
 	    CHARGE_CURRENT_MAX
 };
 
-const u32 BQ24157_VCDT_HV_VTH[] = {
+const u32 bq24157_VCDT_HV_VTH[] = {
 	BATTERY_VOLT_04_200000_V, BATTERY_VOLT_04_250000_V, BATTERY_VOLT_04_300000_V,
 	    BATTERY_VOLT_04_350000_V,
 	BATTERY_VOLT_04_400000_V, BATTERY_VOLT_04_450000_V, BATTERY_VOLT_04_500000_V,
@@ -101,7 +117,14 @@ const u32 BQ24157_VCDT_HV_VTH[] = {
 	    BATTERY_VOLT_10_500000_V
 };
 
-static u32 charging_value_to_parameter(const u32 *parameter, const u32 array_size, const u32 val)
+// add for DPM at 20150604
+const unsigned int bq24157_VBAT_SCV_VTH[]=
+{
+    BATTERY_VOLT_04_200000_V, BATTERY_VOLT_04_280000_V, BATTERY_VOLT_04_360000_V, BATTERY_VOLT_04_440000_V,
+    BATTERY_VOLT_04_520000_V, BATTERY_VOLT_04_600000_V, BATTERY_VOLT_04_680000_V, BATTERY_VOLT_04_760000_V
+};
+
+u32 bq24157_charging_value_to_parameter(const u32 *parameter, const u32 array_size, const u32 val)
 {
 	if (val < array_size)
 		return parameter[val];
@@ -109,7 +132,7 @@ static u32 charging_value_to_parameter(const u32 *parameter, const u32 array_siz
 	return parameter[0];
 }
 
-static u32 charging_parameter_to_value(const u32 *parameter, const u32 array_size, const u32 val)
+u32 bq24157_charging_parameter_to_value(const u32 *parameter, const u32 array_size, const u32 val)
 {
 	u32 i;
 
@@ -157,28 +180,33 @@ static u32 charging_hw_init(void *data)
 	u32 status = STATUS_OK;
 	static bool charging_init_flag = KAL_FALSE;
 
+	//modify 
+    /*
+    mt_set_gpio_mode(bq24157_gpio_number,bq24157_gpio_on_mode);
+    mt_set_gpio_dir(bq24157_gpio_number,bq24157_gpio_on_dir);
+    mt_set_gpio_out(bq24157_gpio_number,bq24157_gpio_on_out);
+	*/
+	charger_pin_cd_config(KAL_FALSE);
+
 #if defined(MTK_WIRELESS_CHARGER_SUPPORT)
 	mt_set_gpio_mode(wireless_charger_gpio_number, 0);	/* 0:GPIO mode */
 	mt_set_gpio_dir(wireless_charger_gpio_number, 0);	/* 0: input, 1: output */
 #endif
-battery_log(BAT_LOG_CRTI, "bq24157  charging_hw_init  line=%d\n", __LINE__);
 
-#if defined(HIGH_BATTERY_VOLTAGE_SUPPORT)
-	bq24157_reg_config_interface(0x06, 0x57); /* ISAFE = 1050mA, VSAFE = 4.34V */
-#else
-	bq24157_reg_config_interface(0x06, 0x70);
-#endif
-
-	bq24157_reg_config_interface(0x00, 0xC0); /* kick chip watch dog */
-	bq24157_reg_config_interface(0x01, 0xb8); /* TE=1, CE=0, HZ_MODE=0, OPA_MODE=0 */
-	bq24157_reg_config_interface(0x05, 0x03);
+	#if defined(HIGH_BATTERY_VOLTAGE_SUPPORT)
+	//bq24157_reg_config_interface(0x06,0x79); // ISAFE = 1250mA, VSAFE = 4.38V
+	bq24157_reg_config_interface(0x06,0x7b); // ISAFE = 1518mA, VSAFE = 4.42V
+	#else
+	bq24157_reg_config_interface(0x06,0x70);
+	#endif
+	bq24157_reg_config_interface(0x00, 0xC0);	/* kick chip watch dog */
+	bq24157_reg_config_interface(0x01, 0xb8);	/* TE=1, CE=0, HZ_MODE=0, OPA_MODE=0 */
+	//bq24157_reg_config_interface(0x05,0x02); //VDPM=4.36V
+	bq24157_reg_config_interface(0x05,0x03); //VDPM=4.44V
 	if (!charging_init_flag) {
-		bq24157_reg_config_interface(0x04, 0x59); /* 97mA */
+		bq24157_reg_config_interface(0x04, 0x1A);	/* termination current 121mA */
 		charging_init_flag = KAL_TRUE;
 	}
-#ifdef CONFIG_ONTIM_DSM
-	bq24157_dsm_client = dsm_register_client(&bq24157_dsm_dev);
-#endif
 	return status;
 }
 
@@ -207,8 +235,17 @@ static u32 charging_enable(void *data)
 #if defined(CONFIG_USB_MTK_HDRC_HCD)
 		if (mt_usb_is_device())
 #endif
+    	{
+            //drop 
+            /*
+	        mt_set_gpio_mode(bq24157_gpio_number,bq24157_gpio_off_mode);
+	        mt_set_gpio_dir(bq24157_gpio_number,bq24157_gpio_off_dir);
+	        mt_set_gpio_out(bq24157_gpio_number,bq24157_gpio_off_out);
+			*/
+			charger_pin_cd_config(KAL_TRUE);
 
-			bq24157_set_ce(1);
+	        //bq24157_set_ce(1);
+    	}
 	}
 
 	return status;
@@ -219,9 +256,21 @@ static u32 charging_set_cv_voltage(void *data)
 {
 	u32 status = STATUS_OK;
 	u16 register_value;
+//add ,but not use,Just wait.
+#if 1
+    u32 cv_value = *(u32 *) (data);
 
-	register_value =
-	    charging_parameter_to_value(BQ24157_VBAT_CV_VTH, GETARRAYNUM(BQ24157_VBAT_CV_VTH), *(u32 *) (data));
+    if (cv_value == BATTERY_VOLT_04_200000_V) {
+#if defined(HIGH_BATTERY_VOLTAGE_SUPPORT)
+    //highest of voltage will be 4.3V, because powerpath limitatior
+    cv_value = 4304000;
+#else
+    cv_value = 4208000;
+#endif
+    }
+#endif
+
+	register_value = bq24157_charging_parameter_to_value(bq24157_VBAT_CV_VTH, GETARRAYNUM(bq24157_VBAT_CV_VTH), *(u32 *) (data));
 	bq24157_set_oreg(register_value);
 
 	return status;
@@ -235,9 +284,9 @@ static u32 charging_get_current(void *data)
 	u8 reg_value;
 
 	/* Get current level */
-	array_size = GETARRAYNUM(BQ24157_CS_VTH);
+	array_size = GETARRAYNUM(bq24157_CS_VTH);
 	bq24157_read_interface(0x1, &reg_value, 0x3, 0x6);	/* IINLIM */
-	*(u32 *) data = charging_value_to_parameter(BQ24157_CS_VTH, array_size, reg_value);
+	*(u32 *) data = bq24157_charging_value_to_parameter(bq24157_CS_VTH, array_size, reg_value);
 
 	return status;
 }
@@ -252,17 +301,20 @@ static u32 charging_set_current(void *data)
 	u32 register_value;
 	u32 current_value = *(u32 *) data;
 
-	if (current_value <= CHARGE_CURRENT_350_00_MA) {
+	//if (current_value <= CHARGE_CURRENT_350_00_MA) {
+	if (current_value <= CHARGE_CURRENT_400_00_MA) {//
 		bq24157_set_io_level(1);
 	} else {
 		bq24157_set_io_level(0);
-		array_size = GETARRAYNUM(BQ24157_CS_VTH);
-		set_chr_current = bmt_find_closest_level(BQ24157_CS_VTH, array_size, current_value);
+	//modify for E1 volue of Rsense is 56mR
+	/*	array_size = GETARRAYNUM(bq24157_CS_VTH);
+		set_chr_current = bmt_find_closest_level(bq24157_CS_VTH, array_size, current_value);
+		register_value = bq24157_charging_parameter_to_value(bq24157_CS_VTH, array_size, set_chr_current);
+	*/
+		array_size = GETARRAYNUM(bq24157_CS_VTH_E1);
+		set_chr_current = bmt_find_closest_level(bq24157_CS_VTH_E1, array_size, current_value);
+		register_value = bq24157_charging_parameter_to_value(bq24157_CS_VTH_E1, array_size, set_chr_current);
 
-	battery_log(BAT_LOG_CRTI, "charging_set_current  set_chr_current=%d\n", set_chr_current);
-
-		register_value = charging_parameter_to_value(BQ24157_CS_VTH, array_size, set_chr_current);
-	battery_log(BAT_LOG_CRTI, "charging_set_current  register_value=%d\n", register_value);
 		bq24157_set_iocharge(register_value);
 	}
 	return status;
@@ -276,16 +328,14 @@ static u32 charging_set_input_current(void *data)
 	u32 array_size;
 	u32 register_value;
 
-	if (*(u32 *) data > CHARGE_CURRENT_500_00_MA) {
+	//if (*(u32 *) data > CHARGE_CURRENT_500_00_MA) {
+	if (*(u32 *) data > CHARGE_CURRENT_800_00_MA) {//
 		register_value = 0x3;
-	battery_log(BAT_LOG_CRTI, "charging_set_input_current  register_value=%d\n", register_value);
 	} else {
-		array_size = GETARRAYNUM(BQ24157_INPUT_CS_VTH);
-		set_chr_current = bmt_find_closest_level(BQ24157_INPUT_CS_VTH, array_size, *(u32 *) data);
-	battery_log(BAT_LOG_CRTI, "charging_set_input_current  set_chr_current=%d\n", set_chr_current);
+		array_size = GETARRAYNUM(bq24157_INPUT_CS_VTH);
+		set_chr_current = bmt_find_closest_level(bq24157_INPUT_CS_VTH, array_size, *(u32 *) data);
 		register_value =
-		    charging_parameter_to_value(BQ24157_INPUT_CS_VTH, array_size, set_chr_current);
-	battery_log(BAT_LOG_CRTI, "charging_set_input_current  register_value=%d\n", register_value);
+		    bq24157_charging_parameter_to_value(bq24157_INPUT_CS_VTH, array_size, set_chr_current);
 	}
 
 	bq24157_set_input_charging_current(register_value);
@@ -309,44 +359,25 @@ static u32 charging_get_charging_status(void *data)
 	return status;
 }
 
+ static unsigned int charging_get_enable(void *data)
+ {
+	 unsigned int status = STATUS_OK;
+	 unsigned int ret_val;
+
+	 ret_val = bq24157_get_chip_status();
+
+	 if((ret_val == 0x1) || (ret_val == 0x2)) //0x2: charge done;	0x1: charge in progress
+		 *(unsigned int *)data = KAL_TRUE;
+	 else
+		 *(unsigned int *)data = KAL_FALSE;
+
+	 return status;
+ }
 
 static u32 charging_reset_watch_dog_timer(void *data)
 {
 	u32 status = STATUS_OK;
 
-#ifdef CONFIG_ONTIM_DSM
-	if (bq24157_dsm_client && (bq24157_get_chip_status() == 0x03)) {
-		u8 reg[8];
-		int i;
-
-		for (i = 0; i < 7; i++)
-			bq24157_read_interface(i, &reg[i], 0xFF, 0);
-
-		bq24157_read_interface(0x10, &reg[i], 0xFF, 0);
-		if ((bq24157_dsm_client) && dsm_client_ocuppy(bq24157_dsm_client)) {
-			int error = OMTIM_DSM_CHARGER_ERROR;
-
-			if ((bq24157_dsm_client->dump_buff) && (bq24157_dsm_client->buff_size)
-				&& (bq24157_dsm_client->buff_flag == OMTIM_DSM_BUFF_OK)) {
-				bq24157_dsm_client->used_size = sprintf(bq24157_dsm_client->dump_buff,
-						"Type=%d; ID=%d; error_id=%d;  Charger info:%s; ",
-						bq24157_dsm_client->client_type, bq24157_dsm_client->client_id, error,
-						bq24157_dsm_client->client_name);
-				for (i = 0; i < 7; i++) {
-					bq24157_dsm_client->used_size += sprintf(bq24157_dsm_client->dump_buff
-						+ bq24157_dsm_client->used_size, "Reg[0x%x]=0x%x; ", i, reg[i]);
-				}
-				bq24157_dsm_client->used_size += sprintf(bq24157_dsm_client->dump_buff
-					+ bq24157_dsm_client->used_size, "Reg[0x10]=0x%x; ", reg[i]);
-				bq24157_dsm_client->used_size += sprintf(bq24157_dsm_client->dump_buff
-					+ bq24157_dsm_client->used_size, "\n");
-				dsm_client_notify(bq24157_dsm_client, error);
-			}
-		} else {
-			battery_log(BAT_LOG_CRTI, "%s: dsm ocuppy error!!!", __func__);
-		}
-	 }
-#endif
 	bq24157_set_tmr_rst(1);
 
 	return status;
@@ -362,10 +393,11 @@ static u32 charging_set_hv_threshold(void *data)
 	u16 register_value;
 	u32 voltage = *(u32 *) (data);
 
-	array_size = GETARRAYNUM(BQ24157_VCDT_HV_VTH);
-	set_hv_voltage = bmt_find_closest_level(BQ24157_VCDT_HV_VTH, array_size, voltage);
-	register_value = charging_parameter_to_value(BQ24157_VCDT_HV_VTH, array_size, set_hv_voltage);
-	pmic_set_register_value(PMIC_RG_VCDT_HV_VTH, register_value);
+	array_size = GETARRAYNUM(bq24157_VCDT_HV_VTH);
+	set_hv_voltage = bmt_find_closest_level(bq24157_VCDT_HV_VTH, array_size, voltage);
+	register_value = bq24157_charging_parameter_to_value(bq24157_VCDT_HV_VTH, array_size, set_hv_voltage);
+	pmic_set_register_value(PMIC_RG_VCDT_HV_VTH, register_value);// PMIC register setting, while not charger IC.
+    pmic_set_register_value(PMIC_RG_VCDT_LV_VTH,0);//change VBUS threadhold to 4.2V
 	return status;
 }
 
@@ -387,9 +419,9 @@ static u32 charging_get_battery_status(void *data)
 {
 	unsigned int status = STATUS_OK;
 
-#if 1 /*defined(CONFIG_POWER_EXT) || defined(CONFIG_MTK_FPGA)*/
+#if 1 //defined(CONFIG_POWER_EXT) || defined(CONFIG_MTK_FPGA)
 	*(kal_bool *) (data) = 0;	/* battery exist */
-	battery_log(BAT_LOG_CRTI, "[charging_get_battery_status] battery exist for bring up.\n");
+	battery_log(BAT_LOG_FULL, "[charging_get_battery_status] battery exist for bring up.\n");
 #else
 	unsigned int val = 0;
 
@@ -516,25 +548,76 @@ static u32 charging_set_error_state(void *data)
 	return STATUS_UNSUPPORTED;
 }
 
+//add for DPM
+static unsigned int charging_set_scv(void *data)
+{
+    unsigned int status = STATUS_OK;
+
+    unsigned int set_sc_voltage;
+    unsigned int array_size;
+    unsigned short register_value;
+    unsigned int voltage = *(unsigned int*)(data);
+
+    array_size = GETARRAYNUM(bq24157_VBAT_SCV_VTH);
+    set_sc_voltage = bmt_find_closest_level(bq24157_VBAT_SCV_VTH, array_size, voltage);
+    register_value = bq24157_charging_parameter_to_value(bq24157_VBAT_SCV_VTH, array_size ,set_sc_voltage);
+    bq24157_set_vsp(register_value);
+
+    return status;
+}
+
+ static unsigned int charging_get_v_safe(void *data)
+ {
+     unsigned int status = STATUS_OK;
+
+     *(unsigned int *)data = bq24157_get_v_safe();
+
+     return status;
+ }
 static u32(*const charging_func[CHARGING_CMD_NUMBER]) (void *data) = {
-charging_hw_init, charging_dump_register, charging_enable, charging_set_cv_voltage,
-	    charging_get_current, charging_set_current, charging_set_input_current,
-	    charging_get_charging_status, charging_reset_watch_dog_timer,
-	    charging_set_hv_threshold, charging_get_hv_status, charging_get_battery_status,
-	    charging_get_charger_det_status, charging_get_charger_type,
-	    charging_get_is_pcm_timer_trigger, charging_set_platform_reset,
-	    charging_get_platform_boot_mode, charging_set_power_off,
-	    charging_get_power_source, charging_get_csdac_full_flag,
-	    charging_set_ta_current_pattern, charging_set_error_state};
+	 charging_hw_init
+	,charging_dump_register
+	,charging_enable
+	,charging_set_cv_voltage
+	,charging_get_current
+	,charging_set_current
+	,charging_set_input_current
+	,charging_get_charging_status
+	,charging_reset_watch_dog_timer
+	,charging_set_hv_threshold
+	,charging_get_hv_status
+	,charging_get_battery_status
+	,charging_get_charger_det_status
+	,charging_get_charger_type
+	,charging_get_is_pcm_timer_trigger
+	,charging_set_platform_reset
+	,charging_get_platform_boot_mode
+	,charging_set_power_off
+	,charging_get_power_source
+	,charging_get_csdac_full_flag
+	,charging_set_ta_current_pattern
+	,charging_set_error_state
+    ,charging_set_scv
+    ,charging_get_v_safe
+    ,charging_get_enable
+ };
 
 s32 bq24157_chr_control_interface(CHARGING_CTRL_CMD cmd, void *data)
 {
 	s32 status;
-
-	if ((cmd < CHARGING_CMD_NUMBER) && (charging_func[cmd] != NULL))
+//Add
+#if 0
+	if (cmd < CHARGING_CMD_NUMBER)
 		status = charging_func[cmd] (data);
 	else
 		return STATUS_UNSUPPORTED;
-
+#endif
+	if (cmd <= CHARGING_CMD_GET_CHARGING_ENABLE) {
+		status = charging_func[cmd] (data);
+	} else {
+		battery_log(BAT_LOG_CRTI, "%s: hw bq24157 interface Error(%d)\n", __FUNCTION__, cmd);
+		return STATUS_UNSUPPORTED;
+	}
+//end.
 	return status;
 }

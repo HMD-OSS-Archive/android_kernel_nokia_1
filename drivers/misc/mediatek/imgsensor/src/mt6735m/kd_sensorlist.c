@@ -59,18 +59,31 @@
 #include <linux/regulator/consumer.h>
 #endif /* !defined(CONFIG_MTK_LEGACY) */
 
+// add for BBS log++
+#define FIHBBS
+#ifdef FIHBBS
+#include "fihBBS/fih_camera_bbs.h"
+extern void fih_bbs_camera_msg_by_addr(int, int);
+int g_SensorFound =0;
+#endif
+// add for BBS log--
 /* Camera information */
 #define PROC_CAMERA_INFO "driver/camera_info"
 #define camera_info_size 128
 #define PDAF_DATA_SIZE 4096
+//
+//#if !defined(CONFIG_FIH_PROJECT_NE1)
+#ifndef CONFIG_FIH_PROJECT_NE1
 #define BYTE unsigned char
+extern BYTE get_otp_module_id(BYTE zone);
+#endif
 char mtk_ccm_name[camera_info_size] = { 0 };
 #define FEATURE_CONTROL_MAX_DATA_SIZE 128000
 
 static unsigned int gDrvIndex;
 
 static DEFINE_SPINLOCK(kdsensor_drv_lock);
-extern BYTE get_otp_module_id(BYTE zone);
+
 /* Move these defines to kd_camera_hw.h, so they can be project-dependent //Jessy @2014/06/04
 #define SUPPORT_I2C_BUS_NUM1        0
 #define SUPPORT_I2C_BUS_NUM2        2
@@ -384,6 +397,16 @@ int iReadReg(u16 a_u2Addr, u8 *a_puBuff, u16 i2cId)
 int iReadRegI2C(u8 *a_pSendData , u16 a_sizeSendData, u8 *a_pRecvData, u16 a_sizeRecvData, u16 i2cId)
 {
 	int i4RetValue = 0;
+/*
+//test tmp
+// add for BBS log++
+			#ifdef FIHBBS
+			PK_ERR("[MIMI CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+			fih_bbs_camera_msg_by_addr(i2cId, FIH_BBS_CAMERA_ERRORCODE_I2C_READ);
+			#endif
+			// add for BBS log--
+//test tmp
+*/
 
 	if (gI2CBusNum == SUPPORT_I2C_BUS_NUM1) {
 		spin_lock(&kdsensor_drv_lock);
@@ -402,12 +425,32 @@ int iReadRegI2C(u8 *a_pSendData , u16 a_sizeSendData, u8 *a_pRecvData, u16 a_siz
 		i4RetValue = i2c_master_send(g_pstI2Cclient, a_pSendData, a_sizeSendData);
 		if (i4RetValue != a_sizeSendData) {
 			PK_ERR("[CAMERA SENSOR] I2C send failed!!, Addr = 0x%x\n", a_pSendData[0]);
+			// add for BBS log++
+			#ifdef FIHBBS
+			if(!g_IsSearchSensor){
+				if(!g_SensorFound){
+					PK_ERR("[CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+					fih_bbs_camera_msg_by_addr(i2cId, FIH_BBS_CAMERA_ERRORCODE_I2C_WRITE);
+				}
+			}
+			#endif
+			// add for BBS log--
 			return -1;
 		}
 
 		i4RetValue = i2c_master_recv(g_pstI2Cclient, (char *)a_pRecvData, a_sizeRecvData);
 		if (i4RetValue != a_sizeRecvData) {
 			PK_ERR("[CAMERA SENSOR] I2C read failed!!\n");
+			// add for BBS log++
+			#ifdef FIHBBS
+			if(!g_IsSearchSensor){
+				if(!g_SensorFound){
+					PK_ERR("[CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+					fih_bbs_camera_msg_by_addr(i2cId, FIH_BBS_CAMERA_ERRORCODE_I2C_READ);
+				}
+			}
+			#endif
+			// add for BBS log--
 			return -1;
 		}
 	} else {
@@ -425,12 +468,32 @@ int iReadRegI2C(u8 *a_pSendData , u16 a_sizeSendData, u8 *a_pRecvData, u16 a_siz
 		i4RetValue = i2c_master_send(g_pstI2Cclient2, a_pSendData, a_sizeSendData);
 		if (i4RetValue != a_sizeSendData) {
 			PK_ERR("[CAMERA SENSOR] I2C send failed!!, Addr = 0x%x\n", a_pSendData[0]);
+			// add for BBS log++
+			#ifdef FIHBBS
+			if(!g_IsSearchSensor){
+				if(!g_SensorFound){
+					PK_ERR("[CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+					fih_bbs_camera_msg_by_addr(i2cId, FIH_BBS_CAMERA_ERRORCODE_I2C_WRITE);
+				}
+			}
+			#endif
+			// add for BBS log--
 			return -1;
 		}
 
 		i4RetValue = i2c_master_recv(g_pstI2Cclient2, (char *)a_pRecvData, a_sizeRecvData);
 		if (i4RetValue != a_sizeRecvData) {
 			PK_ERR("[CAMERA SENSOR] I2C read failed!!\n");
+			// add for BBS log++
+			#ifdef FIHBBS
+			if(!g_IsSearchSensor){
+				if(!g_SensorFound){
+					PK_ERR("[CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+					fih_bbs_camera_msg_by_addr(i2cId, FIH_BBS_CAMERA_ERRORCODE_I2C_READ);
+				}
+			}
+			#endif
+			// add for BBS log--
 			return -1;
 		}
 	}
@@ -498,6 +561,99 @@ int iWriteReg(u16 a_u2Addr, u32 a_u4Data, u32 a_u4Bytes, u16 i2cId)
 	/* KD_IMGSENSOR_PROFILE("iWriteReg"); */
 	return 0;
 }
+
+/** add for i2c err**/
+int iWriteReg_otp(u16 a_u2Addr, u32 a_u4Data, u32 a_u4Bytes, u16 i2cId, char * sensorname )
+{
+	int i4RetValue = 0;
+	int u4Index = 0;
+	u8 *puDataInBytes = (u8 *) &a_u4Data;
+	int retry = 3;
+	int i2c = -1;
+
+	char puSendCmd[6] = { (char)(a_u2Addr >> 8), (char)(a_u2Addr & 0xFF),
+		0, 0, 0, 0
+	};
+
+	/* PK_DBG("Addr : 0x%x,Val : 0x%x\n",a_u2Addr,a_u4Data); */
+    //PK_ERR("yujinyun %s\n", sensorname);
+	/* KD_IMGSENSOR_PROFILE_INIT(); */
+	spin_lock(&kdsensor_drv_lock);
+
+	if (gI2CBusNum == SUPPORT_I2C_BUS_NUM1)
+	{
+		//PK_ERR("yujinyun yujinyun hhhhhhhhhh \n");
+        if( !strcmp (sensorname ,"S5K4H8JKSUB") || !strcmp (sensorname ,"S5K4H8SUB"))
+		{
+			//PK_ERR("this is mian camera \n");
+       		i2c = 1;
+			// return -1;
+        }
+
+		g_pstI2Cclient->addr = (i2cId >> 1);
+		g_pstI2Cclient->ext_flag = (g_pstI2Cclient->ext_flag) & (~I2C_DMA_FLAG);
+	}
+	else
+	{
+		if( !strcmp (sensorname ,"S5K4H8JK") || !strcmp (sensorname ,"S5K4H8"))
+		{
+			//PK_ERR("this is sub camera \n");
+			i2c = 2;
+		}
+
+		g_pstI2Cclient2->addr = (i2cId >> 1);
+		g_pstI2Cclient2->ext_flag = (g_pstI2Cclient2->ext_flag) & (~I2C_DMA_FLAG);
+	}
+
+	spin_unlock(&kdsensor_drv_lock);
+
+	if( i2c == 1 || i2c == 2)
+	{
+		return -1;
+	}
+
+	if (a_u4Bytes > 2)
+	{
+		PK_ERR("[CAMERA SENSOR] exceed 2 bytes\n");
+		return -1;
+	}
+
+	if (a_u4Data >> (a_u4Bytes << 3))
+	{
+		PK_DBG("[CAMERA SENSOR] warning!! some data is not sent!!\n");
+	}
+
+	for (u4Index = 0; u4Index < a_u4Bytes; u4Index += 1)
+	{
+		puSendCmd[(u4Index + 2)] = puDataInBytes[(a_u4Bytes - u4Index - 1)];
+	}
+
+	do {
+		if (gI2CBusNum == SUPPORT_I2C_BUS_NUM1)
+		{
+			i4RetValue = i2c_master_send(g_pstI2Cclient, puSendCmd, (a_u4Bytes + 2));
+		}
+		else
+		{
+			i4RetValue = i2c_master_send(g_pstI2Cclient2, puSendCmd, (a_u4Bytes + 2));
+		}
+
+		if (i4RetValue != (a_u4Bytes + 2))
+		{
+			PK_ERR("[CAMERA SENSOR] I2C send failed addr = 0x%x, data = 0x%x !!\n", a_u2Addr, a_u4Data);
+		}
+		else
+		{
+			break;
+		}
+	
+		uDELAY(50);
+	} while ((retry--) > 0);
+
+	/* KD_IMGSENSOR_PROFILE("iWriteReg"); */
+	return 0;
+}
+
 
 int kdSetI2CBusNum(u32 i2cBusNum)
 {
@@ -683,7 +839,16 @@ int iWriteRegI2C(u8 *a_pSendData, u16 a_sizeSendData, u16 i2cId)
 {
 	int i4RetValue = 0;
 	int retry = 3;
-
+/*
+//test tmp
+// add for BBS log++
+			#ifdef FIHBBS
+			PK_ERR("[MIMI CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+			fih_bbs_camera_msg_by_addr(i2cId, FIH_BBS_CAMERA_ERRORCODE_I2C_WRITE);
+			#endif
+			// add for BBS log--
+//test tmp
+*/
 /* PK_DBG("Addr : 0x%x,Val : 0x%x\n",a_u2Addr,a_u4Data); */
 
 	/* KD_IMGSENSOR_PROFILE_INIT(); */
@@ -706,7 +871,17 @@ int iWriteRegI2C(u8 *a_pSendData, u16 a_sizeSendData, u16 i2cId)
 		}
 		if (i4RetValue != a_sizeSendData) {
 			PK_DBG("[CAMERA SENSOR] I2C send failed!!, Addr = 0x%x, Data = 0x%x\n",
-			       a_pSendData[0], a_pSendData[1]);
+			a_pSendData[0], a_pSendData[1]);
+			// add for BBS log++
+			#ifdef FIHBBS
+			if(!g_IsSearchSensor){
+				if(!g_SensorFound){
+					PK_ERR("[CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+					fih_bbs_camera_msg_by_addr(i2cId, FIH_BBS_CAMERA_ERRORCODE_I2C_WRITE);
+				}
+			}
+			#endif
+			// add for BBS log--
 		} else {
 			break;
 		}
@@ -1438,9 +1613,13 @@ static inline int adopt_CAMERA_HW_CheckIsAlive(void)
 	UINT32 i = 0;
 	MUINT32 sensorID = 0;
 	MUINT32 retLen = 0;
-	BYTE my_module_id;
+//
+        MINT32 ret = ERROR_NONE;
+//#if !defined(CONFIG_FIH_PROJECT_NE1)
+#ifndef CONFIG_FIH_PROJECT_NE1
+        BYTE my_module_id;
 	char* module_name;
-	MINT32 ret = ERROR_NONE;
+#endif
 
 	KD_IMGSENSOR_PROFILE_INIT();
 	/* power on sensor */
@@ -1457,9 +1636,17 @@ static inline int adopt_CAMERA_HW_CheckIsAlive(void)
 	/* Search sensor keep i2c debug log */
 	g_IsSearchSensor = 1;
 	/* Camera information */
+//
+#ifdef CONFIG_FIH_PROJECT_NE1
+	if (gDrvIndex == 0x10000) {
+		memset(mtk_ccm_name, 0, camera_info_size);
+	}
+#else
+       
 	if (gDrvIndex == 0x20000) {
 		memset(mtk_ccm_name, 0, camera_info_size);
 	}
+#endif
 
 	if (g_pSensorFunc) {
 		for (i = KDIMGSENSOR_INVOKE_DRIVER_0; i < KDIMGSENSOR_MAX_INVOKE_DRIVERS; i++) {
@@ -1470,26 +1657,42 @@ static inline int adopt_CAMERA_HW_CheckIsAlive(void)
 									(MUINT8 *) &sensorID,
 									&retLen);
 				if (sensorID == 0) {	/* not implement this feature ID */
-					PK_DBG
-					    (" Not implement!!, use old open function to check\n");
+					PK_DBG(" Not implement!!, use old open function to check\n");
 					err = ERROR_SENSOR_CONNECT_FAIL;
 				} else if (sensorID == 0xFFFFFFFF) {	/* fail to open the sensor */
 					PK_DBG(" No Sensor Found");
-					err = ERROR_SENSOR_CONNECT_FAIL;
+                                        err = ERROR_SENSOR_CONNECT_FAIL;
 				} else {
-
-					PK_DBG(" Sensor found ID = 0x%x\n", sensorID);
-					/* add module id to proc sys begin*/
-					my_module_id = get_otp_module_id(0x04);
-					if(my_module_id == 0x01) {
-						module_name = "FoxLink";
-					} else {
-						module_name = "KingCom";
-					}
-					/* add module id to proc sys end */
-					snprintf(mtk_ccm_name + strlen(mtk_ccm_name),
-						 sizeof(mtk_ccm_name) - strlen(mtk_ccm_name),
-						 " CAM[%d]:%s, Module:%s;", g_invokeSocketIdx[i], g_invokeSensorNameStr[i],module_name);
+					//
+					#ifdef CONFIG_FIH_PROJECT_NE1
+						printk("[MIMI]1 Sensor found ID = 0x%x\n", sensorID);
+						// add for BBS log++
+						#ifdef FIHBBS
+							g_SensorFound =1;
+						#endif
+						// add for BBS log--
+						snprintf(mtk_ccm_name + strlen(mtk_ccm_name),
+							sizeof(mtk_ccm_name) - strlen(mtk_ccm_name),
+							" CAM[%d]:%s;", g_invokeSocketIdx[i], g_invokeSensorNameStr[i]);
+					#else
+						printk("[MIMI]2 Sensor found ID = 0x%x\n", sensorID);
+						// add for BBS log++
+						#ifdef FIHBBS
+							g_SensorFound =1;
+						#endif
+						// add for BBS log--
+						/* add module id to proc sys begin*/
+						my_module_id = get_otp_module_id(0x04);
+						if(my_module_id == 0x01) {
+							module_name = "FoxLink";
+						} else {
+							module_name = "KingCom";
+						}
+						/* add module id to proc sys end */
+						snprintf(mtk_ccm_name + strlen(mtk_ccm_name),
+							sizeof(mtk_ccm_name) - strlen(mtk_ccm_name),
+							" CAM[%d]:%s, Module:%s;", g_invokeSocketIdx[i], g_invokeSensorNameStr[i],module_name);
+					#endif
 					err = ERROR_NONE;
 				}
 				if (ERROR_NONE != err) {

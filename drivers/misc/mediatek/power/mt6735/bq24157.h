@@ -1,15 +1,3 @@
-/*
- * Copyright (C) 2015 MediaTek Inc.
- *
- * This file is free software; you can redistribute it and/or modify
- * it under the terms of version 2 of the GNU General Public License
- * as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- */
 /*****************************************************************************
 *
 * Filename:
@@ -142,9 +130,7 @@
   *   [Extern Function]
   *
   *********************************************************/
-extern kal_bool chargin_hw_init_done;
 /* CON0---------------------------------------------------- */
-extern int is_bq24157_exist(void);
 extern void bq24157_set_tmr_rst(unsigned int val);
 extern unsigned int bq24157_get_otg_status(void);
 extern void bq24157_set_en_stat(unsigned int val);
@@ -179,6 +165,7 @@ extern void bq24157_set_vsp(unsigned int val);
 /* CON6---------------------------------------------------- */
 extern void bq24157_set_i_safe(unsigned int val);
 extern void bq24157_set_v_safe(unsigned int val);
+extern unsigned int bq24157_get_v_safe(void);
 /* --------------------------------------------------------- */
 extern void bq24157_dump_register(void);
 extern unsigned int bq24157_reg_config_interface(unsigned char RegNum, unsigned char val);
@@ -187,4 +174,5 @@ extern unsigned int bq24157_read_interface(unsigned char RegNum, unsigned char *
 	unsigned char MASK, unsigned char SHIFT);
 extern unsigned int bq24157_config_interface(unsigned char RegNum, unsigned char val,
 	unsigned char MASK, unsigned char SHIFT);
+extern void charger_pin_cd_config(kal_bool status);
 #endif				/* _bq24157_SW_H_ */

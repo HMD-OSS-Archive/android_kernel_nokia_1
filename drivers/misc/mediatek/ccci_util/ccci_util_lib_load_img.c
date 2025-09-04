@@ -646,7 +646,7 @@ char *ccci_get_md_info_str(int md_id)
 	return md_img_info_str[md_id];
 }
 
-/*Begin:add for multi modem*/
+/*Begin: add for choose multi modem, 20190104*/
 struct custom_modem{
 	int hwid;
 	int type;
@@ -658,8 +658,11 @@ modem image format is "modem_x_yy_n.img"
 1. x is always 1;
 2. n rest with custom_modem.num;
 3. yy rest with custom_modem.type;
+
 one type corresponding to one bit!
-typedef enum {
+
+typedef enum 
+{
 	md_type_invalid = 0,
 	modem_2g = 1,
 	modem_3g,
@@ -684,14 +687,55 @@ typedef enum {
 	modem_ulfctg,
 	MAX_IMG_NUM = modem_ulfctg // this enum starts from 1
 } MD_LOAD_TYPE;
+
 eg:
 1.if have only one modem image type "lwg", so bit'5 is 1 and custom_modem.type is 0x000020;
-2.if have two modem image type "ltg & lwg", so bit'5 is 1 ,bit'6 is 1 and
-custom_modem.type is 0x000060;
+2.if have two modem image type "ltg & lwg", so bit'5 is 1 ,bit'6 is 1 and custom_modem.type is 0x000060;
 */
 
 const struct custom_modem fih_modem[] =
 {
+#ifdef CONFIG_FIH_PROJECT_NE1
+	{.hwid = 0x111, .type= 0x000060, .num = 1},
+	{.hwid = 0x112, .type= 0x000060, .num = 1},
+	{.hwid = 0x113, .type= 0x000060, .num = 1},
+	{.hwid = 0x114, .type= 0x000060, .num = 1},
+	{.hwid = 0x115, .type= 0x000060, .num = 1},
+	{.hwid = 0x121, .type= 0x000060, .num = 1},
+	{.hwid = 0x122, .type= 0x000060, .num = 1},
+	{.hwid = 0x123, .type= 0x000060, .num = 1},
+	{.hwid = 0x124, .type= 0x000060, .num = 1},
+	{.hwid = 0x125, .type= 0x000060, .num = 1},
+	{.hwid = 0x126, .type= 0x000060, .num = 1},
+	{.hwid = 0x132, .type= 0x000060, .num = 1},
+	{.hwid = 0x133, .type= 0x000060, .num = 2},
+	{.hwid = 0x134, .type= 0x000060, .num = 2},
+	{.hwid = 0x135, .type= 0x000060, .num = 2},
+	{.hwid = 0x136, .type= 0x000060, .num = 2},
+	{.hwid = 0x131, .type= 0x000060, .num = 2},
+	{.hwid = 0x141, .type= 0x000060, .num = 2},
+	{.hwid = 0x142, .type= 0x000060, .num = 2},
+	{.hwid = 0x143, .type= 0x000060, .num = 2},
+	{.hwid = 0x144, .type= 0x000060, .num = 2},
+	{.hwid = 0x145, .type= 0x000060, .num = 2},
+	{.hwid = 0x146, .type= 0x000060, .num = 2},
+	{.hwid = 0x233, .type= 0x000060, .num = 2},
+	{.hwid = 0x234, .type= 0x000060, .num = 2},
+	{.hwid = 0x235, .type= 0x000060, .num = 2},
+	{.hwid = 0x236, .type= 0x000060, .num = 2},
+	{.hwid = 0x153, .type= 0x000060, .num = 2},
+	{.hwid = 0x154, .type= 0x000060, .num = 2},
+	{.hwid = 0x155, .type= 0x000060, .num = 2},
+	{.hwid = 0x156, .type= 0x000060, .num = 2},
+	{.hwid = 0x161, .type= 0x000060, .num = 2},
+	{.hwid = 0x162, .type= 0x000060, .num = 2},
+	{.hwid = 0x163, .type= 0x000060, .num = 2},
+	{.hwid = 0x164, .type= 0x000060, .num = 2},
+	{.hwid = 0x165, .type= 0x000060, .num = 2},
+	{.hwid = 0x166, .type= 0x000060, .num = 2},
+	{.hwid = 0x171, .type= 0x000060, .num = 2},
+	{.hwid = 0x172, .type= 0x000060, .num = 2}
+#else  //FRT
 //Pre-EVT:
 	{.hwid = 0x111, .type= 0x000060, .num = 4},
 	{.hwid = 0x112, .type= 0x000060, .num = 5},
@@ -719,8 +763,8 @@ const struct custom_modem fih_modem[] =
 	{.hwid = 0x155, .type= 0x000060, .num = 5},
 	{.hwid = 0x156, .type= 0x000060, .num = 5},
 //NFC:
-        {.hwid = 0x115, .type= 0x000060, .num = 4},
-
+	{.hwid = 0x115, .type= 0x000060, .num = 4}
+#endif
 };
 
 size_t get_fih_modem_size(void)
@@ -730,7 +774,7 @@ size_t get_fih_modem_size(void)
 
 extern unsigned short fih_hwid;
 
-/*End:add for multi modem*/
+/*End: add for choose multi modem, 20190104*/
 
 void get_md_postfix(int md_id, char k[], char buf[], char buf_ex[])
 {
@@ -739,7 +783,7 @@ void get_md_postfix(int md_id, char k[], char buf[], char buf_ex[])
 	char YY_K[IMG_POSTFIX_LEN];
 	unsigned int feature_val = 0;
 
-	int i = 0,modem_num = 1;
+	int i = 0, modem_num = 1;
 
 	if ((md_id < 0) || (md_id > MAX_MD_NUM)) {
 		CCCI_UTIL_ERR_MSG_WITH_ID(md_id, "wrong MD ID to get postfix\n");
@@ -785,13 +829,14 @@ void get_md_postfix(int md_id, char k[], char buf[], char buf_ex[])
 		CCCI_UTIL_ERR_MSG_WITH_ID(md_id, "request MD type %d not supported\n", feature_val);
 		feature_val = md_type_invalid;
 	}
-	/*Begin:modify for multi modem*/
+
+	/*Begin: add for choose multi modem, 20190104*/
 	#if 0
-	/* K */
-	if (k == NULL)
-		snprintf(YY_K, IMG_POSTFIX_LEN, "_%s_n", type_str[feature_val]);
-	else
-		snprintf(YY_K, IMG_POSTFIX_LEN, "_%s_%s", type_str[feature_val], k);
+		/* K */
+		if (k == NULL)
+			snprintf(YY_K, IMG_POSTFIX_LEN, "_%s_n", type_str[feature_val]);
+		else
+			snprintf(YY_K, IMG_POSTFIX_LEN, "_%s_%s", type_str[feature_val], k);
 	#endif
 
 	modem_num = 2;
@@ -803,8 +848,10 @@ void get_md_postfix(int md_id, char k[], char buf[], char buf_ex[])
 			break;
 		}
 	}
+
 	snprintf(YY_K, IMG_POSTFIX_LEN, "_%s_%d", type_str[feature_val], modem_num);
-	/*End:modify for multi modem */
+	/*End: add for choose multi modem, 20190104*/
+
 	/* [_Ex] Get chip version */
 #if 0
 	if (get_chip_version() == CHIP_SW_VER_01)
@@ -820,8 +867,8 @@ void get_md_postfix(int md_id, char k[], char buf[], char buf_ex[])
 		snprintf(buf, IMG_POSTFIX_LEN, "%d%s", X, YY_K);
 		CCCI_UTIL_DBG_MSG_WITH_ID(md_id, "MD%d image postfix=%s\n", md_id + 1, buf);
 	}
-	printk("\n\n[%s]fih_hwid = %d modem_num = %d modem name = %s\n\n",__func__, fih_hwid,
-	    modem_num, buf);
+
+	printk("get_md_postfix() modem name = %s\n", buf);
 
 	if (buf_ex) {
 		snprintf(buf_ex, IMG_POSTFIX_LEN, "%d%s_E%d", X, YY_K, Ex);

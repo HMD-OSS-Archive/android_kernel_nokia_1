@@ -52,4 +52,7 @@ struct alsps_hw {
 
 int get_alsps_dts_func(struct device_node *node, struct alsps_hw *hw);
 
+// 
+struct alsps_hw *fih_get_alsps_dts_func(const char *name, struct alsps_hw *hw);
+
 #endif

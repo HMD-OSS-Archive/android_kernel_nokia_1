@@ -79,7 +79,9 @@
  ****************************************************************************/
 #define CALL_IDLE (0)
 #define CALL_ACTIVE (1)
+#if defined(CONFIG_FIH_PROJECT_FRT)
 #define CALL_VIDEO (2)
+#endif
 
 /*****************************************************************************
  *  Enum
@@ -188,8 +190,9 @@ typedef unsigned char  BOOL;
   #define TRUE  (1)
 #endif
 
+#if defined(CONFIG_FIH_PROJECT_FRT)
 /*****************************************************************************
- *  FIH PSE
+ *  OEM PSE
  ****************************************************************************/
 #define	MODE_NUM	7
 #define	CONTENT_NUM	15
@@ -221,6 +224,7 @@ typedef enum {
 	CHANGE_TEMP_L,
 	CHANGE_TEMP_H,
 } pse_col;
+#endif
 
 
 /*****************************************************************************
@@ -254,8 +258,10 @@ typedef struct {
 	unsigned int nPercent_ZCV;
 	unsigned int nPrecent_UI_SOC_check_point;
 	unsigned int ZCV;
+#if defined(CONFIG_FIH_PROJECT_FRT)
 	unsigned int charge_mode;
 	signed int temperature_pse;
+#endif
 } PMU_ChargerStruct;
 
 struct battery_custom_data {
@@ -363,7 +369,11 @@ extern struct battery_custom_data batt_cust_data;
 extern CHARGING_CONTROL battery_charging_control;
 extern kal_bool g_ftm_battery_flag;
 extern int charging_level_data[1];
+#if defined(CONFIG_FIH_PROJECT_FRT)
 extern unsigned int g_call_state;
+#else
+extern kal_bool g_call_state;
+#endif
 extern kal_bool g_charging_full_reset_bat_meter;
 #if defined(CONFIG_MTK_PUMP_EXPRESS_SUPPORT)
 extern kal_bool ta_check_chr_type;

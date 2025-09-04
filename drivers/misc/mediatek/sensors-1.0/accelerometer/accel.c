@@ -399,6 +399,7 @@ static ssize_t acc_store_batch(struct device *dev, struct device_attribute *attr
 			cxt->delay_ns = 10000000;
 
 	}
+
 	mutex_lock(&acc_context_obj->acc_op_mutex);
 
 #ifdef CONFIG_NANOHUB

@@ -5,34 +5,29 @@
 #include <linux/seq_file.h>
 #include <linux/utsname.h>
 
-extern char g_skuid_buf[6];
+extern char fih_skuid[8];
 
 static int version_proc_show(struct seq_file *m, void *v)
 {
 	int length = 0, offset = 0;
-
 	char old_linux_version[256] = {0}, new_linux_version[256] = {0};
+	char *at = NULL, *user = NULL, *machine = NULL, *left_parentheses = NULL, *right_parentheses = NULL;	
 
-	char *timezone = NULL, *at = NULL, *user = NULL, *machine = NULL, *left_parentheses = NULL, *right_parentheses = NULL;
-
-
-	printk("%s: g_skuid_buf from cmdline = %s\n", __func__, g_skuid_buf);
-
-	if(strncmp(g_skuid_buf, "600ID", 5) != 0)
+	if(strncmp(fih_skuid, "600ID", 5) != 0)
 	{
 		seq_printf(m, linux_proc_banner,
-				utsname()->sysname,
-				utsname()->release,
-				utsname()->version);
+			utsname()->sysname,
+			utsname()->release,
+			utsname()->version);
 		return 0;
 	}
 	else
 	{
 		snprintf(old_linux_version, 256, linux_proc_banner, utsname()->sysname, utsname()->release, utsname()->version);
 		/*
-		   Linux version 3.4.0-g8bf076e (fihtdc@fihtdc-sw5) (gcc version 4.9.x-google 20140827 (prerelease) (GCC) )
+		Linux version 3.4.0-g8bf076e (fihtdc@fihtdc-sw5) (gcc version 4.9.x-google 20140827 (prerelease) (GCC) ) 
 		#11 SMP PREEMPT Tue Aug 30 15:00:42 CST 2016
-		 */
+		*/
 
 		// copy before @
 		left_parentheses = strchr(old_linux_version,'(');
@@ -47,20 +42,19 @@ static int version_proc_show(struct seq_file *m, void *v)
 		strncpy(new_linux_version, old_linux_version, length);
 
 		// set user@machine as evercoss@android
-		strncpy(&new_linux_version[offset], "Tsm-0@tsm-Server0", 17);
-		offset += 17;
+	#if 0
+		strncpy(&new_linux_version[offset], "elevate@tsm-server0", strlen("elevate@tsm-server0"));
+		offset += strlen("elevate@tsm-server0");
+	#else
+		strncpy(&new_linux_version[offset], "Tsm-0@tsm-Server0", strlen("Tsm-0@tsm-Server0"));
+		offset += strlen("Tsm-0@tsm-Server0");
+	#endif
 
 		// copy ) and others
 		length = strlen(old_linux_version) - strlen(right_parentheses)+1;
 		snprintf(new_linux_version, 256, "%s%s", new_linux_version, right_parentheses);
 		//strncpy(&new_linux_version[offset], right_parentheses, length);
 
-		timezone = strstr(new_linux_version, "CST");
-
-		if(timezone != NULL)
-		{
-			memcpy(timezone, "WIB", 3);
-		}
 
 		seq_printf(m, new_linux_version);
 

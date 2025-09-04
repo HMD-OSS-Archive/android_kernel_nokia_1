@@ -12,8 +12,7 @@
 #
 
 #obj-$(CONFIG_MTK_PMIC)          += pmic.o upmu_common.o pmic_auxadc.o pmic_chr_type_det.o mt6311.o
-obj-$(CONFIG_MTK_PMIC)          += pmic.o upmu_common.o pmic_auxadc.o
-obj-$(CONFIG_MTK_MT6311_SUPPORT) += mt6311.o
+obj-$(CONFIG_MTK_PMIC)          += pmic.o upmu_common.o pmic_auxadc.o mt6311.o
 
 ifeq ($(CONFIG_MTK_PMIC_DVT_SUPPORT),y)
      obj-$(CONFIG_MTK_PMIC)     += pmic_dvt.o
@@ -21,12 +20,14 @@ endif
 
 obj-$(CONFIG_MTK_SMART_BATTERY) += battery_meter_hal.o pmic_chr_type_det.o
 
-# Jason
+# 
 obj-$(CONFIG_MTK_CHARGER_INTERFACE) += mtk_charger_intf.o
 ifeq ($(CONFIG_CHARGER_RT9458),y)
      obj-$(CONFIG_MTK_SMART_BATTERY) += rt9458.o
+     ifeq ($(CONFIG_MTK_BQ24157_SUPPORT),y)
+         obj-$(CONFIG_MTK_SMART_BATTERY) += bq24157.o charging_hw_bq24157.o
+     endif
 else
-
 ifeq ($(CONFIG_ONTIM_POWER_DRIVER),y)
      ifeq ($(CONFIG_MTK_FAN5405_SUPPORT),y)
           obj-$(CONFIG_MTK_SMART_BATTERY) += fan5405.o charging_hw_fan5405.o

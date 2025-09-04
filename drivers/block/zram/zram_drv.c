@@ -34,7 +34,6 @@
 #include <linux/err.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
-#include <linux/random.h>
 
 #ifdef CONFIG_ZSM
 #include <linux/rbtree.h>
@@ -215,7 +214,7 @@ static u32 insert_node_to_zram_tree(struct zram *zram, struct zram_meta *meta, u
 
 			/* found the same node and add ref count */
 			node_in_list->copy_count++;
-			if (unlikely(TABLE_GET_SIZE(input_node->value) > zram->max_zpage_size))
+			if (unlikely(TABLE_GET_SIZE(input_node->value) > max_zpage_size))
 				atomic64_add((u64)TABLE_GET_SIZE(input_node->value), &zram->stats.zsm_saved4k);
 			else
 				atomic64_add((u64)TABLE_GET_SIZE(input_node->value), &zram->stats.zsm_saved);
@@ -291,7 +290,7 @@ static int remove_node_from_zram_list(struct zram *zram, struct zram_meta *meta,
 			copy_index = meta->table[index].copy_index;
 			meta->table[copy_index].copy_count = meta->table[copy_index].copy_count - 1;
 		}
-		if (unlikely(TABLE_GET_SIZE(meta->table[index].value) > zram->max_zpage_size))
+		if (unlikely(TABLE_GET_SIZE(meta->table[index].value) > max_zpage_size))
 			atomic64_sub((u64)TABLE_GET_SIZE(meta->table[index].value), &zram->stats.zsm_saved4k);
 		else
 			atomic64_sub((u64)TABLE_GET_SIZE(meta->table[index].value), &zram->stats.zsm_saved);
@@ -588,99 +587,6 @@ static ssize_t comp_algorithm_store(struct device *dev,
 	return len;
 }
 
-static ssize_t secondary_algorithm_rate_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	size_t sz;
-	struct zram *zram = dev_to_zram(dev);
-
-	down_read(&zram->init_lock);
-	sz = scnprintf(buf, PAGE_SIZE, "%u\n", zram->secondary_algorithm_rate);
-	up_read(&zram->init_lock);
-
-	return sz;
-}
-
-static ssize_t secondary_algorithm_rate_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t len)
-{
-
-	struct zram *zram = dev_to_zram(dev);
-	int ret = 0;
-	u32 val = 0;
-
-	down_write(&zram->init_lock);
-	ret = kstrtou32(buf, 10, &val);
-	if (val > MAX_SECONDARY_ALGORITHM_RATE) {
-		val = MAX_SECONDARY_ALGORITHM_RATE;
-	}
-	zram->secondary_algorithm_rate = val;
-	up_write(&zram->init_lock);
-	return len;
-}
-
-static ssize_t secondary_algorithm_threshold_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	size_t sz;
-	struct zram *zram = dev_to_zram(dev);
-
-	down_read(&zram->init_lock);
-	sz = scnprintf(buf, PAGE_SIZE, "%u\n", zram->secondary_algorithm_threshold);
-	up_read(&zram->init_lock);
-
-	return sz;
-}
-
-static ssize_t secondary_algorithm_threshold_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t len)
-{
-
-	struct zram *zram = dev_to_zram(dev);
-	int ret = 0;
-	u32 val = 0;
-
-	down_write(&zram->init_lock);
-	ret = kstrtou32(buf, 10, &val);
-	if (val > PAGE_SIZE) {
-		val = PAGE_SIZE;
-	}
-	zram->secondary_algorithm_threshold = val;
-	up_write(&zram->init_lock);
-	return len;
-}
-
-static ssize_t max_zpage_size_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	size_t sz;
-	struct zram *zram = dev_to_zram(dev);
-
-	down_read(&zram->init_lock);
-	sz = scnprintf(buf, PAGE_SIZE, "%u\n", zram->max_zpage_size);
-	up_read(&zram->init_lock);
-
-	return sz;
-}
-
-static ssize_t max_zpage_size_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t len)
-{
-
-	struct zram *zram = dev_to_zram(dev);
-	int ret = 0;
-	u32 val = 0;
-
-	down_write(&zram->init_lock);
-	ret = kstrtou32(buf, 10, &val);
-	if (val >= PAGE_SIZE) {
-		val = PAGE_SIZE - 1;
-	}
-	zram->max_zpage_size = val;
-	up_write(&zram->init_lock);
-	return len;
-}
-
 /* flag operations needs meta->tb_lock */
 static int zram_test_flag(struct zram_meta *meta, u32 index,
 			enum zram_pageflags flag)
@@ -834,10 +740,6 @@ static void zram_free_page(struct zram *zram, size_t index)
 #ifdef CONFIG_ZSM
 	int ret = 0;
 #endif
-	if (zram_test_flag(meta, index, ZRAM_COMP_BACKUP)) {
-	     zram_clear_flag(meta, index, ZRAM_COMP_BACKUP);
-	}
-
 	if (unlikely(!handle)) {
 		/*
 		 * No memory is allocated for zero filled pages.
@@ -949,22 +851,13 @@ static int zram_decompress_page(struct zram *zram, char *mem, u32 index)
 		memcpy(mem, cmem, PAGE_SIZE);
 #ifndef CONFIG_MT_ENG_BUILD
 	else
-		if (zram_test_flag(meta, index, ZRAM_COMP_BACKUP)) {
-                        ret = zcomp_decompress(zram->comp, cmem, size, mem, true);
-                } else {
-			ret = zcomp_decompress(zram->comp, cmem, size, mem, false);
-
-		}
+		ret = zcomp_decompress(zram->comp, cmem, size, mem);
 #else
 	else {
 		/* Check header */
 		zram_check_guardbytes(cmem, true);
 		/* Move to the start of bitstream */
-		if (zram_test_flag(meta, index, ZRAM_COMP_BACKUP)) {
-			ret = zcomp_decompress(zram->comp, cmem, size, mem, true);
-		} else {
-			ret = zcomp_decompress(zram->comp, cmem += GUARD_BYTES_HALFLEN, size, mem, false);
-		}
+		ret = zcomp_decompress(zram->comp, cmem += GUARD_BYTES_HALFLEN, size, mem);
 		/* Check tail */
 		zram_check_guardbytes(cmem + size, false);
 	}
@@ -1067,8 +960,6 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 	struct zcomp_strm *zstrm;
 	bool locked = false;
 	unsigned long alloced_pages;
-	bool is_secondary = false;
-	u8 rand_num;
 
 	page = bvec->bv_page;
 
@@ -1130,29 +1021,8 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 #ifdef CONFIG_ZSM
 	ret = zcomp_compress_zram(zram->comp, zstrm, uncmem, &clen, &checksum);
 #else
+	ret = zcomp_compress(zram->comp, zstrm, uncmem, &clen);
 #endif
-
-	get_random_bytes(&rand_num, sizeof(rand_num));
-	if (zstrm->private_secondary &&
-            (rand_num % MAX_SECONDARY_ALGORITHM_RATE) < zram->secondary_algorithm_rate) {
-		is_secondary = true;
-		ret = zcomp_compress(zram->comp, zstrm, uncmem, &clen, true);
-		atomic64_inc(&zram->stats.num_secondary_compress);
-	} else {
-		ret = zcomp_compress(zram->comp, zstrm, uncmem, &clen, false);
-		atomic64_inc(&zram->stats.num_primary_compress);
-		if (zstrm->private_secondary) {
-
-			if (clen > zram->secondary_algorithm_threshold) {
-				ret = zcomp_compress(zram->comp, zstrm, uncmem, &clen, true);
-				atomic64_inc(&zram->stats.num_secondary_compress);
-				if (clen <= zram->max_zpage_size && !ret) {
-					pr_info("ZRAM: double compress\n");
-					is_secondary = true;
-				}
-			}
-		}
-	}
 
 	if (!is_partial_io(bvec)) {
 		kunmap_atomic(user_mem);
@@ -1165,9 +1035,8 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 		goto out;
 	}
 	src = zstrm->buffer;
-	if (unlikely(clen > zram->max_zpage_size)) {
+	if (unlikely(clen > max_zpage_size)) {
 		clen = PAGE_SIZE;
-		is_secondary = false;
 		if (is_partial_io(bvec))
 			src = uncmem;
 #ifdef CONFIG_ZSM
@@ -1211,7 +1080,7 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 #endif
 	}
 #ifdef CONFIG_ZSM
-	if (unlikely(clen <= zram->max_zpage_size)) {
+	if (unlikely(clen <= max_zpage_size)) {
 		int search_ret = 0;
 
 		bit_spin_lock(ZRAM_ACCESS, &meta->table[index].value);
@@ -1310,15 +1179,6 @@ static int zram_bvec_write(struct zram *zram, struct bio_vec *bvec, u32 index,
 	atomic64_add(clen, &zram->stats.compr_data_size);
 	atomic64_inc(&zram->stats.pages_stored);
 out:
-	if (!ret) {
-		bit_spin_lock(ZRAM_ACCESS, &meta->table[index].value);
-		if (is_secondary)
-			zram_set_flag(meta, index, ZRAM_COMP_BACKUP);
-		else
-			zram_clear_flag(meta, index, ZRAM_COMP_BACKUP);
-		bit_spin_unlock(ZRAM_ACCESS, &meta->table[index].value);
-	}
-
 	if (locked)
 		zcomp_strm_release(zram->comp, zstrm);
 	if (is_partial_io(bvec))
@@ -1425,6 +1285,7 @@ static void zram_reset_device(struct zram *zram, bool reset_capacity)
 	zram->disksize = 0;
 	if (reset_capacity)
 		set_capacity(zram->disk, 0);
+
 	up_write(&zram->init_lock);
 
 	/*
@@ -1652,12 +1513,6 @@ static DEVICE_ATTR(max_comp_streams, S_IRUGO | S_IWUSR,
 		max_comp_streams_show, max_comp_streams_store);
 static DEVICE_ATTR(comp_algorithm, S_IRUGO | S_IWUSR,
 		comp_algorithm_show, comp_algorithm_store);
-static DEVICE_ATTR(secondary_algorithm_rate, S_IRUGO | S_IWUSR,
-		secondary_algorithm_rate_show, secondary_algorithm_rate_store);
-static DEVICE_ATTR(secondary_algorithm_threshold, S_IRUGO | S_IWUSR,
-		secondary_algorithm_threshold_show, secondary_algorithm_threshold_store);
-static DEVICE_ATTR(max_zpage_size, S_IRUGO | S_IWUSR,
-		max_zpage_size_show, max_zpage_size_store);
 
 ZRAM_ATTR_RO(num_reads);
 ZRAM_ATTR_RO(num_writes);
@@ -1687,9 +1542,6 @@ static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_mem_used_max.attr,
 	&dev_attr_max_comp_streams.attr,
 	&dev_attr_comp_algorithm.attr,
-	&dev_attr_secondary_algorithm_rate.attr,
-	&dev_attr_secondary_algorithm_threshold.attr,
-	&dev_attr_max_zpage_size.attr,
 	NULL,
 };
 
@@ -1729,9 +1581,6 @@ static int create_device(struct zram *zram, int device_id)
 	zram->disk->fops = &zram_devops;
 	zram->disk->queue = zram->queue;
 	zram->disk->private_data = zram;
-	zram->max_zpage_size = PAGE_SIZE / 4 * 3;
-	zram->secondary_algorithm_rate = 0;
-	zram->secondary_algorithm_threshold = PAGE_SIZE / 3 * 2;
 	snprintf(zram->disk->disk_name, 16, "zram%d", device_id);
 
 	/* Actual capacity set using syfs (/sys/block/zram<id>/disksize */
@@ -1823,33 +1672,29 @@ static int zraminfo_proc_show(struct seq_file *m, void *v)
 #define P2K(x) (((unsigned long)x) << (PAGE_SHIFT - 10))
 #define B2K(x) (((unsigned long)x) >> (10))
 		seq_printf(m,
-				"DiskSize:             %8lu kB\n"
-				"OrigSize:             %8lu kB\n"
-				"ComprSize:            %8lu kB\n"
-				"MemUsed:              %8lu kB\n"
-				"ZeroPage:             %8lu kB\n"
-				"NumPrimaryCompress:   %8lu kB\n"
-				"NumSecondaryCompress: %8lu kB\n"
-				"NotifyFree:           %8lu kB\n"
-				"FailReads:            %8lu kB\n"
-				"FailWrites:           %8lu kB\n"
-				"NumReads:             %8lu kB\n"
-				"NumWrites:            %8lu kB\n"
-				"InvalidIO:            %8lu kB\n"
+				"DiskSize:       %8lu kB\n"
+				"OrigSize:       %8lu kB\n"
+				"ComprSize:      %8lu kB\n"
+				"MemUsed:        %8lu kB\n"
+				"ZeroPage:       %8lu kB\n"
+				"NotifyFree:     %8lu kB\n"
+				"FailReads:      %8lu kB\n"
+				"FailWrites:     %8lu kB\n"
+				"NumReads:       %8lu kB\n"
+				"NumWrites:      %8lu kB\n"
+				"InvalidIO:      %8lu kB\n"
 #ifdef CONFIG_ZSM
-				"ZSM saved:            %8lu kB\n"
-				"ZSM4k saved:          %8lu kB\n"
+				"ZSM saved:      %8lu kB\n"
+				"ZSM4k saved:    %8lu kB\n"
 #endif
-				"MaxUsedPages:         %8lu kB\n"
-				"PageMigrated:	       %8lu kB\n"
+				"MaxUsedPages:   %8lu kB\n"
+				"PageMigrated:	 %8lu kB\n"
 				,
 				B2K(zram_devices->disksize),
 				P2K(atomic64_read(&zram_devices->stats.pages_stored)),
 				B2K(atomic64_read(&zram_devices->stats.compr_data_size)),
 				P2K(zs_get_total_pages(zram_devices->meta->mem_pool)),
 				P2K(atomic64_read(&zram_devices->stats.zero_pages)),
-				P2K(atomic64_read(&zram_devices->stats.num_primary_compress)),
-				P2K(atomic64_read(&zram_devices->stats.num_secondary_compress)),
 				P2K(atomic64_read(&zram_devices->stats.notify_free)),
 				P2K(atomic64_read(&zram_devices->stats.failed_reads)),
 				P2K(atomic64_read(&zram_devices->stats.failed_writes)),

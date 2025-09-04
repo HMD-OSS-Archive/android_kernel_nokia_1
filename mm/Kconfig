@@ -328,7 +328,7 @@ config MMU_NOTIFIER
 
 config KSM
 	bool "Enable KSM for page merging"
-	depends on MMU
+	depends on MMU && !MTK_ENABLE_AGO
 	help
 	  Enable Kernel Samepage Merging: KSM periodically scans those areas
 	  of an application's address space that an app has advised may be
@@ -339,16 +339,6 @@ config KSM
 	  See Documentation/vm/ksm.txt for more information: KSM is inactive
 	  until a program has madvised that an area is MADV_MERGEABLE, and
 	  root has set /sys/kernel/mm/ksm/run to 1 (if CONFIG_SYSFS is set).
-
-config KSM_GO
-	bool "Enable KSM optimized solution for low ram"
-	depends on KSM
-	help
-	  Enable optimized solution for low ram, improve user experience
-          As for low end mobile phone, CPU ability is limited. performance is more
-          important than power consumption. change scene of KSM running,
-          when screen off, run KSM; vice verse. when no new merged pages, sleep
-          is longer for saving CPU.
 
 config DEFAULT_MMAP_MIN_ADDR
         int "Low address space to protect from user allocation"

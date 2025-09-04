@@ -685,8 +685,10 @@ int dmesg_restrict = IS_ENABLED(CONFIG_SECURITY_DMESG_RESTRICT);
 
 static int syslog_action_restricted(int type)
 {
+//BBS begin
 	if (type == SYSLOG_ACTION_GET_KERNEL_BUFFER)
 		return 0;
+//BBS end
 	if (dmesg_restrict)
 		return 1;
 	/*
@@ -1883,7 +1885,7 @@ static inline int can_use_console(unsigned int cpu)
  * is successful, false otherwise.
  */
 static int console_trylock_for_printk(void)
-	__releases(&bbs_logbuf_lock)
+	__releases(&bbs_logbuf_lock)    //BBS
 {
 	unsigned int cpu = smp_processor_id();
 
@@ -2269,7 +2271,7 @@ asmlinkage __visible int printk(const char *fmt, ...)
 	va_start(args, fmt);
 	r = vprintk_emit(0, -1, NULL, 0, fmt, args);
 
-//marxchen
+//
 	if(strstr(fmt,"BBox") != NULL){
 		int i;
 		char printk_bbsbuf[512];
@@ -2289,7 +2291,7 @@ asmlinkage __visible int printk(const char *fmt, ...)
 		if(waitqueue_active(&bbs_log_wait))
 			wake_up_interruptible(&bbs_log_wait);
 	}
-//marxchen
+//
 
 	va_end(args);
 

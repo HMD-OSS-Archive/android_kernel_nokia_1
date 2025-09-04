@@ -81,7 +81,6 @@ int get_accel_dts_func(struct device_node *node, struct acc_hw *hw)
 	return 0;
 }
 
-
 int get_alsps_dts_func(struct device_node *node, struct alsps_hw *hw)
 {
 	int i, ret;
@@ -166,55 +165,6 @@ int get_alsps_dts_func(struct device_node *node, struct alsps_hw *hw)
 	return 0;
 }
 
-int get_mag_dts_func(struct device_node *node, struct mag_hw *hw)
-{
-	int i, ret;
-	u32 i2c_num[] = {0};
-	u32 i2c_addr[M_CUST_I2C_ADDR_NUM] = {0};
-	u32 direction[] = {0};
-	u32 power_id[] = {0};
-	u32 power_vol[] = {0};
-	u32 is_batch_supported[] = {0};
-
-	SENSOR_LOG("Device Tree get mag info!\n");
-	if (node) {
-		ret = of_property_read_u32_array(node, "i2c_num", i2c_num, ARRAY_SIZE(i2c_num));
-		if (ret == 0)
-			hw->i2c_num	=	i2c_num[0];
-
-		ret = of_property_read_u32_array(node, "i2c_addr", i2c_addr, ARRAY_SIZE(i2c_addr));
-		if (ret == 0) {
-			for (i = 0; i < M_CUST_I2C_ADDR_NUM; i++)
-				hw->i2c_addr[i]   = i2c_addr[i];
-		}
-
-		ret = of_property_read_u32_array(node, "direction", direction, ARRAY_SIZE(direction));
-		if (ret == 0)
-			hw->direction = direction[0];
-
-		ret = of_property_read_u32_array(node, "power_id", power_id, ARRAY_SIZE(power_id));
-		if (ret == 0) {
-			if (power_id[0] == 0xffff)
-				hw->power_id = -1;
-			else
-				hw->power_id	=	 power_id[0];
-		}
-
-		ret = of_property_read_u32_array(node, "power_vol", power_vol, ARRAY_SIZE(power_vol));
-		if (ret == 0)
-			hw->power_vol	 =	  power_vol[0];
-
-		ret = of_property_read_u32_array(node, "is_batch_supported", is_batch_supported,
-			ARRAY_SIZE(is_batch_supported));
-		if (ret == 0)
-			hw->is_batch_supported		   = is_batch_supported[0];
-	} else {
-		SENSOR_PR_ERR("Device Tree: can not find mag node!. Go to use old cust info\n");
-		return -1;
-	}
-	return 0;
-}
-
 int get_gyro_dts_func(struct device_node *node, struct gyro_hw *hw)
 {
 	int i, ret;
@@ -267,6 +217,175 @@ int get_gyro_dts_func(struct device_node *node, struct gyro_hw *hw)
 		return -1;
 	}
 	return 0;
+}
+
+
+int get_mag_dts_func(struct device_node *node, struct mag_hw *hw)
+{
+	int i, ret;
+	u32 i2c_num[] = {0};
+	u32 i2c_addr[M_CUST_I2C_ADDR_NUM] = {0};
+	u32 direction[] = {0};
+	u32 power_id[] = {0};
+	u32 power_vol[] = {0};
+	u32 is_batch_supported[] = {0};
+
+	SENSOR_LOG("Device Tree get mag info!\n");
+	if (node) {
+		ret = of_property_read_u32_array(node, "i2c_num", i2c_num, ARRAY_SIZE(i2c_num));
+		if (ret == 0)
+			hw->i2c_num	=	i2c_num[0];
+
+		ret = of_property_read_u32_array(node, "i2c_addr", i2c_addr, ARRAY_SIZE(i2c_addr));
+		if (ret == 0) {
+			for (i = 0; i < M_CUST_I2C_ADDR_NUM; i++)
+				hw->i2c_addr[i]   = i2c_addr[i];
+		}
+
+		ret = of_property_read_u32_array(node, "direction", direction, ARRAY_SIZE(direction));
+		if (ret == 0)
+			hw->direction = direction[0];
+
+		ret = of_property_read_u32_array(node, "power_id", power_id, ARRAY_SIZE(power_id));
+		if (ret == 0) {
+			if (power_id[0] == 0xffff)
+				hw->power_id = -1;
+			else
+				hw->power_id	=	 power_id[0];
+		}
+
+		ret = of_property_read_u32_array(node, "power_vol", power_vol, ARRAY_SIZE(power_vol));
+		if (ret == 0)
+			hw->power_vol	 =	  power_vol[0];
+
+		ret = of_property_read_u32_array(node, "is_batch_supported", is_batch_supported,
+			ARRAY_SIZE(is_batch_supported));
+		if (ret == 0)
+			hw->is_batch_supported		   = is_batch_supported[0];
+	} else {
+		SENSOR_PR_ERR("Device Tree: can not find mag node!. Go to use old cust info\n");
+		return -1;
+	}
+	return 0;
+}
+
+struct acc_hw *fih_get_accel_dts_func(const char *name, struct acc_hw *hw)
+{
+	hw->i2c_num = 2;
+
+	hw->i2c_addr[0] = 0x10;
+	hw->i2c_addr[1] = 0;
+
+	hw->direction = 4;
+
+	hw->power_id = -1;
+
+	hw->power_vol = 0;
+
+	hw->firlen = 0;
+
+	hw->is_batch_supported = 0;
+
+	return hw;
+}
+
+struct alsps_hw *fih_get_alsps_dts_func(const char *name, struct alsps_hw *hw)
+{
+	hw->i2c_num = 2;
+
+	hw->i2c_addr[0] = 0x48;
+	hw->i2c_addr[1] = 0;
+	hw->i2c_addr[2] = 0;
+	hw->i2c_addr[3] = 0;
+
+	hw->power_id = -1;
+
+	hw->power_vol = 0;
+
+	hw->als_level[0] = 0;
+	hw->als_level[1] = 213;
+	hw->als_level[2] = 711;
+	hw->als_level[3] = 1143;
+	hw->als_level[4] = 2630;
+	hw->als_level[5] = 6803;
+	hw->als_level[6] = 6909;
+	hw->als_level[7] = 10736;
+	hw->als_level[8] = 19968;
+	hw->als_level[9] = 24783;
+	hw->als_level[10] = 29231;
+	hw->als_level[11] = 42000;
+	hw->als_level[12] = 51141;
+	hw->als_level[13] = 51141;
+	hw->als_level[14] = 51141;
+
+	hw->als_value[0] = 0;
+	hw->als_value[1] = 135;
+	hw->als_value[2] = 303;
+	hw->als_value[3] = 501;
+	hw->als_value[4] = 1005;
+	hw->als_value[5] = 2005;
+	hw->als_value[6] = 3209;
+	hw->als_value[7] = 5002;
+	hw->als_value[8] = 8006;
+	hw->als_value[9] = 10010;
+	hw->als_value[10] = 12000;
+	hw->als_value[11] = 16010;
+	hw->als_value[12] = 20000;
+	hw->als_value[13] = 20000;
+	hw->als_value[14] = 20000;
+	hw->als_value[15] = 20000;
+
+	hw->polling_mode_ps = 1;
+
+	hw->polling_mode_als = 1;
+
+	hw->ps_threshold_high = 1000;
+
+	hw->ps_threshold_low = 800;
+
+	hw->is_batch_supported_ps = 0;
+
+	hw->is_batch_supported_als = 0;
+
+	return hw;
+}
+
+struct gyro_hw *fih_get_gyro_dts_func(const char *name, struct gyro_hw *hw)
+{
+	hw->i2c_num = 2;
+
+	hw->i2c_addr[0] = 0x68;
+	hw->i2c_addr[1] = 0;
+
+	hw->direction = 0;
+
+	hw->power_id = -1;
+
+	hw->power_vol = 0;
+
+	hw->firlen = 0;
+
+	hw->is_batch_supported = 0;
+
+	return hw;
+}
+
+struct mag_hw *fih_get_mag_dts_func(const char *name, struct mag_hw *hw)
+{
+	hw->i2c_num = 2;
+
+	hw->i2c_addr[0] = 0x12;
+	hw->i2c_addr[1] = 0;
+
+	hw->direction = 4;
+
+	hw->power_id = -1;
+
+	hw->power_vol = 0;
+
+	hw->is_batch_supported = 0;
+
+	return hw;
 }
 
 int get_baro_dts_func(struct device_node *node, struct baro_hw *hw)

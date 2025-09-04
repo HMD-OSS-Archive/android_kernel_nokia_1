@@ -118,17 +118,23 @@ extern struct keypad_dts_data kpd_dts_data;
 	KEY_ENDCALL, KEY_POWER,	\
 }
 
-#define KPD_HAS_SLIDE_QWERTY	0
+// OEM
+#define KPD_HAS_SLIDE_QWERTY	1
+
 #if KPD_HAS_SLIDE_QWERTY
 static inline bool powerOn_slidePin_interface(void)
 {
-	return hwPowerOn(MT65XX_POWER_LDO_VCAM_IO, VOL_2800, "Qwerty slide");
+	//return hwPowerOn(MT65XX_POWER_LDO_VCAM_IO, VOL_2800, "Qwerty slide");
+	return 0;
 }
+
 static inline bool powerOff_slidePin_interface(void)
 {
-	return hwPowerDown(MT65XX_POWER_LDO_VCAM_IO, "Qwerty slide");
+	//return hwPowerDown(MT65XX_POWER_LDO_VCAM_IO, "Qwerty slide");
+	return 0;
 }
 #endif
+
 #ifdef CONFIG_KPD_PWRKEY_USE_PMIC
 void kpd_pwrkey_pmic_handler(unsigned long pressed);
 #else

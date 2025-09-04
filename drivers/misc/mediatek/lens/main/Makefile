@@ -65,4 +65,5 @@ mainaf-y  += common/bu63169af/BU63169AF.o
 mainaf-y  += common/bu63169af/OIS_func.o
 mainaf-y  += common/bu63169af/OIS_main.o
 mainaf-y  += common/bu63169af/OIS_user.o
+obj-$(CONFIG_MTK_LENS_GT9762AF_SUPPORT)    += common/gt9762af/
 endif

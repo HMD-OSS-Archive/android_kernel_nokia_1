@@ -574,7 +574,7 @@ static ssize_t mtp_read(struct file *fp, char __user *buf,
 	size_t count, loff_t *pos)
 {
 	struct mtp_dev *dev = fp->private_data;
-	struct usb_composite_dev *cdev = dev->cdev;
+	struct usb_composite_dev *cdev;
 	struct usb_request *req;
 	ssize_t r = count;
 	unsigned xfer;
@@ -599,19 +599,23 @@ static ssize_t mtp_read(struct file *fp, char __user *buf,
 			skip_cnt++;
 	}
 
-	DBG(cdev, "mtp_read(%zu)\n", count);
+	pr_debug("mtp_read(%zu)\n", count);
 
 	if (count > MTP_BULK_BUFFER_SIZE) {
 		return -EINVAL;
 	}
 	/* we will block until we're online */
-	DBG(cdev, "mtp_read: waiting for online state\n");
+	pr_debug("mtp_read: waiting for online state\n");
 	ret = wait_event_interruptible(dev->read_wq,
 		dev->state != STATE_OFFLINE);
 	if (ret < 0) {
 		r = ret;
 		goto done;
 	}
+
+	/* update cdev after online */
+	cdev = dev->cdev;
+
 	spin_lock_irq(&dev->lock);
 	if (dev->state == STATE_CANCELED) {
 		/* report cancelation to userspace */
@@ -673,7 +677,7 @@ done:
 		dev->state = STATE_READY;
 	spin_unlock_irq(&dev->lock);
 
-	DBG(cdev, "mtp_read returning %zd\n", r);
+	pr_debug("mtp_read returning %zd\n", r);
 	return r;
 }
 

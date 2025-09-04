@@ -818,6 +818,7 @@ static struct miscdevice acc_device = {
 	.fops = &acc_fops,
 };
 
+
 static const struct hid_device_id acc_hid_table[] = {
 	{ HID_USB_DEVICE(HID_ANY_ID, HID_ANY_ID) },
 	{ }

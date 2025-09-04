@@ -391,7 +391,7 @@ static int __init init_fliper(void)
 	pe = proc_create("fliper", 0664, fliperfs_dir, &mt_fliper_fops);
 	if (!pe)
 		return -ENOMEM;
-	perf_dir = proc_create("perf", 0664, fliperfs_dir, &mt_perf_fops);
+	perf_dir = proc_create("perf", 0644, fliperfs_dir, &mt_perf_fops);
 	if (!perf_dir) {
 		pr_debug("not perf_dir\n");
 		return -ENOMEM;

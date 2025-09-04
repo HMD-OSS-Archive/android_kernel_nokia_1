@@ -75,6 +75,11 @@ extern void mt65xx_eint_mask(unsigned int line);
 #define TPD_HAVE_CALIBRATION
 #define TPD_CALIBRATION_MATRIX        {962,0,0,0,1600,0,0,0};
 
+#define BBOX_TP_PROBE_FAILED do {printk("BBox::%s: BBOX_TP_PROBE_FAILED \n", __func__); printk("BBox::UEC;7::0\n");} while (0);
+#define BBOX_TP_I2C_READ_FAILED do {printk("BBox::%s: BBOX_TP_I2C_READ_FAILED \n", __func__); printk("BBox::UEC;7::1\n");} while (0);
+#define BBOX_TP_I2C_WRITE_FAILED do {printk("BBox::%s: BBOX_TP_I2C_WRITE_FAILED \n", __func__); printk("BBox::UEC;7::2\n");} while (0);
+#define BBOX_TP_FW_UPGRADE_FAILED do {printk("BBox::%s: BBOX_TP_FW_UPGRADE_FAILED \n", __func__); printk("BBox::UEC;7::6\n");} while (0);
+
 extern void tpd_on(void);
 extern void tpd_off(void);
 

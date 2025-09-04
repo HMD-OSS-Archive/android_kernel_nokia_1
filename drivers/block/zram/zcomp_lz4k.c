@@ -12,7 +12,6 @@
 #include <linux/lz4k.h>
 
 #include "zcomp_lz4k.h"
-#include "zcomp_zstd.h"
 
 static void *zcomp_lz4k_create(void)
 {
@@ -60,7 +59,6 @@ struct zcomp_backend zcomp_lz4k = {
 	.create = zcomp_lz4k_create,
 	.destroy = zcomp_lz4k_destroy,
 	.name = "lz4k",
-	.secondary = &zcomp_zstd,
 };
 #endif
 

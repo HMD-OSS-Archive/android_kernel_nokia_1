@@ -127,9 +127,9 @@ static int accdet_mod_init(void)
 
 	ACCDET_DEBUG_DRV("[Accdet]accdet_mod_init begin!\n");
 
-        //Added to press hook twice or three times
-        accdet_hrtimer_init();
-        accdet_hrtimer2_init();
+    // for press hook twice or three times
+    accdet_hrtimer_init();
+    accdet_hrtimer2_init();
 
 	ret = platform_driver_register(&accdet_driver);
 	if (ret)

@@ -75,7 +75,6 @@ static CLK_BUF_SWCTRL_STATUS_T clk_buf_swctrl[CLKBUF_NUM] = {
 
 #define CLK_BUF_BSI_PAD_NUM	5
 #define clkbuf_debug(fmt, args...)	pr_debug(fmt, ##args)
-
 static unsigned int clk_buf_spm_cfg[CLK_BUF_BSI_PAD_NUM] = {
 	0x00000000, /* BSI_EN_SR */
 	0x00000000, /* BSI_CLK_SR */

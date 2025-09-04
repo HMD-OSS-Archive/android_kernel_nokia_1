@@ -98,48 +98,6 @@ static void enable_kpd(int enable)
 }
 #endif
 
-void kpd_slide_qwerty_init(void)
-{
-#if KPD_HAS_SLIDE_QWERTY
-	bool evdev_flag = false;
-	bool power_op = false;
-	struct input_handler *handler;
-	struct input_handle *handle;
-
-	handle = rcu_dereference(dev->grab);
-	if (handle) {
-		handler = handle->handler;
-		if (strcmp(handler->name, "evdev") == 0)
-			return -1;
-	} else {
-		list_for_each_entry_rcu(handle, &dev->h_list, d_node) {
-			handler = handle->handler;
-			if (strcmp(handler->name, "evdev") == 0) {
-				evdev_flag = true;
-				break;
-			}
-		}
-		if (evdev_flag == false)
-			return -1;
-	}
-
-	power_op = powerOn_slidePin_interface();
-	if (!power_op)
-		kpd_print(KPD_SAY "Qwerty slide pin interface power on fail\n");
-	else
-		kpd_print("Qwerty slide pin interface power on success\n");
-
-	mt_eint_set_sens(KPD_SLIDE_EINT, KPD_SLIDE_SENSITIVE);
-	mt_eint_set_hw_debounce(KPD_SLIDE_EINT, KPD_SLIDE_DEBOUNCE);
-	mt_eint_registration(KPD_SLIDE_EINT, true, KPD_SLIDE_POLARITY, kpd_slide_eint_handler, false);
-
-	power_op = powerOff_slidePin_interface();
-	if (!power_op)
-		kpd_print(KPD_SAY "Qwerty slide pin interface power off fail\n");
-	else
-		kpd_print("Qwerty slide pin interface power off success\n");
-#endif
-}
 
 void kpd_get_keymap_state(u16 state[])
 {

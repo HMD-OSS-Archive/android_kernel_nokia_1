@@ -90,6 +90,7 @@ struct rt_regmap_device {
 	unsigned char part_size_limit;
 	unsigned char *alloc_data;
 	char *err_msg;
+	int slv_addr;
 
 	int (*rt_block_write[4])(struct rt_regmap_device *rd,
 			struct rt_register *rm, int size,
@@ -1371,9 +1372,9 @@ hiden_read:
 		break;
 	case RT_DBG_SLAVE_ADDR:
 		{
-			struct i2c_client *i2c = rd->client;
+			//struct i2c_client *i2c = rd->client;
 
-			seq_printf(seq_file, "0x%02x\n", i2c->addr);
+			seq_printf(seq_file, "0x%02x\n", rd->slv_addr);
 		}
 		break;
 	case RT_SUPPORT_MODE:
@@ -1971,11 +1972,11 @@ static int rt_create_simple_map(struct rt_regmap_device *rd)
  * @client: a pointer to the slave client of this device
  * @drvdata: a pointer to the driver data
  */
-struct rt_regmap_device *rt_regmap_device_register
+struct rt_regmap_device *rt_regmap_device_register_ex
 			(struct rt_regmap_properties *props,
 			struct rt_regmap_fops *rops,
 			struct device *parent,
-			void *client, void *drvdata)
+			void *client, int slv_addr, void *drvdata)
 {
 	struct rt_regmap_device *rd;
 	int ret = 0, i;
@@ -2024,6 +2025,7 @@ struct rt_regmap_device *rt_regmap_device_register
 	}
 
 	rd->rops = rops;
+	rd->slv_addr = slv_addr;
 	rd->err_msg = devm_kzalloc(parent, 128*sizeof(char), GFP_KERNEL);
 
 	if (!(rd->props.rt_regmap_mode &  RT_BYTE_MODE_MASK)) {
@@ -2079,7 +2081,7 @@ err_cacheinit:
 	return NULL;
 
 }
-EXPORT_SYMBOL(rt_regmap_device_register);
+EXPORT_SYMBOL(rt_regmap_device_register_ex);
 
 /* rt_regmap_device_unregister - unregister rt_regmap_device*/
 void rt_regmap_device_unregister(struct rt_regmap_device *rd)

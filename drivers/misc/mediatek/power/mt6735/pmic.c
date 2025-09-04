@@ -3221,6 +3221,12 @@ void homekey_int_handler_r(void)
 #endif
 }
 
+#if defined(CONFIG_MTK_BQ24157_SUPPORT)
+//
+extern unsigned short fih_hwid;
+extern void bq24157_set_reset(unsigned int val);
+#endif
+
 void chrdet_int_handler(void)
 {
 	PMICLOG("[chrdet_int_handler]CHRDET status = %d....\n",
@@ -3235,6 +3241,12 @@ void chrdet_int_handler(void)
 		if (boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT
 		    || boot_mode == LOW_POWER_OFF_CHARGING_BOOT) {
 			PMICLOG("[chrdet_int_handler] Unplug Charger/USB\n");
+#if defined(CONFIG_MTK_BQ24157_SUPPORT)
+			if (fih_hwid <= 0x113) {
+				if (chargin_hw_init_done == KAL_TRUE)// charger IC driver init is OK.
+					bq24157_set_reset(1);
+			}
+#endif
 			mt_power_off();
 		}
 	}
@@ -3624,31 +3636,25 @@ int is_ext_vbat_boost_exist(void)
 
 int get_ext_buck_i2c_ch_num(void)
 {
-#ifdef MTK_MT6311_SUPPORT
 	if (is_mt6311_exist() == 1)
 		return get_mt6311_i2c_ch_num();
 	else
-#endif
 		return -1;
 }
 
 int is_ext_buck_sw_ready(void)
 {
-#ifdef MTK_MT6311_SUPPORT
 	if ((is_mt6311_sw_ready() == 1))
 		return 1;
 	else
-#endif
 		return 0;
 }
 
 int is_ext_buck_exist(void)
 {
-#ifdef MTK_MT6311_SUPPORT
 	if ((is_mt6311_exist() == 1))
 		return 1;
 	else
-#endif
 		return 0;
 }
 

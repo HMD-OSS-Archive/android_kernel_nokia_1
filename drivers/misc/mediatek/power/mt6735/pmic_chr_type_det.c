@@ -59,7 +59,9 @@
 /* extern function */
 /* ============================================================ // */
 bool is_dcp_type = false;
+#if defined(CONFIG_FIH_PROJECT_FRT)
 extern int First_temp;
+#endif
 
 #if defined(CONFIG_POWER_EXT) || defined(CONFIG_MTK_FPGA)
 
@@ -82,9 +84,12 @@ static void hw_bc11_dump_register(void)
 
 static void hw_bc11_init(void)
 {
+#if defined(CONFIG_FIH_PROJECT_FRT)
 	int timeout_count = 60;
+#endif
 	msleep(200);
-        //add by mtk start
+#if defined(CONFIG_FIH_PROJECT_FRT)
+	//add by mtk start
 	/* add make sure USB Ready */
 	if (is_usb_rdy() == KAL_FALSE) {
 		battery_log(BAT_LOG_CRTI, "CDP, block\n");
@@ -100,6 +105,7 @@ static void hw_bc11_init(void)
 	} else
 		battery_log(BAT_LOG_CRTI, "CDP, PASS\n");
 	//add by mtk start
+#endif
 
 #if defined(CONFIG_MTK_SMART_BATTERY)
 	Charger_Detect_Init();
@@ -129,8 +135,10 @@ static void hw_bc11_init(void)
 		hw_bc11_dump_register();
 	}
 
+#if defined(CONFIG_FIH_PROJECT_FRT)
 	mtk_chr_reset_aicr_upper_bound();
 	First_temp = 0;
+#endif
 }
 
 
@@ -246,11 +254,14 @@ static unsigned int hw_bc11_stepB2(void)
 	bc11_set_register_value(PMIC_RG_BC11_CMP_EN, 0x2);
 	msleep(80);
 	wChargerAvail = bc11_get_register_value(PMIC_RGS_BC11_CMP_OUT);
-	//if (!wChargerAvail) {
+#if !defined(CONFIG_FIH_PROJECT_FRT)
+	if (!wChargerAvail) {
 		/* RG_bc11_VSRC_EN[1.0] = 10 */
-		//bc11_set_register_value(PMIC_RG_BC11_VSRC_EN, 0x2);
-	//}
+		bc11_set_register_value(PMIC_RG_BC11_VSRC_EN, 0x2);
+	}
+#endif
 	/*reset to default value*/
+#if defined(CONFIG_FIH_PROJECT_FRT)
 	//add by mtk begin
 	if (wChargerAvail == 1)
 	{
@@ -258,6 +269,7 @@ static unsigned int hw_bc11_stepB2(void)
 		return wChargerAvail;
 	}
 	//add by mtk end
+#endif
 
 	bc11_set_register_value(PMIC_RG_BC11_VSRC_EN, 0x0);
 	bc11_set_register_value(PMIC_RG_BC11_IPD_EN, 0x0);
@@ -339,10 +351,12 @@ int hw_charging_get_charger_type(void)
 				is_dcp_type = true;
 				CHR_Type_num = STANDARD_CHARGER;
 				battery_log(BAT_LOG_CRTI, "step B2 : STANDARD CHARGER!\r\n");
+#if defined(CONFIG_FIH_PROJECT_FRT)
 				//add by mtk begin
 				battery_log(BAT_LOG_CRTI, "DCP, keep DM voltage source\n");
 				return CHR_Type_num;
 				//add by mtk end
+#endif
 			} else {
 				CHR_Type_num = CHARGING_HOST;
 				battery_log(BAT_LOG_CRTI, "step B2 :  Charging Host!\r\n");

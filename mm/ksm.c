@@ -23,7 +23,7 @@
 #include <linux/pagemap.h>
 #include <linux/rmap.h>
 #include <linux/spinlock.h>
-#include <linux/xxhash.h>
+#include <linux/jhash.h>
 #include <linux/delay.h>
 #include <linux/kthread.h>
 #include <linux/wait.h>
@@ -146,7 +146,6 @@ struct stable_node {
 	};
 	struct hlist_head hlist;
 	unsigned long kpfn;
-	u32 checksum;
 #ifdef CONFIG_NUMA
 	int nid;
 #endif
@@ -228,11 +227,6 @@ static unsigned int ksm_thread_pages_to_scan = 100;
 
 /* Milliseconds ksmd should sleep between batches */
 static unsigned int ksm_thread_sleep_millisecs = 20;
-
-#ifdef CONFIG_KSM_GO
-/* Merge page or not after once scan */
-static bool ksm_find_same_page = true;
-#endif
 
 #ifdef CONFIG_NUMA
 /* Zeroed when merging across nodes is not allowed */
@@ -841,31 +835,27 @@ static u32 calc_checksum(struct page *page)
 {
 	u32 checksum;
 	void *addr = kmap_atomic(page);
-	checksum = xxh32(addr, PAGE_SIZE, 17);
+	checksum = jhash2(addr, PAGE_SIZE / 4, 17);
 	kunmap_atomic(addr);
 	return checksum;
 }
 
-static int memcmp_pages(struct page *page1, struct page *page2, u32 checksum1, u32 checksum2)
+static int memcmp_pages(struct page *page1, struct page *page2)
 {
 	char *addr1, *addr2;
 	int ret;
 
-	if (checksum1 == checksum2) {
-		addr1 = kmap_atomic(page1);
-		addr2 = kmap_atomic(page2);
-		ret = memcmp(addr1, addr2, PAGE_SIZE);
-		kunmap_atomic(addr2);
-		kunmap_atomic(addr1);
-	} else {
-		return (checksum1 > checksum2) ? 1 : -1;
-	}
+	addr1 = kmap_atomic(page1);
+	addr2 = kmap_atomic(page2);
+	ret = memcmp(addr1, addr2, PAGE_SIZE);
+	kunmap_atomic(addr2);
+	kunmap_atomic(addr1);
 	return ret;
 }
 
 static inline int pages_identical(struct page *page1, struct page *page2)
 {
-	return !memcmp_pages(page1, page2, 0, 0);
+	return !memcmp_pages(page1, page2);
 }
 
 static int write_protect_page(struct vm_area_struct *vma, struct page *page,
@@ -1164,7 +1154,7 @@ static struct page *try_to_merge_two_pages(struct rmap_item *rmap_item,
  * This function returns the stable tree node of identical content if found,
  * NULL otherwise.
  */
-static struct page *stable_tree_search(struct page *page, u32 checksum)
+static struct page *stable_tree_search(struct page *page)
 {
 	int nid;
 	struct rb_root *root;
@@ -1196,7 +1186,7 @@ again:
 		if (!tree_page)
 			return NULL;
 
-		ret = memcmp_pages(page, tree_page, checksum, stable_node->checksum);
+		ret = memcmp_pages(page, tree_page);
 		put_page(tree_page);
 
 		parent = *new;
@@ -1264,7 +1254,7 @@ replace:
  * This function returns the stable tree node just allocated on success,
  * NULL otherwise.
  */
-static struct stable_node *stable_tree_insert(struct page *kpage, u32 checksum)
+static struct stable_node *stable_tree_insert(struct page *kpage)
 {
 	int nid;
 	unsigned long kpfn;
@@ -1288,7 +1278,7 @@ static struct stable_node *stable_tree_insert(struct page *kpage, u32 checksum)
 		if (!tree_page)
 			return NULL;
 
-		ret = memcmp_pages(kpage, tree_page, checksum, stable_node->checksum);
+		ret = memcmp_pages(kpage, tree_page);
 		put_page(tree_page);
 
 		parent = *new;
@@ -1312,7 +1302,6 @@ static struct stable_node *stable_tree_insert(struct page *kpage, u32 checksum)
 
 	INIT_HLIST_HEAD(&stable_node->hlist);
 	stable_node->kpfn = kpfn;
-	stable_node->checksum = checksum;
 	set_page_stable_node(kpage, stable_node);
 	DO_NUMA(stable_node->nid = nid);
 	rb_link_node(&stable_node->node, parent, new);
@@ -1368,7 +1357,7 @@ struct rmap_item *unstable_tree_search_insert(struct rmap_item *rmap_item,
 			return NULL;
 		}
 
-		ret = memcmp_pages(page, tree_page, rmap_item->oldchecksum, tree_rmap_item->oldchecksum);
+		ret = memcmp_pages(page, tree_page);
 
 		parent = *new;
 		if (ret < 0) {
@@ -1418,9 +1407,6 @@ static void stable_tree_append(struct rmap_item *rmap_item,
 		ksm_pages_sharing++;
 	else
 		ksm_pages_shared++;
-#ifdef CONFIG_KSM_GO
-	ksm_find_same_page = true;
-#endif
 }
 
 /*
@@ -1456,7 +1442,7 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 	}
 
 	/* We first start with searching the page inside the stable tree */
-	kpage = stable_tree_search(page, rmap_item->oldchecksum);
+	kpage = stable_tree_search(page);
 	if (kpage == page && rmap_item->head == stable_node) {
 		put_page(kpage);
 		return;
@@ -1494,8 +1480,22 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 	tree_rmap_item =
 		unstable_tree_search_insert(rmap_item, page, &tree_page);
 	if (tree_rmap_item) {
+		bool split;
+
 		kpage = try_to_merge_two_pages(rmap_item, page,
 						tree_rmap_item, tree_page);
+		/*
+		 * If both pages we tried to merge belong to the same compound
+		 * page, then we actually ended up increasing the reference
+		 * count of the same compound page twice, and split_huge_page
+		 * failed.
+		 * Here we set a flag if that happened, and we use it later to
+		 * try split_huge_page again. Since we call put_page right
+		 * afterwards, the reference count will be correct and
+		 * split_huge_page should succeed.
+		 */
+		split = PageTransCompound(page)
+			&& compound_head(page) == compound_head(tree_page);
 		put_page(tree_page);
 		if (kpage) {
 			/*
@@ -1503,7 +1503,7 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 			 * node in the stable tree and add both rmap_items.
 			 */
 			lock_page(kpage);
-			stable_node = stable_tree_insert(kpage, checksum);
+			stable_node = stable_tree_insert(kpage);
 			if (stable_node) {
 				stable_tree_append(tree_rmap_item, stable_node);
 				stable_tree_append(rmap_item, stable_node);
@@ -1520,6 +1520,20 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 				break_cow(tree_rmap_item);
 				break_cow(rmap_item);
 			}
+		} else if (split) {
+			/*
+			 * We are here if we tried to merge two pages and
+			 * failed because they both belonged to the same
+			 * compound page. We will split the page now, but no
+			 * merging will take place.
+			 * We do not want to add the cost of a full lock; if
+			 * the page is locked, it is better to skip it and
+			 * perhaps try again later.
+			 */
+			if (!trylock_page(page))
+				return;
+			split_huge_page(page);
+			unlock_page(page);
 		}
 	}
 }
@@ -1771,23 +1785,6 @@ static ssize_t ksm_run_change(unsigned long flags)
 
 static void ksm_tuning_pressure(void)
 {
-#ifdef CONFIG_KSM_GO
-	if (ksm_find_same_page) {
-		ksm_thread_sleep_millisecs = 20;
-		ksm_thread_pages_to_scan = 100;
-	} else {
-		ksm_thread_sleep_millisecs += 50;
-		if (ksm_thread_sleep_millisecs > 1000) {
-			ksm_thread_sleep_millisecs = 1000;
-		}
-		ksm_thread_pages_to_scan += 100;
-		if (ksm_thread_pages_to_scan > 500) {
-			ksm_thread_pages_to_scan = 500;
-		}
-	}
-
-	ksm_find_same_page = false;
-#else
 #if NR_CPUS > 1
 	if (bat_is_charger_exist() == KAL_TRUE) {
 		if (ksm_thread_sleep_millisecs == 20 &&
@@ -1812,7 +1809,6 @@ static void ksm_tuning_pressure(void)
 			ksm_thread_pages_to_scan = 200;
 		}
 	}
-#endif
 #endif
 }
 
@@ -1843,18 +1839,9 @@ static int ksm_fb_notifier_callback(struct notifier_block *p,
 	blank = *(int *)((struct fb_event *)data)->data;
 
 	if (blank == FB_BLANK_UNBLANK) { /*LCD ON*/
-#ifdef CONFIG_KSM_GO
-		ksm_run_change(KSM_RUN_STOP);
-#else
 		ksm_run_change(KSM_RUN_MERGE);
-#endif
 	} else if (blank == FB_BLANK_POWERDOWN) { /*LCD OFF*/
-#ifdef CONFIG_KSM_GO
-		ksm_find_same_page = true;
-		ksm_run_change(KSM_RUN_MERGE);
-#else
 		ksm_run_change(KSM_RUN_STOP);
-#endif
 	}
 
 	return 0;

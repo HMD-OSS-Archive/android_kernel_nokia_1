@@ -37,8 +37,8 @@
 #include <linux/module.h>
 #include <linux/dma-mapping.h>
 
-#include "cust_acc.h"
-#include "accel.h"
+#include <cust_acc.h>
+#include <accel.h>
 #include "bma2x2.h"
 
 /*----------------------------------------------------------------------------*/
@@ -491,6 +491,7 @@ static int bma_i2c_read_block(struct i2c_client *client,
 
 	err = i2c_transfer(client->adapter, msgs, sizeof(msgs)/sizeof(msgs[0]));
 	if (err != 2) {
+		printk("BBox::UEC;8::0\n");
 		GSE_ERR("i2c_transfer error: (%d %p %d) %d\n",
 			addr, data, len, err);
 		err = -EIO;
@@ -612,6 +613,7 @@ static int BMA2x2_ReadData(struct i2c_client *client, s16 data[BMA2x2_AXES_NUM])
 	err = bma_i2c_read_block(client, addr, buf, BMA2x2_DATA_LEN);
 	mutex_unlock(&obj->lock);
 	if (err) {
+		printk("BBox::UEC;8::63\n");
 		GSE_ERR("error: %d\n", err);
 	} else {
 		if (CHIP_TYPE == BMA255_TYPE) {
@@ -1023,7 +1025,7 @@ static int BMA2x2_CheckDeviceID(struct i2c_client *client)
 	mutex_unlock(&obj->lock);
 	if (res < 0)
 		goto exit_BMA2x2_CheckDeviceID;
-
+	printk("BBox::UPD;77::%d\n", data);
 	switch (data) {
 	case BMA222E_CHIPID:
 		CHIP_TYPE = BMA222E_TYPE;
@@ -1048,8 +1050,10 @@ static int BMA2x2_CheckDeviceID(struct i2c_client *client)
 	}
 
 exit_BMA2x2_CheckDeviceID:
-	if ((res < 0) || (CHIP_TYPE < 0))
+	if ((res < 0) || (CHIP_TYPE < 0)) {
+		printk("BBox::UEC;8::64\n");
 		return BMA2x2_ERR_I2C;
+	}
 
 	return BMA2x2_SUCCESS;
 }
@@ -2885,6 +2889,7 @@ exit_init_failed:
 exit_kfree:
 	kfree(obj);
 exit:
+	printk("BBox::UEC;8::8\n");
 	GSE_ERR("%s: err = %d\n", __func__, err);
 	bma2x2_init_flag = -1;
 	return err;

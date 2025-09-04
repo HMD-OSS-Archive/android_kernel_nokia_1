@@ -67,6 +67,12 @@
 	};
 };
 
+&lcm {
+	compatible = "mediatek,lcm";
+	vdd28-supply = <&mt_pmic_vgp1_ldo_reg>;
+	vddi18-supply = <&mt_pmic_vio18_ldo_reg>;
+};
+
 &odm {
 	led0:led@0 {
 		compatible = "mediatek,red";

@@ -99,6 +99,14 @@ usb_acm_temp_device,
 };*/
 #endif
 
+//rt9458 OTG
+extern int set_chr_enable_otg(unsigned int enable);
+#ifdef CONFIG_MTK_BQ24157_SUPPORT
+extern void bq24157_set_opa_mode(unsigned int val);
+extern void bq24157_set_otg_pl(unsigned int val);
+extern void bq24157_set_otg_en(unsigned int val);
+extern unsigned int bq24157_reg_config_interface(unsigned char RegNum, unsigned char val);
+#endif
 /* switch charger API*/
 #ifdef CONFIG_MTK_FAN5405_SUPPORT
 extern void fan5405_set_opa_mode(unsigned int val);

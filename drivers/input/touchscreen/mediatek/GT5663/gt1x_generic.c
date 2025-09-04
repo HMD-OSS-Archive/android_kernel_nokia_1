@@ -504,6 +504,7 @@ s32 _do_i2c_read(struct i2c_msg * msgs, u16 addr, u8 * buffer, s32 len)
 
 		ret = i2c_transfer(gt1x_i2c_client->adapter, msgs, 2);
 		if (ret != 2) {
+			BBOX_TP_I2C_READ_FAILED
 			GTP_ERROR("I2c Transfer error! (%d)", ret);
 			kfree(data);
 			return ERROR_IIC;
@@ -546,6 +547,7 @@ s32 _do_i2c_write(struct i2c_msg * msg, u16 addr, u8 * buffer, s32 len)
 
 		ret = i2c_transfer(gt1x_i2c_client->adapter, msg, 1);
 		if (ret != 1) {
+			BBOX_TP_I2C_WRITE_FAILED
 			GTP_ERROR("I2c transfer error! (%d)", ret);
 			kfree(data);
 			return ERROR_IIC;
@@ -569,6 +571,7 @@ static s32 gt1x_i2c_test(void)
 	while (retry++ < 3) {
 		ret = gt1x_i2c_read(GTP_REG_HW_INFO, (u8 *) & hw_info, sizeof(hw_info));
 		if (!ret) {
+			BBOX_TP_I2C_READ_FAILED
 			GTP_INFO("Hardware Info:%08X", hw_info);
 			return ret;
 		}

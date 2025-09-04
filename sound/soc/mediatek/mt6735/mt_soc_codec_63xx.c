@@ -104,6 +104,9 @@
 #define GPIO_AUDIO_SEL         (GPIO4 | 0x80000000)
 #define GPIO_AUDIO_SEL_M_GPIO   GPIO_MODE_00
 
+/* BBS Log */
+#define BBOX_CODEC_PROBE_FAIL  do {printk("BBox;%s: Audio codec probe failure\n", __func__); printk("BBox::UEC;2::3\n");} while(0)
+
 /* #define AW8736_MODE_CTRL // AW8736 PA output power mode control */
 
 /* static function declaration */
@@ -158,9 +161,7 @@ static unsigned int pin_mode_extspkamp, pin_mode_extspkamp_2, pin_mode_vowclk, p
 
 
 #ifdef CONFIG_MTK_SPEAKER
-//static int Speaker_mode = AUDIO_SPEAKER_MODE_AB;
-//Frontier Speaker is Class D. Modified by Stephen Zhang, BDC, FIH.
-static int Speaker_mode = AUDIO_SPEAKER_MODE_D;
+static int Speaker_mode = AUDIO_SPEAKER_MODE_AB;
 static unsigned int Speaker_pga_gain = 1;	/* default 0Db. */
 static bool mSpeaker_Ocflag;
 #endif
@@ -192,6 +193,15 @@ typedef enum {
 
 static int mAudio_VOW_Mic_type = AUDIO_VOW_MIC_TYPE_Handset_AMIC;
 static void Audio_Amp_Change(int channels, bool enable);
+
+// Beging, 
+struct pinctrl *pinctrl78;
+struct pinctrl_state *extPAen_default;
+struct pinctrl_state *extPAen_High;
+struct pinctrl_state *extPAen_Low;
+// End, 
+
+
 static void SavePowerState(void)
 {
 	int i = 0;
@@ -1884,6 +1894,13 @@ static void Speaker_Amp_Change(bool enable)
 		/* Enable ClassAB/D clock */
 
 #ifdef CONFIG_MTK_SPEAKER
+    /* speaker amp for FRT ------------ st. */
+    //Frontier Speaker is Class D. Modified by Stephen Zhang, BDC.
+		if (strncmp("FRT", CONFIG_ARCH_MTK_PROJECT, 3) == 0) {
+			 Speaker_mode = AUDIO_SPEAKER_MODE_D;
+	  }
+    /* speaker amp for FRT ------------ ed. */
+    
 		if (Speaker_mode == AUDIO_SPEAKER_MODE_D)
 			Speaker_ClassD_Open();
 		else if (Speaker_mode == AUDIO_SPEAKER_MODE_AB)
@@ -1988,6 +2005,14 @@ static void Ext_Speaker_Amp_Change(bool enable)
 #endif
 	if (enable) {
 		pr_debug("Ext_Speaker_Amp_Change ON+\n");
+		
+		if (strncmp("NE1", CONFIG_ARCH_MTK_PROJECT, 3) == 0) {
+			// Beging, 
+			pinctrl_select_state(pinctrl78, extPAen_High);
+			pr_warn("Ext_Speaker_Amp_Change enable\n");
+			// End, 
+		}
+		
 #ifndef CONFIG_MTK_SPEAKER
 #if defined(CONFIG_MTK_LEGACY)
 
@@ -2045,6 +2070,14 @@ static void Ext_Speaker_Amp_Change(bool enable)
 		pr_debug("Ext_Speaker_Amp_Change ON-\n");
 	} else {
 		pr_debug("Ext_Speaker_Amp_Change OFF+\n");
+
+		if (strncmp("NE1", CONFIG_ARCH_MTK_PROJECT, 3) == 0) {
+			// Beging,
+			pinctrl_select_state(pinctrl78, extPAen_Low);
+			pr_warn("Ext_Speaker_Amp_Change disable\n");
+			// End, 
+		}
+		
 #ifndef CONFIG_MTK_SPEAKER
 #if defined(CONFIG_MTK_LEGACY)
 		ret = GetGPIO_Info(10, &pin_extspkamp_2, &pin_mode_extspkamp_2);
@@ -4706,6 +4739,7 @@ static struct snd_soc_codec_driver soc_mtk_codec = {
 
 static int mtk_mt6331_codec_dev_probe(struct platform_device *pdev)
 {
+	int ret;	// 
 	pdev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
 
 	if (pdev->dev.dma_mask == NULL)
@@ -4717,9 +4751,55 @@ static int mtk_mt6331_codec_dev_probe(struct platform_device *pdev)
 
 
 	pr_debug("%s: dev name %s\n", __func__, dev_name(&pdev->dev));
+
+    if (strncmp("NE1", CONFIG_ARCH_MTK_PROJECT, 3) == 0) {
+		// Begin, 
+		/* gpio setting */
+		pinctrl78 = devm_pinctrl_get(&pdev->dev);
+		if (IS_ERR(pinctrl78))
+		{
+			ret = PTR_ERR(pinctrl78);
+			pr_warn("Cannot find extPA_en pinctrl!\n");
+		}
+	
+		extPAen_default = pinctrl_lookup_state(pinctrl78, "extPAen_default");
+		if (IS_ERR(extPAen_default))
+		{
+			ret = PTR_ERR(extPAen_default);
+			pr_warn("Cannot find pinctrl78 extPAen_default!\n");
+		}
+
+		extPAen_High = pinctrl_lookup_state(pinctrl78, "extPAenHigh");
+		if (IS_ERR(extPAen_High))
+		{
+			ret = PTR_ERR(extPAen_High);
+			pr_warn("Cannot find pinctrl78 extPAenHigh!\n");
+		}	
+
+		extPAen_Low = pinctrl_lookup_state(pinctrl78, "extPAenLow");
+		if (IS_ERR(extPAen_Low))
+		{
+			ret = PTR_ERR(extPAen_Low);
+			pr_warn("Cannot find pinctrl78 extPAenLow!\n");
+		}	
+		// End, 	
+	}
+
+#ifdef BBOX_CODEC_PROBE_FAIL
+	ret = snd_soc_register_codec(&pdev->dev,
+					&soc_mtk_codec, mtk_6331_dai_codecs,
+					ARRAY_SIZE(mtk_6331_dai_codecs));
+
+	if(ret < 0) {
+		BBOX_CODEC_PROBE_FAIL;
+	}
+
+	return ret;
+#else
 	return snd_soc_register_codec(&pdev->dev,
 				      &soc_mtk_codec, mtk_6331_dai_codecs,
 				      ARRAY_SIZE(mtk_6331_dai_codecs));
+#endif
 }
 
 static int mtk_mt6331_codec_dev_remove(struct platform_device *pdev)

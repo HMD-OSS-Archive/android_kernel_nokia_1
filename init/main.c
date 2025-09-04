@@ -2,7 +2,6 @@
  *  linux/init/main.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
- *  Copyright (c) 2017 FIH Mobile Limited.
  *
  *  GK 2/5/95  -  Changed to support mounting root fs via NFS
  *  Added initrd & change_root: Werner Almesberger & Hans Lermen, Feb '96
@@ -87,7 +86,9 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
-
+// add for Indonesia TKDN SW Requirements V1.0-13: Build Time Zone
+#include <linux/utsname.h>
+// add for Indonesia TKDN SW Requirements V1.0-13: Build Time Zone
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
 #endif
@@ -98,9 +99,6 @@ extern void init_IRQ(void);
 extern void fork_init(unsigned long);
 extern void radix_tree_init(void);
 
-//FIH firefly add S
-static void fih_get_skuid(void);
-//FIH firefly add E
 /*
  * Debug helper: via this flag we know that we are in 'early bootup code'
  * where only the boot processor is running with IRQ disabled.  This means
@@ -384,10 +382,10 @@ static void __init setup_command_line(char *command_line)
 
 
 
-/* Begin ************************************* FIH ADD */
+/* Begin, for feature, 20190104 */
+char fih_skuid[8] = {'0'};
 bool fih_efuse_enable = 1;
 unsigned short fih_hwid = 0xFF;
-char g_skuid_buf[6] = {0};
 
 unsigned short fih_gethwid(void)
 {
@@ -417,43 +415,30 @@ unsigned short fih_gethwid(void)
 }
 EXPORT_SYMBOL(fih_gethwid);
 
-void fih_get_skuid(void)
-{
-	char *pattern = "fih_skuid=";
-	char *p = strstr(saved_command_line, pattern);
-	unsigned short i  = 0;
-
-	if (p == NULL)
-		return;
-
-	p += strlen(pattern);
-	while(*p != ' ' && i < 6){
-		g_skuid_buf[i++]=*p;
-		p++;
-	}
-}
-
+/* for runin*/
 unsigned int fih_get_ramtest_result(void)
 {
-	unsigned char result=0;
-	char *pattern = "ramtest_result=";
-	char *p = strstr(saved_command_line, pattern);
-	unsigned short ret=0;
+    unsigned char result=0;
+    char *pattern = "ramtest_result=";
+    char *p = strstr(saved_command_line, pattern);
+    unsigned short ret=0;
 
-	if (p == NULL) return ret;
+    if (p == NULL)
+		return ret;
 
-	p += strlen(pattern);
-	p = p + 2; // skip '0' & 'x'
-	if((*p >= '0') && (*p <= '9'))
-		result = *p - '0';
-	else if((*p >= 'a') && (*p <= 'f'))
-		result = *p - 'a' + 10;
-	else if((*p >= 'A') && (*p <= 'F'))
-		result = *p - 'A' + 10;
-	ret = result;
-	return ret;
+    p += strlen(pattern);
+    p = p + 2; // skip '0' & 'x'
+    if((*p >= '0') && (*p <= '9'))
+                result = *p - '0';
+    else if((*p >= 'a') && (*p <= 'f'))
+                result = *p - 'a' + 10;
+    else if((*p >= 'A') && (*p <= 'F'))
+        result = *p - 'A' + 10;
+    ret = result;
+    return ret;
 }
 EXPORT_SYMBOL(fih_get_ramtest_result);
+
 extern unsigned long long fih_mmc_size(void)
 {
 	unsigned char a = 0;
@@ -501,7 +486,7 @@ extern unsigned long long fih_mmc_usersize(void)
 		return ret;
 
 	p += strlen(pattern);
-	p = p + 2;
+	p = p + 2; 
 
 	for(i = 0; i < 9; i++)
 	{
@@ -602,8 +587,7 @@ extern unsigned long long fih_get_emmc_size(void)
 			a = *p - 'a' + 10;
 		else if((*p >= 'A') && (*p <= 'F'))
 			a = *p - 'A' + 10;
-		else
-			break;
+
 		p++;
 		ret = a | ( ret<< 4);
 	}
@@ -625,7 +609,7 @@ extern unsigned long long fih_get_emmc_usersize(void)
 		return ret;
 
 	p += strlen(pattern);
-	p = p + 2;
+	p = p + 2; 
 
 	for(i = 0; i < 9; i++)
 	{
@@ -635,8 +619,7 @@ extern unsigned long long fih_get_emmc_usersize(void)
 			a = *p - 'a' + 10;
 		else if((*p >= 'A') && (*p <= 'F'))
 			a = *p - 'A' + 10;
-		else
-			break;
+
 		p++;
 		ret = a | ( ret<< 4);
 	}
@@ -664,10 +647,10 @@ unsigned char fih_get_ps_magnum(void)
 
 unsigned char fih_getcmd(void)
 {
+	unsigned char ret = 0;
+
 	char *pattern = "androidboot.mode=";
 	char *p = strstr(saved_command_line, pattern);
-
-	unsigned char ret = 0;
 
 	if (p == NULL)
 		return ret;
@@ -721,8 +704,37 @@ bool fih_get_efuse_enable(void)
 	return ret;
 }
 
-/* END ************************************* FIH ADD */
+void fih_get_skuid(void)
+{
+	char *pattern = "androidboot.skuid=";
+	char *p = strstr(saved_command_line, pattern);
 
+	if (p == NULL)
+		return;
+
+	p += strlen(pattern);
+
+	strncpy(fih_skuid, p, 5);
+	//printk("fih_get_skuid fih_skuid = %s\n", fih_skuid);
+}
+/* END, for feature, 20190104 */
+
+//FIH, add for Indonesia TKDN SW Requirements V1.0-13: Build Time Zone
+static void fih_info_version(void)
+{
+  char *timezone = NULL;
+
+  printk("%s: SW version(skuid) = %s\n", __func__, fih_skuid);
+  if(strncmp(fih_skuid, "600ID", 5) == 0)
+  {
+    timezone = strstr(init_utsname()->version, "CST");
+    if(timezone != NULL)
+    {
+      memcpy(timezone, "WIB", 3);
+    }
+  }
+}
+//FIH, add for Indonesia TKDN SW Requirements V1.0-13: Build Time Zone
 
 /*
  * We need to finalize in a non-__init function or else race conditions
@@ -885,9 +897,21 @@ asmlinkage __visible void __init start_kernel(void)
 	build_all_zonelists(NULL, NULL);
 	page_alloc_init();
 
+	// 
 	fih_hwid = fih_gethwid();
+	if (fih_hwid == 0xFF)
+		fih_hwid = 0x156;
+
 	fih_efuse_enable = fih_get_efuse_enable();
+
+	fih_get_gensor_cmd();
+	//pr_notice("Alex x = %d, y = %d, z = %d\n", gsen_cali_x, gsen_cali_y, gsen_cali_z);
+
 	fih_get_skuid();
+
+	// add for Indonesia TKDN SW Requirements V1.0-13: Build Time Zone
+	fih_info_version();
+	// add for Indonesia TKDN SW Requirements V1.0-13: Build Time Zone
 
 	pr_notice("Kernel command line: %s\n", boot_command_line);
 	parse_early_param();

@@ -323,14 +323,18 @@ static void hs_slew_rate_cal(void)
 	USBPHY_CLR8(0xf00 - 0x800 + 0x03, 0x01);
 	USBPHY_CLR8(0xf00 - 0x800 + 0x11, 0x01);
 
+	//After HW Confirm, Modify for USB Driver Capacity, 0309
 	/* 4 s9: */
 #define MSK_RG_USB20_HSTX_SRCTRL 0x7
 	/* all clr first then set */
 	USBPHY_CLR8(0x15, MSK_RG_USB20_HSTX_SRCTRL << 4);
-	USBPHY_SET8(0x15, (value & MSK_RG_USB20_HSTX_SRCTRL) << 4);
+	USBPHY_SET8(0x15, (0 & MSK_RG_USB20_HSTX_SRCTRL) << 4);
 
 	/* 4 s10:disable usb ring oscillator. */
 	USBPHY_CLR8(0x15, 0x80);
+
+	USBPHY_SET8(0x5, 7);
+	USBPHY_SET8(0x5, 7 << 4);
 }
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH

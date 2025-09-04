@@ -1,7 +1,3 @@
-/*
- * Copyright (c) 2017 FIH Mobile Limited.
-*/
-
 #ifndef __RT9458_CHARGER_H
 #define __RT9458_CHARGER_H
 

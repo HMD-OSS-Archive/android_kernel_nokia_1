@@ -20,7 +20,7 @@
 #include <linux/timer.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
-#include <linux/hrtimer.h>//Added to press hook twice or three times
+#include <linux/hrtimer.h> // OEM
 
 #define DEBUG_THREAD 1
 
@@ -38,9 +38,9 @@ unsigned int gpiopin, headsetdebounce;
 unsigned int accdet_eint_type = IRQ_TYPE_LEVEL_LOW;/* default low_level trigger */
 struct headset_mode_settings *cust_headset_settings;
 #define ACCDET_DEBUG(format, args...)	pr_debug(format, ##args)
-#define ACCDET_INFO(format, args...)	pr_warn(format, ##args)
-#define ACCDET_ERROR(format, args...)	pr_err(format, ##args)
-#define JUST_INPUT_NO_SWITCH  1
+#define ACCDET_INFO(format, args...)	pr_info(format, ##args)
+#define ACCDET_ERROR(format, args...)	pr_info(format, ##args)
+#define JUST_INPUT_NO_SWITCH  0
 #if JUST_INPUT_NO_SWITCH
 static struct switch_dev accdet_data;
 #endif
@@ -103,15 +103,25 @@ static struct workqueue_struct *accdet_disable_workqueue;
 struct pinctrl *accdet_pinctrl1;
 struct pinctrl_state *pins_eint_int;
 #endif
+
+
 #ifdef DEBUG_THREAD
 #endif
 
-//Added to press hook twice or three times
-static struct hrtimer accdet_timer;
+// Begin, 
+//struct pinctrl *pinctrl7;
 static int short_timer = 0;
-static struct hrtimer accdet_timer2;
 static int short_timer2 = 0;
-//end
+
+static struct hrtimer accdet_timer;
+static struct hrtimer accdet_timer2;
+
+struct pinctrl_state *HeadsetSwitchEnableLow;
+struct pinctrl_state *HeadsetSwitchEnableHigh;
+struct pinctrl_state *HeadsetSwitchEnableDefault;
+
+extern unsigned short fih_hwid;
+// End, 
 
 
 static u32 pmic_pwrap_read(u32 addr);
@@ -294,6 +304,11 @@ static inline void disable_accdet(void)
 
 	/*sync with accdet_irq_handler set clear accdet irq bit to avoid  set clear accdet irq bit after disable accdet
 	disable accdet irq*/
+	
+	// OEM
+    hrtimer_cancel(&accdet_timer);
+    hrtimer_cancel(&accdet_timer2);
+	
 	pmic_pwrap_write(INT_CON_ACCDET_CLR, RG_ACCDET_IRQ_CLR);
 	clear_accdet_interrupt();
 	udelay(200);
@@ -429,6 +444,15 @@ static void accdet_eint_work_callback(struct work_struct *work)
 		eint_accdet_sync_flag = 1;
 		mutex_unlock(&accdet_eint_irq_sync_mutex);
 		wake_lock_timeout(&accdet_timer_lock, 7 * HZ);
+
+		// OEM
+		if (fih_hwid <= 0x113)
+		{
+			pinctrl_select_state(accdet_pinctrl1, HeadsetSwitchEnableHigh);
+			pr_warn("Headset switch enable\n");
+			msleep(100);
+		}
+		
 #ifdef CONFIG_ACCDET_PIN_SWAP
 		/*pmic_pwrap_write(0x0400, pmic_pwrap_read(0x0400)|(1<<14)); */
 		msleep(800);
@@ -487,6 +511,14 @@ static void accdet_eint_work_callback(struct work_struct *work)
 		eint_accdet_sync_flag = 0;
 		mutex_unlock(&accdet_eint_irq_sync_mutex);
 		del_timer_sync(&micbias_timer);
+
+		// OEM
+		if (fih_hwid <= 0x113)
+		{
+			pinctrl_select_state(accdet_pinctrl1, HeadsetSwitchEnableLow);
+			pr_warn("Headset switch disable\n");
+		}
+
 #ifdef CONFIG_ACCDET_PIN_RECOGNIZATION
 		show_icon_delay = 0;
 		cable_pin_recognition = 0;
@@ -601,6 +633,33 @@ static inline int accdet_setup_eint(struct platform_device *accdet_device)
 	}
 	pinctrl_select_state(accdet_pinctrl1, pins_eint_int);
 
+	// Begin, 
+	if (fih_hwid <= 0x113)
+	{
+		/* gpio setting */
+		HeadsetSwitchEnableDefault = pinctrl_lookup_state(accdet_pinctrl1, "HeadsetSwitchEnableDefault");
+		if (IS_ERR(HeadsetSwitchEnableDefault))
+		{
+			ret = PTR_ERR(HeadsetSwitchEnableDefault);
+			/*pr_warn("Cannot find pinctrl7 HeadsetSwitchEnableDefault!\n");*/
+		}
+
+		HeadsetSwitchEnableLow = pinctrl_lookup_state(accdet_pinctrl1, "HeadsetSwitchEnableLow");
+		if (IS_ERR(HeadsetSwitchEnableLow))
+		{
+			ret = PTR_ERR(HeadsetSwitchEnableLow);
+			pr_warn("Cannot find pinctrl7 HeadsetSwitchEnableLow!\n");
+		}	
+
+		HeadsetSwitchEnableHigh = pinctrl_lookup_state(accdet_pinctrl1, "HeadsetSwitchEnableHigh");
+		if (IS_ERR(HeadsetSwitchEnableHigh))
+		{
+			ret = PTR_ERR(HeadsetSwitchEnableHigh);
+			pr_warn("Cannot find pinctrl7 HeadsetSwitchEnableHigh!\n");
+		}
+	}	
+	// End, 
+
 	/*node = of_find_matching_node(node, accdet_of_match);*/
 	node = of_find_matching_node(node, accdet_of_match);
 	if (node) {
@@ -654,8 +713,8 @@ static int key_check(int b)
 	ACCDET_DEBUG("[accdet] leave key_check!!\n");
 	return NO_KEY;
 }
-
-//Added to press hook twice or three times
+	
+// Begin, for press hook twice or three times 
 static enum hrtimer_restart accdet_timer_func(struct hrtimer *timer)
 {
     ACCDET_DEBUG("[Accdet]accdet_timer_func: accdet hook short press %d.\n", short_timer);
@@ -723,7 +782,7 @@ void accdet_hrtimer2_init(void)
     hrtimer_init(&accdet_timer2, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
     accdet_timer2.function = accdet_timer2_func;
 }
-//end ]
+// End, for press hook twice or three times 
 
 #else
 static int key_check(int b)
@@ -779,13 +838,14 @@ static void send_key_event(int keycode, int flag)
 		ACCDET_DEBUG("[accdet]KEY_VOLUMEUP %d\n", flag);
 		break;
 	case MD_KEY:
-         //Added to press hook twice or three times
+
+		// for press hook twice or three times 
          if (call_status == 0)
          {
              if (!flag) {
                  hrtimer_cancel(&accdet_timer);
                  ACCDET_DEBUG("[Accdet] hrtimer_cancel\n");
-
+     
                  if (short_timer < 3)
                      short_timer++;
                  else
@@ -802,7 +862,7 @@ static void send_key_event(int keycode, int flag)
              {
                  hrtimer_cancel(&accdet_timer2);
                  ACCDET_DEBUG("[Accdet] hrtimer2_cancel\n");
-
+     
                  if (short_timer2 < 3)
                      short_timer2++;
                  else
@@ -1382,7 +1442,11 @@ static inline void accdet_init(void)
 	pmic_pwrap_write(INT_CON_ACCDET_SET, RG_ACCDET_NEGV_IRQ_SET);
 #endif
    /*********************ACCDET Analog Setting***********************************************************/
-	pmic_set_register_value(PMIC_RG_AUDMICBIASVREF, accdet_dts_data.mic_mode_vol);
+
+	// OEM
+	//pmic_set_register_value(PMIC_RG_AUDMICBIASVREF, accdet_dts_data.mic_mode_vol);
+	pmic_set_register_value(PMIC_RG_AUDMICBIAS1BYPASSEN, 1);
+
 	pmic_pwrap_write(ACCDET_RSV, 0x1290);	/*TODO: need confirm pull low,6328 bit[12]=1*/
 #ifdef CONFIG_ACCDET_EINT_IRQ
 	pmic_pwrap_write(ACCDET_EINT_NV, pmic_pwrap_read(ACCDET_EINT_NV) | ACCDET_EINT_CON_EN);
@@ -1823,20 +1887,20 @@ int mt_accdet_probe(struct platform_device *dev)
 	__set_bit(KEY_VOLUMEUP, kpd_accdet_dev->keybit);
 	__set_bit(KEY_VOICECOMMAND, kpd_accdet_dev->keybit);
 
-	//Added to press hook twice or three times  [
+	__set_bit(EV_SW, kpd_accdet_dev->evbit);
+	__set_bit(SW_HEADPHONE_INSERT, kpd_accdet_dev->swbit);
+	__set_bit(SW_MICROPHONE_INSERT, kpd_accdet_dev->swbit);
+	__set_bit(SW_JACK_PHYSICAL_INSERT, kpd_accdet_dev->swbit);
+	__set_bit(SW_LINEOUT_INSERT, kpd_accdet_dev->swbit);
+
+	// Begin, for press hook twice or three times
 	__set_bit(KEY_NEXTSONG, kpd_accdet_dev->keybit);
 	__set_bit(KEY_PREVIOUSSONG, kpd_accdet_dev->keybit);
 
 	__set_bit(KEY_CALL, kpd_accdet_dev->keybit);
 	__set_bit(KEY_ENDCALL, kpd_accdet_dev->keybit);
 	__set_bit(KEY_STOPCD, kpd_accdet_dev->keybit);
-	//Added to press hook twice or three times  ]
-
-	__set_bit(EV_SW, kpd_accdet_dev->evbit);
-	__set_bit(SW_HEADPHONE_INSERT, kpd_accdet_dev->swbit);
-	__set_bit(SW_MICROPHONE_INSERT, kpd_accdet_dev->swbit);
-	__set_bit(SW_JACK_PHYSICAL_INSERT, kpd_accdet_dev->swbit);
-	__set_bit(SW_LINEOUT_INSERT, kpd_accdet_dev->swbit);
+	// End, for press hook twice or three times
 
 	kpd_accdet_dev->id.bustype = BUS_HOST;
 	kpd_accdet_dev->name = "ACCDET";
@@ -2045,7 +2109,6 @@ long mt_accdet_unlocked_ioctl(unsigned int cmd, unsigned long arg)
 		ACCDET_DEBUG("[Accdet]accdet_ioctl : CALL_STATE=%d\n", call_status);
 		break;
 	case GET_BUTTON_STATUS:
-		ACCDET_DEBUG("[Accdet]accdet_ioctl : Button_Status=%d (state:%d)\n", button_status, accdet_data.state);
 		return button_status;
 	default:
 		ACCDET_DEBUG("[Accdet]accdet_ioctl : default\n");

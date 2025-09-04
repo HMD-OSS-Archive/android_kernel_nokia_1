@@ -34,4 +34,8 @@ struct gyro_hw {
 };
 
 int get_gyro_dts_func(struct device_node *node, struct gyro_hw*);
+
+// 
+struct gyro_hw *fih_get_gyro_dts_func(const char *name, struct gyro_hw *hw);
+
 #endif

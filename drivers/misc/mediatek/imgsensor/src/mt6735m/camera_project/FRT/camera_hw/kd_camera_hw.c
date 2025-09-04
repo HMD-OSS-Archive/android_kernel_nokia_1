@@ -24,7 +24,13 @@
 #include "kd_imgsensor.h"
 #include "kd_imgsensor_define.h"
 #include "kd_camera_feature.h"
-
+//misty add for BBS log++
+#define FIHBBS 
+#ifdef FIHBBS
+#include "../../../fihBBS/fih_camera_bbs.h"
+extern void fih_bbs_camera_msg_by_addr(int, int);
+#endif
+//misty add for BBS log--
 /******************************************************************************
  * Debug configuration
 ******************************************************************************/
@@ -505,11 +511,63 @@ int kdCISModulePowerOn(CAMERA_DUAL_CAMERA_SENSOR_ENUM SensorIdx, char *currSenso
 
 		}
 	}
+//misty for test tmp
+/*
+if(On){
+		switch(pinSetIdx){
+        case 0:	//main
+		    PK_ERR("[MIMI CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+			fih_bbs_camera_msg_by_addr(FIH_I2C_ADDR_S5K5E8_CAMERA, FIH_BBS_CAMERA_ERRORCODE_POWER_UP);
+			break;
+		case 1://front
+		    PK_ERR("[MIMI CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+		    fih_bbs_camera_msg_by_addr(FIH_I2C_ADDR_GC2385_CAMERA, FIH_BBS_CAMERA_ERRORCODE_POWER_UP);
+			break;
+		}
+	}
+else{
+		switch(pinSetIdx){
+        case 0:	//main
+		    PK_ERR("[MIMI CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+			fih_bbs_camera_msg_by_addr(FIH_I2C_ADDR_S5K5E8_CAMERA, FIH_BBS_CAMERA_ERRORCODE_POWER_DW);
+			break;
+		case 1://front
+		    PK_ERR("[MIMI CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+		    fih_bbs_camera_msg_by_addr(FIH_I2C_ADDR_GC2385_CAMERA, FIH_BBS_CAMERA_ERRORCODE_POWER_DW);
+			break;
+		}
+	}
+*/
 return poweron_err;
 
 
 _kdCISModulePowerOn_exit_:
-return -EIO;
+	//misty add for BBS log++
+	#ifdef FIHBBS
+	PK_ERR("[CAMERA SENSOR]%s\n %s()%4d\n", __FILE__, __func__  , __LINE__);
+	if(On){
+		switch(pinSetIdx){
+        case 0:	//main
+			fih_bbs_camera_msg_by_addr(FIH_I2C_ADDR_S5K5E8_CAMERA, FIH_BBS_CAMERA_ERRORCODE_POWER_UP);
+			break;
+		case 1://front
+		    fih_bbs_camera_msg_by_addr(FIH_I2C_ADDR_GC2385_CAMERA, FIH_BBS_CAMERA_ERRORCODE_POWER_UP);
+			break;
+		}
+	}
+	else{
+		switch(pinSetIdx){
+        case 0:	//main
+			fih_bbs_camera_msg_by_addr(FIH_I2C_ADDR_S5K5E8_CAMERA, FIH_BBS_CAMERA_ERRORCODE_POWER_DW);
+			break;
+		case 1://front
+		    fih_bbs_camera_msg_by_addr(FIH_I2C_ADDR_GC2385_CAMERA, FIH_BBS_CAMERA_ERRORCODE_POWER_DW);
+			break;
+		}
+	}
+	#endif
+	//misty add for BBS log--
+	return -EIO;
 
 }
 

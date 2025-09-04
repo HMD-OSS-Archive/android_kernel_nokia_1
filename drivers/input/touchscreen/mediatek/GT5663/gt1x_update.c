@@ -223,10 +223,12 @@ int gt1x_i2c_write_with_readback(u16 addr, u8 * buffer, int length)
 	u8 buf[100];
 	int ret = gt1x_i2c_write(addr, buffer, length);
 	if (ret) {
+		BBOX_TP_I2C_WRITE_FAILED
 		return ret;
 	}
 	ret = gt1x_i2c_read(addr, buf, length);
 	if (ret) {
+		BBOX_TP_I2C_READ_FAILED
 		return ret;
 	}
 	if (memcmp(buf, buffer, length)) {
@@ -430,6 +432,7 @@ int gt1x_update_firmware(void *filename)
 	u8 *p;
 
 	if (update_info.status != UPDATE_STATUS_IDLE) {
+    BBOX_TP_FW_UPGRADE_FAILED
 		GTP_ERROR("Update process is running!");
 		return ERROR;
 	}
@@ -467,6 +470,7 @@ int gt1x_update_firmware(void *filename)
 
 	p = gt1x_get_fw_data(update_info.firmware_info->subsystem[0].offset, update_info.firmware_info->subsystem[0].length);
 	if (p == NULL) {
+    BBOX_TP_FW_UPGRADE_FAILED
 		GTP_ERROR("get isp fail");
 		ret = ERROR_FW;
 		update_info.status = UPDATE_STATUS_ABORT;
@@ -476,6 +480,7 @@ int gt1x_update_firmware(void *filename)
 
 	ret = gt1x_run_ss51_isp(p, update_info.firmware_info->subsystem[0].length);
 	if (ret) {
+    BBOX_TP_FW_UPGRADE_FAILED
 		GTP_ERROR("run isp fail");
 		goto gt1x_update_exit;
 	}
@@ -489,6 +494,7 @@ int gt1x_update_firmware(void *filename)
 
 		ret = gt1x_burn_subsystem(&(update_info.firmware_info->subsystem[i]));
 		if (ret) {
+      BBOX_TP_FW_UPGRADE_FAILED
 			GTP_ERROR("burn subsystem fail!");
 			goto gt1x_update_exit;
 		}
@@ -500,6 +506,7 @@ int gt1x_update_firmware(void *filename)
 
 	p = gt1x_get_fw_data(update_info.firmware_info->subsystem[0].offset, update_info.firmware_info->subsystem[0].length);
 	if (p == NULL) {
+		BBOX_TP_FW_UPGRADE_FAILED
 		GTP_ERROR("get isp fail");
 		ret = ERROR_FW;
 		goto gt1x_update_exit;
@@ -508,6 +515,7 @@ int gt1x_update_firmware(void *filename)
 
 	ret = gt1x_run_ss51_isp(p, update_info.firmware_info->subsystem[0].length);
 	if (ret) {
+		BBOX_TP_FW_UPGRADE_FAILED
 		GTP_ERROR("run isp fail");
 		goto gt1x_update_exit;
 	}
@@ -567,6 +575,7 @@ int gt1x_update_prepare(char *filename)
 		update_info.fw = NULL;
 		ret = request_firmware(&update_info.fw, GT1X_FW_NAME, &gt1x_i2c_client->dev);
 		if (ret < 0) {
+			BBOX_TP_FW_UPGRADE_FAILED
 			GTP_ERROR("Request firmware failed - %s (%d)\n", GT1X_FW_NAME, ret);
 			return ERROR_FW;
 		}
@@ -576,6 +585,7 @@ int gt1x_update_prepare(char *filename)
 		update_info.fw_data = (u8*)update_info.fw->data;
 		update_info.fw_length = update_info.fw->size;
 #else
+    BBOX_TP_FW_UPGRADE_FAILED
 		GTP_ERROR("No Fw in .h file!");
 		return ERROR_FW;
 #endif
@@ -587,6 +597,7 @@ int gt1x_update_prepare(char *filename)
 		update_info.update_type = UPDATE_TYPE_FILE;
 		update_info.fw_file = filp_open(update_info.fw_name, O_RDONLY, 0);
 		if (IS_ERR(update_info.fw_file)) {
+			BBOX_TP_FW_UPGRADE_FAILED
 			GTP_ERROR("Open update file(%s) error!", update_info.fw_name);
 			set_fs(update_info.old_fs);
 			return ERROR_FILE;
@@ -624,6 +635,7 @@ int gt1x_update_prepare(char *filename)
 		}
 	}
 	if (retry <= 0) {
+    BBOX_TP_FW_UPGRADE_FAILED
 		ret = ERROR_RETRY;
 		goto gt1x_update_pre_fail0;
 	}
@@ -683,15 +695,18 @@ int gt1x_check_firmware(void)
 
 	// compare file length with the length field in the firmware header
 	if (update_info.fw_length < FW_HEAD_SIZE) {
+    BBOX_TP_FW_UPGRADE_FAILED
 		GTP_ERROR("Bad firmware!(file length: %d)", update_info.fw_length);
 		return ERROR_CHECK;
 	}
 	p = gt1x_get_fw_data(0, 6);
 	if (p == NULL) {
+		BBOX_TP_FW_UPGRADE_FAILED
 		return ERROR_FW;
 	}
 
 	if (getU32(p) + 6 != update_info.fw_length) {
+    BBOX_TP_FW_UPGRADE_FAILED
 		GTP_ERROR("Bad firmware!(file length: %d, header define: %d)", update_info.fw_length, getU32(p));
 		return ERROR_CHECK;
 	}
@@ -701,18 +716,21 @@ int gt1x_check_firmware(void)
 	for (i = 6; i < update_info.fw_length; i++) {
 		p = gt1x_get_fw_data(i, 1);
 		if (p == NULL) {
+			BBOX_TP_FW_UPGRADE_FAILED
 			return ERROR_FW;
 		}
 		checksum += p[0];
 	}
 
 	if (checksum != checksum_in_header) {
+		BBOX_TP_FW_UPGRADE_FAILED
 		GTP_ERROR("Bad firmware!(checksum: 0x%04X, header define: 0x%04X)", checksum, checksum_in_header);
 		return ERROR_CHECK;
 	}
 	// parse firmware
 	p = gt1x_get_fw_data(0, FW_HEAD_SIZE);
 	if (p == NULL) {
+		BBOX_TP_FW_UPGRADE_FAILED
 		return ERROR_FW;
 	}
 	memcpy((u8 *) update_info.firmware_info, p, FW_HEAD_SIZE - 8 * 12);
@@ -807,6 +825,7 @@ _reset:
 	}while (--retry);
 
 	if (!retry) {
+		BBOX_TP_I2C_READ_FAILED
 		GTP_INFO("Update abort because of i2c error.");
 		return ERROR_CHECK;
 	}
@@ -823,10 +842,12 @@ _reset:
 	}
 	GTP_INFO("----fw_ver_info:GT%s_%s(Patch)", fw_ver_info.product_id, ver_info.product_id);
 	if (memcmp(fw_ver_info.product_id, ver_info.product_id, 4)) {
+		BBOX_TP_FW_UPGRADE_FAILED
 		GTP_INFO("Product id is not match!");
 		return ERROR_CHECK;
 	}
 	if ((fw_ver_info.mask_id & 0xFFFFFF00) != (ver_info.mask_id & 0xFFFFFF00)) {
+		BBOX_TP_FW_UPGRADE_FAILED
 		GTP_INFO("Mask id is not match!");
 		return ERROR_CHECK;
 	}
@@ -843,6 +864,7 @@ _reset:
 	GTP_INFO("firefly The update firmware  version=%d", fw_ver_info.patch_id);
 	GTP_INFO("firefly the IC firmware curent version=%d", ver_info.patch_id);
 	if ((fw_ver_info.patch_id & 0xFFFF) <= (ver_info.patch_id & 0xFFFF)) {
+    BBOX_TP_FW_UPGRADE_FAILED
 		GTP_INFO("firefly The version of the fw is not high than the IC's!");
 		return ERROR_CHECK;
 	}
@@ -862,6 +884,7 @@ int __gt1x_hold_ss51_dsp_20(void)
 		buf[0] = 0x0C;
 		ret = gt1x_i2c_write(_rRW_MISCTL__SWRST_B0_, buf, 1);
 		if (ret) {
+			BBOX_TP_I2C_WRITE_FAILED
 			GTP_ERROR("Hold ss51 & dsp I2C error,retry:%d", retry);
 			continue;
 		}
@@ -869,6 +892,7 @@ int __gt1x_hold_ss51_dsp_20(void)
 		buf[0] = 0x00;
 		ret = gt1x_i2c_read(_rRW_MISCTL__SWRST_B0_, buf, 1);
 		if (ret) {
+			BBOX_TP_I2C_READ_FAILED
 			GTP_ERROR("Hold ss51 & dsp I2C error,retry:%d", retry);
 			continue;
 		}
@@ -902,6 +926,7 @@ int gt1x_hold_ss51_dsp(void)
 	} while (retry-- && ret < 0);
 
 	if (ret < 0) {
+		BBOX_TP_I2C_READ_FAILED
 		return ERROR;
 	}
 
@@ -914,6 +939,7 @@ int gt1x_hold_ss51_dsp(void)
 	buffer[0] = 0x00;
 	ret = gt1x_i2c_write_with_readback(_bRW_MISCTL__DSP_MCU_PWR_, buffer, 1);
 	if (ret) {
+    BBOX_TP_I2C_WRITE_FAILED
 		GTP_ERROR("enabel dsp & mcu power fail!");
 		return ret;
 	}
@@ -921,6 +947,7 @@ int gt1x_hold_ss51_dsp(void)
 	buffer[0] = 0x00;
 	ret = gt1x_i2c_write_with_readback(_bRW_MISCTL__TMR0_EN, buffer, 1);
 	if (ret) {
+		BBOX_TP_I2C_WRITE_FAILED
 		GTP_ERROR("disable wdt fail!");
 		return ret;
 	}
@@ -928,6 +955,7 @@ int gt1x_hold_ss51_dsp(void)
 	buffer[0] = 0x00;
 	ret = gt1x_i2c_write_with_readback(_bRW_MISCTL__CACHE_EN, buffer, 1);
 	if (ret) {
+		BBOX_TP_I2C_WRITE_FAILED
 		GTP_ERROR("clear cache fail!");
 		return ret;
 	}
@@ -935,6 +963,7 @@ int gt1x_hold_ss51_dsp(void)
 	buffer[0] = 0x01;
 	ret = gt1x_i2c_write(_bWO_MISCTL__CPU_SWRST_PULSE, buffer, 1);
 	if (ret) {
+		BBOX_TP_I2C_WRITE_FAILED
 		GTP_ERROR("software reset fail!");
 		return ret;
 	}
@@ -942,6 +971,7 @@ int gt1x_hold_ss51_dsp(void)
 	buffer[0] = 0x00;
 	ret = gt1x_i2c_write_with_readback(_rRW_MISCTL__BOOT_OPT_B0_, buffer, 1);
 	if (ret) {
+		BBOX_TP_I2C_READ_FAILED
 		GTP_ERROR("set scramble fail!");
 		return ret;
 	}
@@ -962,6 +992,7 @@ int gt1x_run_ss51_isp(u8 * ss51_isp, int length)
 	buffer[0] = 0x04;
 	ret = gt1x_i2c_write_with_readback(_bRW_MISCTL__SRAM_BANK, buffer, 1);
 	if (ret) {
+		BBOX_TP_I2C_WRITE_FAILED
 		GTP_ERROR("select bank4 fail.");
 		return ret;
 	}
@@ -969,6 +1000,7 @@ int gt1x_run_ss51_isp(u8 * ss51_isp, int length)
 	buffer[0] = 0x01;
 	ret = gt1x_i2c_write_with_readback(_bRW_MISCTL__PATCH_AREA_EN_, buffer, 1);
 	if (ret) {
+		BBOX_TP_I2C_WRITE_FAILED
 		GTP_ERROR("enable patch area access fail!");
 		return ret;
 	}
@@ -977,6 +1009,7 @@ int gt1x_run_ss51_isp(u8 * ss51_isp, int length)
 	// load ss51 isp
 	ret = gt1x_i2c_write(0xC000, ss51_isp, length);
 	if (ret) {
+		BBOX_TP_I2C_WRITE_FAILED
 		GTP_ERROR("load ss51 isp fail!");
 		return ret;
 	}
@@ -994,6 +1027,7 @@ int gt1x_run_ss51_isp(u8 * ss51_isp, int length)
 	buffer[0] = 0x00;
 	ret = gt1x_i2c_write_with_readback(_bRW_MISCTL__PATCH_AREA_EN_, buffer, 1);
 	if (ret) {
+		BBOX_TP_I2C_WRITE_FAILED
 		GTP_ERROR("disable patch area access fail!");
 		return ret;
 	}
@@ -1001,6 +1035,7 @@ int gt1x_run_ss51_isp(u8 * ss51_isp, int length)
 	memset(buffer, 0x55, 8);
 	ret = gt1x_i2c_write_with_readback(0x8006, buffer, 8);
 	if (ret) {
+		BBOX_TP_I2C_WRITE_FAILED
 		GTP_ERROR("set 0x8006[0~7] 0x55 fail!");
 		return ret;
 	}
@@ -1008,6 +1043,7 @@ int gt1x_run_ss51_isp(u8 * ss51_isp, int length)
 	buffer[0] = 0x08;
 	ret = gt1x_i2c_write_with_readback(_rRW_MISCTL__SWRST_B0_, buffer, 1);
 	if (ret) {
+		BBOX_TP_I2C_WRITE_FAILED
 		GTP_ERROR("release ss51 fail!");
 		return ret;
 	}
@@ -1016,6 +1052,7 @@ int gt1x_run_ss51_isp(u8 * ss51_isp, int length)
 	// check run state
 	ret = gt1x_i2c_read(0x8006, buffer, 2);
 	if (ret) {
+		BBOX_TP_I2C_READ_FAILED
 		GTP_ERROR("read 0x8006 fail!");
 		return ret;
 	}
@@ -1051,6 +1088,7 @@ int gt1x_recall_check(u8 * chk_src, u16 start_addr, u16 chk_length)
 
 		ret = gt1x_i2c_read(start_addr + compared_length, rd_buf, len);
 		if (ret) {
+			BBOX_TP_I2C_READ_FAILED
 			GTP_ERROR("recall i2c error,exit!");
 			return ret;
 		}
@@ -1098,6 +1136,7 @@ int gt1x_burn_subsystem(struct fw_subsystem_info *subsystem)
 		GTP_INFO("Burn block ==> length: %d, address: 0x%08X", block_len, subsystem->address + burn_len);
 		fw = gt1x_get_fw_data(subsystem->offset + burn_len, block_len);
 		if (fw == NULL) {
+			BBOX_TP_FW_UPGRADE_FAILED
 			return ERROR_FW;
 		}
 
@@ -1116,12 +1155,14 @@ int gt1x_burn_subsystem(struct fw_subsystem_info *subsystem)
 
 		ret = gt1x_i2c_write_with_readback(0x8100, buffer, 4);
 		if (ret) {
+			BBOX_TP_I2C_WRITE_FAILED
 			GTP_ERROR("write length & address fail!");
 			continue;
 		}
 
 		ret = gt1x_i2c_write(0x8100 + 4, fw, block_len);
 		if (ret) {
+			BBOX_TP_I2C_WRITE_FAILED
 			GTP_ERROR("write fw data fail!");
 			continue;
 		}
@@ -1130,6 +1171,7 @@ int gt1x_burn_subsystem(struct fw_subsystem_info *subsystem)
 		buffer[1] = (checksum & 0xFF);
 		ret = gt1x_i2c_write_with_readback(0x8100 + 4 + block_len, buffer, 2);
 		if (ret) {
+			BBOX_TP_I2C_WRITE_FAILED
 			GTP_ERROR("write checksum fail!");
 			continue;
 		}
@@ -1137,6 +1179,7 @@ int gt1x_burn_subsystem(struct fw_subsystem_info *subsystem)
 		buffer[0] = 0;
 		ret = gt1x_i2c_write_with_readback(0x8022, buffer, 1);
 		if (ret) {
+			BBOX_TP_I2C_WRITE_FAILED
 			GTP_ERROR("clear control flag fail!");
 			continue;
 		}
@@ -1145,6 +1188,7 @@ int gt1x_burn_subsystem(struct fw_subsystem_info *subsystem)
 		buffer[1] = subsystem->type;
 		ret = gt1x_i2c_write_with_readback(0x8020, buffer, 2);
 		if (ret) {
+			BBOX_TP_I2C_WRITE_FAILED
 			GTP_ERROR("write subsystem type fail!");
 			continue;
 		}
@@ -1157,11 +1201,13 @@ int gt1x_burn_subsystem(struct fw_subsystem_info *subsystem)
 
 			ret = gt1x_i2c_read(0x8022, buffer, 1);
 			if (ret < 0) {
+				BBOX_TP_I2C_READ_FAILED
 				continue;
 			}
 			msleep(5);
 			ret = gt1x_i2c_read(0x8022, &confirm, 1);
 			if (ret < 0) {
+				BBOX_TP_I2C_READ_FAILED
 				continue;
 			}
 			if (buffer[0] != confirm) {
@@ -1219,6 +1265,7 @@ int gt1x_check_subsystem_in_flash(struct fw_subsystem_info *subsystem)
 		GTP_INFO("Check block ==> length: %d, address: 0x%08X", block_len, subsystem->address + checked_len);
 		fw = gt1x_get_fw_data(subsystem->offset + checked_len, block_len);
 		if (fw == NULL) {
+			BBOX_TP_FW_UPGRADE_FAILED
 			return ERROR_FW;
 		}
 		ret = gt1x_read_flash(subsystem->address + checked_len, block_len);
@@ -1266,6 +1313,7 @@ int gt1x_read_flash(u32 addr, int length)
 	buffer[1] = 0xAA;
 	ret |= gt1x_i2c_write(0x8020, buffer, 2);
 	if (ret) {
+		BBOX_TP_I2C_WRITE_FAILED
 		GTP_ERROR("Error occured.");	//comment
 		return ret;
 	}
@@ -1276,6 +1324,7 @@ int gt1x_read_flash(u32 addr, int length)
 		msleep(5);
 		ret = gt1x_i2c_read_dbl_check(0x8022, buffer, 1);
 		if (ret) {
+			BBOX_TP_I2C_READ_FAILED
 			continue;
 		}
 		if (buffer[0] == 0xBB) {
