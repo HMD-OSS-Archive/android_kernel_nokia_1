@@ -98,6 +98,9 @@ extern void init_IRQ(void);
 extern void fork_init(unsigned long);
 extern void radix_tree_init(void);
 
+//FIH firefly add S
+static void fih_get_skuid(void);
+//FIH firefly add E
 /*
  * Debug helper: via this flag we know that we are in 'early bootup code'
  * where only the boot processor is running with IRQ disabled.  This means
@@ -384,6 +387,7 @@ static void __init setup_command_line(char *command_line)
 /* Begin ************************************* FIH ADD */
 bool fih_efuse_enable = 1;
 unsigned short fih_hwid = 0xFF;
+char g_skuid_buf[6] = {0};
 
 unsigned short fih_gethwid(void)
 {
@@ -412,6 +416,22 @@ unsigned short fih_gethwid(void)
 	return ret;
 }
 EXPORT_SYMBOL(fih_gethwid);
+
+void fih_get_skuid(void)
+{
+	char *pattern = "fih_skuid=";
+	char *p = strstr(saved_command_line, pattern);
+	unsigned short i  = 0;
+
+	if (p == NULL)
+		return;
+
+	p += strlen(pattern);
+	while(*p != ' ' && i < 6){
+		g_skuid_buf[i++]=*p;
+		p++;
+	}
+}
 
 unsigned int fih_get_ramtest_result(void)
 {
@@ -867,6 +887,7 @@ asmlinkage __visible void __init start_kernel(void)
 
 	fih_hwid = fih_gethwid();
 	fih_efuse_enable = fih_get_efuse_enable();
+	fih_get_skuid();
 
 	pr_notice("Kernel command line: %s\n", boot_command_line);
 	parse_early_param();

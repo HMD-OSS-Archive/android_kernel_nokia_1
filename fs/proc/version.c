@@ -5,22 +5,20 @@
 #include <linux/seq_file.h>
 #include <linux/utsname.h>
 
-#include "../../drivers/char/Testflag.h"
+extern char g_skuid_buf[6];
 
 static int version_proc_show(struct seq_file *m, void *v)
 {
 	int length = 0, offset = 0;
 
-	char buffer_SKUID[16] = {'0'};
 	char old_linux_version[256] = {0}, new_linux_version[256] = {0};
 
 	char *timezone = NULL, *at = NULL, *user = NULL, *machine = NULL, *left_parentheses = NULL, *right_parentheses = NULL;
 
-	fih_read_skuid(buffer_SKUID);
 
-	printk("%s: SW version(skuid) = %s\n", __func__, buffer_SKUID);
+	printk("%s: g_skuid_buf from cmdline = %s\n", __func__, g_skuid_buf);
 
-	if(strncmp(buffer_SKUID, "600ID", 5) != 0)
+	if(strncmp(g_skuid_buf, "600ID", 5) != 0)
 	{
 		seq_printf(m, linux_proc_banner,
 				utsname()->sysname,
