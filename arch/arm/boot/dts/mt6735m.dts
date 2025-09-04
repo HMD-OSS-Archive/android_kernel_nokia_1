@@ -1310,11 +1310,13 @@
 
 		/* NFC start */
 		nfc:nfc@0 {
-			compatible = "mediatek,nfc-gpio-v2";
-			gpio-ven = <4>;
-			gpio-rst = <3>;
-			gpio-eint = <1>;
-			gpio-irq = <2>;
+			compatible = "samsung,nfc-sec";
+			ven-gpio = <4>;
+			irq-gpio = <2>;
+			firm-gpio = <3>;
+			clk_req-gpio = <55>;
+			pvdd_en-gpio = <0>;
+
 		};
 		/* NFC end */
 
@@ -1376,7 +1378,7 @@
 			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_LOW>;
 		};
 
-		mt_soc_dl1_pcm@11220000 {
+		audgpio: mt_soc_dl1_pcm@11220000 {
 			compatible = "mediatek,mt-soc-dl1-pcm";
 			reg = <0x11220000 0x1000>;
 			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_LOW>;

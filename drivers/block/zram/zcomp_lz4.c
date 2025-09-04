@@ -14,6 +14,7 @@
 #include <linux/mm.h>
 
 #include "zcomp_lz4.h"
+#include "zcomp_zstd.h"
 
 static void *zcomp_lz4_create(void)
 {
@@ -78,6 +79,7 @@ struct zcomp_backend zcomp_lz4 = {
 	.create = zcomp_lz4_create,
 	.destroy = zcomp_lz4_destroy,
 	.name = "lz4",
+	.secondary = &zcomp_zstd,
 };
 #endif
 

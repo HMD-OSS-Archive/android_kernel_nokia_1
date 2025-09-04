@@ -85,9 +85,66 @@ static const struct file_operations gt1x_fw_ver_fops = {
 	.write = gt1x_fw_ver_write_proc,
 };
 
+static ssize_t gt1x_cfg_id_read_proc(struct file *file, char __user * page, size_t size, loff_t * ppos);
+static ssize_t gt1x_cfg_id_write_proc(struct file *file, const char *buffer, size_t count, loff_t * ppos);
+static struct proc_dir_entry *gt1x_cfg_id_proc_entry = NULL;
+static const struct file_operations gt1x_cfg_id_fops = {
+	.owner = THIS_MODULE,
+	.read = gt1x_cfg_id_read_proc,
+	.write = gt1x_cfg_id_write_proc,
+};
+
+static s32 gt1x_init_cfg_id_node(void)
+{
+	gt1x_cfg_id_proc_entry = proc_create(GT1X_CFG_ID_PROC_FILE, 0664, NULL, &gt1x_cfg_id_fops);
+	if (gt1x_cfg_id_proc_entry == NULL) {
+		GTP_ERROR("Create proc entry /proc/%s FAILED!", GT1X_CFG_ID_PROC_FILE);
+		return -1;
+	}
+	GTP_INFO("Created proc entry /proc/%s.", GT1X_CFG_ID_PROC_FILE);
+	return 0;
+}
+
+static ssize_t gt1x_cfg_id_read_proc(struct file *file, char __user * page, size_t size, loff_t * ppos)
+{
+	struct gt1x_version_info ver_info;
+	int ret = 0;
+	char buf_temp[30] = {0};
+	char length = 0;
+	char config_version = 0;
+
+	ret = gt1x_read_version(&ver_info);
+	if(ret){
+		GTP_ERROR("Can not read version!");
+		return -1;
+	}
+
+	ret = gt1x_i2c_read(GTP_REG_CONFIG_DATA, &config_version, 1);
+	if(ret < 0){
+		config_version = 0xff;
+	}
+
+	length = sprintf(buf_temp, "%02X_%02X\n",
+			config_version, ver_info.sensor_id);
+	return simple_read_from_buffer(page, size, ppos, buf_temp, length + 1);
+}
+
+static ssize_t gt1x_cfg_id_write_proc(struct file *file, const char *buffer, size_t count, loff_t * ppos)
+{
+	GTP_INFO("Write  version ok");
+	return 0;
+}
+
+static void gt1x_deinit_cfg_id_node(void)
+{
+	if (gt1x_cfg_id_proc_entry != NULL) {
+		remove_proc_entry(GT1X_CFG_ID_PROC_FILE, NULL);
+	}
+}
+
 static s32 gt1x_init_fw_ver_node(void)
 {
-	gt1x_fw_ver_proc_entry = proc_create(GT1X_FW_VER_PROC_FILE, 0660, NULL, &gt1x_fw_ver_fops);
+	gt1x_fw_ver_proc_entry = proc_create(GT1X_FW_VER_PROC_FILE, 0664, NULL, &gt1x_fw_ver_fops);
 	if (gt1x_fw_ver_proc_entry == NULL) {
 		GTP_ERROR("Create proc entry /proc/%s FAILED!", GT1X_FW_VER_PROC_FILE);
 		return -1;
@@ -143,7 +200,7 @@ static void gt1x_deinit_fw_ver_node(void)
 
 static s32 gt1x_init_debug_node(void)
 {
-	gt1x_debug_proc_entry = proc_create(GT1X_DEBUG_PROC_FILE, 0660, NULL, &gt1x_debug_fops);
+	gt1x_debug_proc_entry = proc_create(GT1X_DEBUG_PROC_FILE, 0664, NULL, &gt1x_debug_fops);
 	if (gt1x_debug_proc_entry == NULL) {
 		GTP_ERROR("Create proc entry /proc/%s FAILED!", GT1X_DEBUG_PROC_FILE);
 		return -1;
@@ -2507,6 +2564,7 @@ s32 gt1x_init(void)
 		/* reset ic */
 		ret = gt1x_reset_guitar();
 		if (ret != 0) {
+			gt1x_init_failed = -1;
 			GTP_ERROR("Reset guitar failed!");
 			continue;
 		}
@@ -2529,7 +2587,10 @@ s32 gt1x_init(void)
 #endif
 		break;
 	}
-
+        if(gt1x_init_failed){
+		GTP_ERROR("Goodix touch panel init failed,please hardware connector(power/reset/intr gpio) etc!\n");
+		return -1;
+	}
 	/* if the initialization fails, set default setting */
 	ret |= gt1x_init_failed;
 	if (ret) {
@@ -2567,6 +2628,8 @@ s32 gt1x_init(void)
 	/* init auxiliary  node and functions */
 	gt1x_init_fw_ver_node();
 
+	gt1x_init_cfg_id_node();
+
 	gt1x_init_debug_node();
 
 #ifdef CONFIG_GTP_CREATE_WR_NODE
@@ -2600,6 +2663,7 @@ s32 gt1x_init(void)
 
 void gt1x_deinit(void)
 {
+	gt1x_deinit_cfg_id_node();
 	gt1x_deinit_fw_ver_node();
 
 	gt1x_deinit_debug_node();

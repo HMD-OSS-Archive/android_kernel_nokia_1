@@ -1048,7 +1048,7 @@ static int BMA2x2_CheckDeviceID(struct i2c_client *client)
 	}
 
 exit_BMA2x2_CheckDeviceID:
-	if (res < 0)
+	if ((res < 0) || (CHIP_TYPE < 0))
 		return BMA2x2_ERR_I2C;
 
 	return BMA2x2_SUCCESS;

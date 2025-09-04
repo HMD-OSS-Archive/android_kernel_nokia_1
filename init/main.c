@@ -582,7 +582,8 @@ extern unsigned long long fih_get_emmc_size(void)
 			a = *p - 'a' + 10;
 		else if((*p >= 'A') && (*p <= 'F'))
 			a = *p - 'A' + 10;
-
+		else
+			break;
 		p++;
 		ret = a | ( ret<< 4);
 	}
@@ -614,7 +615,8 @@ extern unsigned long long fih_get_emmc_usersize(void)
 			a = *p - 'a' + 10;
 		else if((*p >= 'A') && (*p <= 'F'))
 			a = *p - 'A' + 10;
-
+		else
+			break;
 		p++;
 		ret = a | ( ret<< 4);
 	}

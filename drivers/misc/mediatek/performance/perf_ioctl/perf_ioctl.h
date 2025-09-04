@@ -39,14 +39,16 @@
 typedef struct _FPSGO_PACKAGE {
 	__u32 tid;
 	union {
-		__u64 frame_time;
-		__u64 bufID;
-	};
-	union {
 		__u32 start;
 		__u32 connectedAPI;
 		__u32 render_method;
 	};
+	union {
+		__u64 frame_time;
+		__u64 bufID;
+	};
+	__u64 frame_id; /* for HWUI only*/
+	__s32 queue_SF;
 } FPSGO_PACKAGE;
 
 #define FPSGO_TOUCH          _IOW('g', 10, FPSGO_PACKAGE)

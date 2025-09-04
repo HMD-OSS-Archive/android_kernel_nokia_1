@@ -45,12 +45,14 @@ int write_ef(struct manuf_data * wdata)
 
 		if (len != sizeof(struct manuf_data))
 		{
+			set_fs(oldfs);
 			return FILE_CORRUPTED;
 		}
 	}
 	else
 	{
 		printk("write_ef() open file fail %s\n", MANUF_FILE_LOCATION);
+		set_fs(oldfs);
 		return FILE_NOT_FOUND;
 	}
 
@@ -87,13 +89,14 @@ int read_ef(struct manuf_data * rdata)
 
 			if (len != sizeof(struct manuf_data))
 			{
+				set_fs(oldfs);
 				return FILE_CORRUPTED;
 			}
 		}
 		else
 		{
 			printk("read_ef() failed to open PTR_ERR(pid_filp) = %ld\n", PTR_ERR(pid_filp));
-
+			set_fs(oldfs);
 			return FILE_NOT_FOUND;
 		}
 		set_fs(oldfs);

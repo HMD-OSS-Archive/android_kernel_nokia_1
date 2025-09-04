@@ -548,11 +548,12 @@ return 0;
 	 */
 	gt1x_i2c_client = client;
 	spin_lock_init(&irq_lock);
-
-	if (gt1x_init()) {
+	err = gt1x_init();
+	if (err) {
 		/* TP resolution == LCD resolution, no need to match resolution when initialized fail */
 		gt1x_abs_x_max = 0;
 		gt1x_abs_y_max = 0;
+		return err;
 	}
 
 	thread = kthread_run(tpd_event_handler, 0, TPD_DEVICE);
@@ -941,7 +942,7 @@ static int tpd_local_init(void)
 	{
 		GTP_ERROR("add error touch panel driver.");
 		i2c_del_driver(&tpd_i2c_driver);
-		return -1;
+		goto exit_free_dma;
 	}
 	input_set_abs_params(tpd->dev, ABS_MT_TRACKING_ID, 0, (GTP_MAX_TOUCH - 1), 0, 0);
 #ifdef CONFIG_TPD_HAVE_BUTTON
@@ -971,6 +972,13 @@ static int tpd_local_init(void)
 	tpd_type_cap = 1;
 
 	return 0;
+exit_free_dma:
+#if TPD_SUPPORT_I2C_DMA
+	dma_free_coherent(&tpd->dev->dev, IIC_DMA_MAX_TRANSFER_SIZE, gpDMABuf_va, gpDMABuf_pa);
+	gpDMABuf_va = NULL;
+	gpDMABuf_pa = 0;
+#endif
+	return -1;
 }
 
 /* Function to manage low power suspend */

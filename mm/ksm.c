@@ -23,7 +23,7 @@
 #include <linux/pagemap.h>
 #include <linux/rmap.h>
 #include <linux/spinlock.h>
-#include <linux/jhash.h>
+#include <linux/xxhash.h>
 #include <linux/delay.h>
 #include <linux/kthread.h>
 #include <linux/wait.h>
@@ -146,6 +146,7 @@ struct stable_node {
 	};
 	struct hlist_head hlist;
 	unsigned long kpfn;
+	u32 checksum;
 #ifdef CONFIG_NUMA
 	int nid;
 #endif
@@ -840,27 +841,31 @@ static u32 calc_checksum(struct page *page)
 {
 	u32 checksum;
 	void *addr = kmap_atomic(page);
-	checksum = jhash2(addr, PAGE_SIZE / 4, 17);
+	checksum = xxh32(addr, PAGE_SIZE, 17);
 	kunmap_atomic(addr);
 	return checksum;
 }
 
-static int memcmp_pages(struct page *page1, struct page *page2)
+static int memcmp_pages(struct page *page1, struct page *page2, u32 checksum1, u32 checksum2)
 {
 	char *addr1, *addr2;
 	int ret;
 
-	addr1 = kmap_atomic(page1);
-	addr2 = kmap_atomic(page2);
-	ret = memcmp(addr1, addr2, PAGE_SIZE);
-	kunmap_atomic(addr2);
-	kunmap_atomic(addr1);
+	if (checksum1 == checksum2) {
+		addr1 = kmap_atomic(page1);
+		addr2 = kmap_atomic(page2);
+		ret = memcmp(addr1, addr2, PAGE_SIZE);
+		kunmap_atomic(addr2);
+		kunmap_atomic(addr1);
+	} else {
+		return (checksum1 > checksum2) ? 1 : -1;
+	}
 	return ret;
 }
 
 static inline int pages_identical(struct page *page1, struct page *page2)
 {
-	return !memcmp_pages(page1, page2);
+	return !memcmp_pages(page1, page2, 0, 0);
 }
 
 static int write_protect_page(struct vm_area_struct *vma, struct page *page,
@@ -1159,7 +1164,7 @@ static struct page *try_to_merge_two_pages(struct rmap_item *rmap_item,
  * This function returns the stable tree node of identical content if found,
  * NULL otherwise.
  */
-static struct page *stable_tree_search(struct page *page)
+static struct page *stable_tree_search(struct page *page, u32 checksum)
 {
 	int nid;
 	struct rb_root *root;
@@ -1191,7 +1196,7 @@ again:
 		if (!tree_page)
 			return NULL;
 
-		ret = memcmp_pages(page, tree_page);
+		ret = memcmp_pages(page, tree_page, checksum, stable_node->checksum);
 		put_page(tree_page);
 
 		parent = *new;
@@ -1259,7 +1264,7 @@ replace:
  * This function returns the stable tree node just allocated on success,
  * NULL otherwise.
  */
-static struct stable_node *stable_tree_insert(struct page *kpage)
+static struct stable_node *stable_tree_insert(struct page *kpage, u32 checksum)
 {
 	int nid;
 	unsigned long kpfn;
@@ -1283,7 +1288,7 @@ static struct stable_node *stable_tree_insert(struct page *kpage)
 		if (!tree_page)
 			return NULL;
 
-		ret = memcmp_pages(kpage, tree_page);
+		ret = memcmp_pages(kpage, tree_page, checksum, stable_node->checksum);
 		put_page(tree_page);
 
 		parent = *new;
@@ -1307,6 +1312,7 @@ static struct stable_node *stable_tree_insert(struct page *kpage)
 
 	INIT_HLIST_HEAD(&stable_node->hlist);
 	stable_node->kpfn = kpfn;
+	stable_node->checksum = checksum;
 	set_page_stable_node(kpage, stable_node);
 	DO_NUMA(stable_node->nid = nid);
 	rb_link_node(&stable_node->node, parent, new);
@@ -1362,7 +1368,7 @@ struct rmap_item *unstable_tree_search_insert(struct rmap_item *rmap_item,
 			return NULL;
 		}
 
-		ret = memcmp_pages(page, tree_page);
+		ret = memcmp_pages(page, tree_page, rmap_item->oldchecksum, tree_rmap_item->oldchecksum);
 
 		parent = *new;
 		if (ret < 0) {
@@ -1450,7 +1456,7 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 	}
 
 	/* We first start with searching the page inside the stable tree */
-	kpage = stable_tree_search(page);
+	kpage = stable_tree_search(page, rmap_item->oldchecksum);
 	if (kpage == page && rmap_item->head == stable_node) {
 		put_page(kpage);
 		return;
@@ -1497,7 +1503,7 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 			 * node in the stable tree and add both rmap_items.
 			 */
 			lock_page(kpage);
-			stable_node = stable_tree_insert(kpage);
+			stable_node = stable_tree_insert(kpage, checksum);
 			if (stable_node) {
 				stable_tree_append(tree_rmap_item, stable_node);
 				stable_tree_append(rmap_item, stable_node);

@@ -709,27 +709,18 @@ const struct custom_modem fih_modem[] =
 	{.hwid = 0x134, .type= 0x000060, .num = 6},
 	{.hwid = 0x135, .type= 0x000060, .num = 5},
 	{.hwid = 0x136, .type= 0x000060, .num = 5},
-//DVT1:
+//DVT:
+//PVT:
+//MP:
 	{.hwid = 0x151, .type= 0x000060, .num = 4},
 	{.hwid = 0x152, .type= 0x000060, .num = 4},
 	{.hwid = 0x153, .type= 0x000060, .num = 4},
 	{.hwid = 0x154, .type= 0x000060, .num = 6},
 	{.hwid = 0x155, .type= 0x000060, .num = 5},
 	{.hwid = 0x156, .type= 0x000060, .num = 5},
-//PVT1:
-	{.hwid = 0x161, .type= 0x000060, .num = 4},
-	{.hwid = 0x162, .type= 0x000060, .num = 4},
-	{.hwid = 0x262, .type= 0x000060, .num = 4},
-	{.hwid = 0x163, .type= 0x000060, .num = 6},
-	{.hwid = 0x164, .type= 0x000060, .num = 5},
-	{.hwid = 0x264, .type= 0x000060, .num = 5},
-	{.hwid = 0x165, .type= 0x000060, .num = 5},
-//MP:
-       {.hwid = 0x161, .type= 0x000060, .num = 4},
-       {.hwid = 0x162, .type= 0x000060, .num = 4},
-       {.hwid = 0x163, .type= 0x000060, .num = 6},
-       {.hwid = 0x164, .type= 0x000060, .num = 5},
-       {.hwid = 0x165, .type= 0x000060, .num = 5},
+//NFC:
+        {.hwid = 0x115, .type= 0x000060, .num = 4},
+
 };
 
 size_t get_fih_modem_size(void)

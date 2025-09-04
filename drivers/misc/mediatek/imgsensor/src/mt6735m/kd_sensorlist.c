@@ -1440,11 +1440,14 @@ static inline int adopt_CAMERA_HW_CheckIsAlive(void)
 	MUINT32 retLen = 0;
 	BYTE my_module_id;
 	char* module_name;
+	MINT32 ret = ERROR_NONE;
 
 	KD_IMGSENSOR_PROFILE_INIT();
 	/* power on sensor */
-	kdModulePowerOn((CAMERA_DUAL_CAMERA_SENSOR_ENUM *) g_invokeSocketIdx, g_invokeSensorNameStr,
+	ret = kdModulePowerOn((CAMERA_DUAL_CAMERA_SENSOR_ENUM *) g_invokeSocketIdx, g_invokeSensorNameStr,
 			true, CAMERA_HW_DRVNAME1);
+	if(ret < 0)
+		return -EIO;
 	/* wait for power stable */
 	mDELAY(10);
 	KD_IMGSENSOR_PROFILE("kdModulePowerOn");
@@ -1454,7 +1457,7 @@ static inline int adopt_CAMERA_HW_CheckIsAlive(void)
 	/* Search sensor keep i2c debug log */
 	g_IsSearchSensor = 1;
 	/* Camera information */
-	if (gDrvIndex == 0x10000) {
+	if (gDrvIndex == 0x20000) {
 		memset(mtk_ccm_name, 0, camera_info_size);
 	}
 
@@ -2035,6 +2038,7 @@ static inline int  adopt_CAMERA_HW_FeatureControl(void *pBuf)
 		if (copy_from_user
 		    ((void *)pFeaturePara, (void *)pFeatureCtrl->pFeaturePara, FeatureParaLen)) {
 			PK_DBG("[CAMERA_HW][pFeaturePara] ioctl copy from user failed\n");
+			kfree(pFeaturePara);
 			return -EFAULT;
 		}
 		/* keep the information to wait Vsync synchronize */
@@ -2880,7 +2884,7 @@ bool Get_Cam_Regulator(void)
 				sensor_device->of_node =
 				    of_find_compatible_node(NULL, NULL,
 							    "mediatek,camera_hw");
-				/* 若你需要sub也定義的話，需要自己加上
+				/* If you also need define the sub, you should add it by yourself.
 				   if (regVCAMA == NULL) {
 				   regVCAMA_SUB = regulator_get(sensor_device, "SUB_CAMERA_POWER_A");
 				   }

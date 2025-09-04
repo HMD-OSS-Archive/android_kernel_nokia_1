@@ -17,6 +17,7 @@
  */
 
 #define __MT_CLK_BUF_CTL_C__
+#define pr_fmt(fmt)		"[Power/clkbuf]" fmt
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -73,9 +74,7 @@ static CLK_BUF_SWCTRL_STATUS_T clk_buf_swctrl[CLKBUF_NUM] = {
 #define BSI_CW_DEFAULT		0x01E8F
 
 #define CLK_BUF_BSI_PAD_NUM	5
-
-#define TAG                                    "[Power/clkbuf]"
-#define clk_buf_warn(fmt, args...)             pr_warn(TAG fmt, ##args);
+#define clkbuf_debug(fmt, args...)	pr_debug(fmt, ##args)
 
 static unsigned int clk_buf_spm_cfg[CLK_BUF_BSI_PAD_NUM] = {
 	0x00000000, /* BSI_EN_SR */
@@ -152,6 +151,28 @@ static void clk_buf_Send_BSI_CW(CLK_BUF_SWCTRL_STATUS_T *status)
 }
 
 
+static void spm_clk_buf_ctrl_twice(CLK_BUF_SWCTRL_STATUS_T *status)
+{
+	u32 spm_val;
+	int i;
+
+	clkbuf_debug("%s: enter", __func__);
+	spm_ap_mdsrc_req(1);
+	spm_val = spm_read(SPM_SLEEP_MDBSI_CON) & ~0x7;
+	for (i = 1; i < CLKBUF_NUM; i++)
+		spm_val |= status[i] << (i-1);
+	spm_write(SPM_SLEEP_MDBSI_CON, spm_val);
+	udelay(2);
+	spm_ap_mdsrc_req(0);
+	udelay(2);
+	spm_ap_mdsrc_req(1);
+	spm_write(SPM_SLEEP_MDBSI_CON, spm_val);
+	udelay(2);
+	spm_ap_mdsrc_req(0);
+	clkbuf_debug("%s: leave", __func__);
+}
+
+
 static void spm_clk_buf_ctrl(CLK_BUF_SWCTRL_STATUS_T *status)
 {
 	u32 spm_val;
@@ -170,42 +191,6 @@ static void spm_clk_buf_ctrl(CLK_BUF_SWCTRL_STATUS_T *status)
 
 	spm_ap_mdsrc_req(0);
 }
-
-static void spm_clk_buf_ctrl_tentimes(CLK_BUF_SWCTRL_STATUS_T *status)
-{
-        u32 spm_val;
-        int i;
-
-	clk_buf_warn("%s: enter",__func__);
-
-	//1
-        spm_ap_mdsrc_req(1);
-
-        spm_val = spm_read(SPM_SLEEP_MDBSI_CON) & ~0x7;
-
-        for (i = 1; i < CLKBUF_NUM; i++)
-                spm_val |= status[i] << (i-1);
-
-	spm_write(SPM_SLEEP_MDBSI_CON, spm_val);
-
-	udelay(2);
-
-	spm_ap_mdsrc_req(0);
-
-	udelay(2);
-
-	//2
-	spm_ap_mdsrc_req(1);
-
-        spm_write(SPM_SLEEP_MDBSI_CON, spm_val);
-
-        udelay(2);
-
-        spm_ap_mdsrc_req(0);
-
-	clk_buf_warn("%s: leave",__func__);
-}
-
 
 #define SPM_PWR_STATUS_MD	(1U << 0)
 bool clk_buf_ctrl(enum clk_buf_id id, bool onoff)
@@ -245,8 +230,8 @@ bool clk_buf_ctrl(enum clk_buf_id id, bool onoff)
 
 	clk_buf_swctrl[id] = onoff;
 	if ((spm_read(SPM_PWR_STATUS) & SPM_PWR_STATUS_MD) && (spm_read(SPM_PWR_STATUS_2ND) & SPM_PWR_STATUS_MD))
-		if(id==CLK_BUF_CONN)
-			spm_clk_buf_ctrl_tentimes(clk_buf_swctrl);
+		if (id == CLK_BUF_CONN)
+			spm_clk_buf_ctrl_twice(clk_buf_swctrl);
 		else
 			spm_clk_buf_ctrl(clk_buf_swctrl);
 	else

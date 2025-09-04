@@ -22,6 +22,9 @@
 #ifdef CONFIG_ZRAM_LZ4K_COMPRESS
 #include "zcomp_lz4k.h"
 #endif
+#ifdef CONFIG_ZRAM_ZSTD_COMPRESS
+#include "zcomp_zstd.h"
+#endif
 
 /*
  * single zcomp_strm backend
@@ -54,6 +57,9 @@ static struct zcomp_backend *backends[] = {
 #ifdef CONFIG_ZRAM_LZ4K_COMPRESS
 	&zcomp_lz4k,
 #endif
+#ifdef CONFIG_ZRAM_ZSTD_COMPRESS
+	&zcomp_zstd,
+#endif
 	NULL
 };
 
@@ -72,6 +78,8 @@ static void zcomp_strm_free(struct zcomp *comp, struct zcomp_strm *zstrm)
 {
 	if (zstrm->private)
 		comp->backend->destroy(zstrm->private);
+	if (zstrm->private_secondary)
+		comp->backend->destroy(zstrm->private_secondary);
 	free_pages((unsigned long)zstrm->buffer, 1);
 	kfree(zstrm);
 }
@@ -87,6 +95,12 @@ static struct zcomp_strm *zcomp_strm_alloc(struct zcomp *comp)
 		return NULL;
 
 	zstrm->private = comp->backend->create();
+
+	// secondary
+	if (comp->backend->secondary)
+		zstrm->private_secondary = comp->backend->secondary->create();
+	else
+		zstrm->private_secondary = NULL;
 	/*
 	 * allocate 2 pages. 1 for compressed data, plus 1 extra for the
 	 * case when compressed size is larger than the original one
@@ -327,15 +341,20 @@ int zcomp_compress_zram(struct zcomp *comp, struct zcomp_strm *zstrm,
 }
 #else
 int zcomp_compress(struct zcomp *comp, struct zcomp_strm *zstrm,
-		const unsigned char *src, size_t *dst_len)
+		const unsigned char *src, size_t *dst_len, bool use_secondary)
 {
+	if (use_secondary && comp->backend->secondary)
+		return comp->backend->secondary->compress(src, zstrm->buffer, dst_len,
+                        zstrm->private_secondary);
 	return comp->backend->compress(src, zstrm->buffer, dst_len,
 			zstrm->private);
 }
 #endif
 int zcomp_decompress(struct zcomp *comp, const unsigned char *src,
-		size_t src_len, unsigned char *dst)
+		size_t src_len, unsigned char *dst, bool use_secondary)
 {
+	if (use_secondary && comp->backend->secondary)
+		return comp->backend->secondary->decompress(src, src_len, dst);
 	return comp->backend->decompress(src, src_len, dst);
 }
 

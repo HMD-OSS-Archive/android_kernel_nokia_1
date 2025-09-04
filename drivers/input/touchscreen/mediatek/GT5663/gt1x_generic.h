@@ -118,6 +118,7 @@
 #define GTP_I2C_NAME                "Goodix-TS"
 #define GT1X_DEBUG_PROC_FILE        "gt1x_debug"
 #define GT1X_FW_VER_PROC_FILE       "tp_fw_ver"
+#define GT1X_CFG_ID_PROC_FILE       "cfg_id_ver"
 #define GTP_POLL_TIME               10
 #define GTP_ADDR_LENGTH             2
 #define GTP_CONFIG_MIN_LENGTH       186

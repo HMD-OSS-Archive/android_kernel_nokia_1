@@ -41,6 +41,7 @@
 #define EFUSE_INFO_PROC		"efuse_state"
 #define OTG_LAST_FLAG		"otg_last_flag"
 #define SIM_NUMBER		"simnum"
+#define NFC_SUPPORT		"nfc_support"
 #define FQCXMLPATH		"fqc_xml"
 #define RAMRESULT_PROC		"dramtest_result"
 #define SKUID_PROC		"skuid"
@@ -51,6 +52,14 @@
 #define FIH_PON_APR_FRAMEWORK_EXCEPTION   "0x80000000\n"
 #define FIH_PON_APR_ABNORMAL_POWER_DOWN   "0x01000000\n"
 #define FIH_PON_APR_ABNORMAL_POWER_RESET  "0x02000000\n"
+
+#define FIH_PROC_CDA_USER_DIR   "cda"
+#define FIH_PROC_CDA_USER_PATH  "cda/user"
+
+#define FIH_CDA_KERN_USER  (0)
+#define FIH_CDA_KERN_ROOT  (1)
+#define FIH_CDA_STAT_USER  (0)
+#define FIH_CDA_STAT_ROOT  (1)
 
 int otg_last_flag = 0;
 
@@ -69,6 +78,7 @@ struct systeminfo {
 	char	hac[8];
 	char	sim_num[8];
 	char	audio_para[30];
+	char    nfc_support[16];
 };
 
 struct fih_hwid_info {
@@ -85,6 +95,7 @@ struct fih_hwid_info {
 	char	pcba_description[112];
 	char	hac[8];
 	char	sim_num[8];
+	char    nfc_support[16];
 };
 
 
@@ -102,7 +113,8 @@ struct systeminfo model[] = {
 		.hw_family	=	"unknow",
 		.hac		=	"unknow",
 		.sim_num	=	"unknow",
-		.audio_para 	=	"unknow"
+		.audio_para 	=	"unknow",
+		.nfc_support	=	"unknow"
 	},
 	{
 		.model_name	=	"unknow",
@@ -117,7 +129,8 @@ struct systeminfo model[] = {
 		.hw_family	=	"unknow",
 		.hac		=	"unknow",
 		.sim_num	=	"unknow",
-		.audio_para	=	"unknow"
+		.audio_para	=	"unknow",
+		.nfc_support    =       "unknow"
 	},
 	{
 		.model_name 	=	"unknow",
@@ -132,7 +145,8 @@ struct systeminfo model[] = {
 		.hw_family	=	"unknow",
 		.hac		=	"unknow",
 		.sim_num	=	"unknow",
-		.audio_para 	=	"unknow"
+		.audio_para 	=	"unknow",
+		.nfc_support    =       "unknow"
 	},
 	{
 		.model_name 	=	"unknow",
@@ -147,7 +161,8 @@ struct systeminfo model[] = {
 		.hw_family	=	"unknow",
 		.hac		=	"unknow",
 		.sim_num	=	"unknow",
-		.audio_para 	=	"unknow"
+		.audio_para 	=	"unknow",
+		.nfc_support    =       "unknow"
 	},
 	{
 		.model_name 	=	"unknow",
@@ -162,7 +177,8 @@ struct systeminfo model[] = {
 		.hw_family	=	"unknow",
 		.hac		=	"unknow",
 		.sim_num	=	"unknow",
-		.audio_para 	=	"unknow"
+		.audio_para 	=	"unknow",
+		.nfc_support    =       "unknow"
 	},
 	{
 		.model_name 	=	"unknow",
@@ -177,6 +193,7 @@ struct systeminfo model[] = {
 		.hw_family	=	"unknow",
 		.hac		=	"unknow",
 		.sim_num	=	"unknow",
-		.audio_para 	=	"unknow"
+		.audio_para 	=	"unknow",
+		.nfc_support    =       "unknow"
 	},
 };

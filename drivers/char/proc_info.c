@@ -39,6 +39,8 @@ extern unsigned long long fih_get_emmc_size(void);
 extern unsigned long long fih_get_emmc_usersize(void);
 extern unsigned int fih_get_ramtest_result(void);
 
+char nfc_hw_support[16] = {'\0'};
+
 static char causeStr[99];
 static char *fver_preload;
 static int fver_len = 65536;
@@ -62,6 +64,7 @@ static unsigned long long mtk_emmc_size = 0;
 static char *root_status_load;
 static int root_status_len = 4096;
 static bool open_already = 0;
+static int root_cda_user_flag = 0;
 
 int devmodel_init = 0;
 static char str_project[3];
@@ -235,6 +238,8 @@ static void get_emmc_vendor_and_size(void)
 	u8 sandisk_cid = 0x45;
 	u8 kingston_cid = 0x70;
 	u8 toshiba_cid = 0x11;
+	u8 biwin_cid = 0xF4;
+	u8 longsys_cid = 0x88;
 
 	unsigned short hw_preload = 0, num = 0;
 
@@ -268,6 +273,14 @@ static void get_emmc_vendor_and_size(void)
 	else if (memcmp(mem_cid, &toshiba_cid, 1) == 0)
 	{
 		strcpy(fih_emmc_vendor, "Toshiba");
+	}
+	else if (memcmp(mem_cid, &biwin_cid, 1) == 0)
+	{
+		strcpy(fih_emmc_vendor, "Biwin");
+	}
+	else if (memcmp(mem_cid, &longsys_cid, 1) == 0)
+	{
+		strcpy(fih_emmc_vendor, "Longsys");
 	}
 
 	if(mtk_emmc_size == 0)
@@ -394,7 +407,7 @@ static int dram_show(struct seq_file *s, void *unused)
 		}
 		else if(ddr_verdor == 0x3)
 		{
-			strcpy(fih_dram_vendor, "Elpida");
+			strcpy(fih_dram_vendor, "Biwin");
 		}
 		else if(ddr_verdor == 0x5)
 		{
@@ -403,6 +416,10 @@ static int dram_show(struct seq_file *s, void *unused)
 		else if(ddr_verdor == 0x6)
 		{
 			strcpy(fih_dram_vendor, "Hynix");
+		}
+		else if(ddr_verdor == 0xFF)
+		{
+			strcpy(fih_dram_vendor, "Longsys");
 		}
 	}
 
@@ -432,7 +449,9 @@ static int dram_show(struct seq_file *s, void *unused)
 
 	printk("%s: qyf %d \n", __func__, final);
 
-	if(final >= SIZE_512M && final <= SIZE_1GB)
+	if(final <= SIZE_512M)
+		strcpy(fih_dram_size, "512");
+	else if(final >= SIZE_512M && final <= SIZE_1GB)
 		strcpy(fih_dram_size, "1GB");
 	else if(final >= SIZE_1GB && final <= SIZE_2GB)
 		strcpy(fih_dram_size, "2GB");
@@ -1089,6 +1108,21 @@ static int sim_number_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
+static int nfc_support_show(struct seq_file *s, void *unused)
+{
+	unsigned short project_id = 0, phase_id = 0, module_id = 0;
+
+	project_id = (fih_hwid >> 8) & 0x00F;
+	phase_id   = (fih_hwid >> 4) & 0x00F;
+	module_id  = fih_hwid & 0x00F;
+
+	printk("%s: %s\n", __func__, model[project_id].nfc_support);
+
+	seq_printf(s, "%s\n", model[project_id].nfc_support);
+
+	return 0;
+}
+
 static int fqc_xml_path_show(struct seq_file *s, void *unused)
 {
 	unsigned short project_id = 0, phase_id = 0, module_id = 0;
@@ -1117,6 +1151,53 @@ static int fqc_xml_path_show(struct seq_file *s, void *unused)
 	return 0;
 }
 
+static int cda_user_read_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "%d\n", root_cda_user_flag);
+	return 0;
+}
+
+static int cda_user_proc_write(struct file *file, const char  __user *buffer,
+                                        size_t count, loff_t *data)
+{
+	struct manuf_data fih_proinfo_data;
+	char tmp[16] = {0};
+	int access = 0;
+
+	if ( copy_from_user(tmp, buffer, count) ) {
+		return -EFAULT;
+	}
+
+	memset(&fih_proinfo_data, 0, sizeof(struct manuf_data));
+
+	access = read_ef(&fih_proinfo_data);
+	if ((FILE_NOT_FOUND == access) || (FILE_CORRUPTED == access))
+	{
+		printk("cda_user_proc_writ: Read failed\n");
+		return READ_MANUFACTURE_FAIL;
+	}
+
+	root_cda_user_flag = simple_strtoull(tmp, NULL, 0);
+
+	switch (root_cda_user_flag) {
+	case FIH_CDA_KERN_USER:
+		fih_proinfo_data.rootflag.status = FIH_CDA_STAT_USER;
+		break;
+	case FIH_CDA_KERN_ROOT:
+		fih_proinfo_data.rootflag.status = FIH_CDA_STAT_ROOT;
+		break;
+	default:
+		fih_proinfo_data.rootflag.status = FIH_CDA_STAT_ROOT;
+		break;
+	}
+	access = write_ef(&fih_proinfo_data);
+	if ((FILE_NOT_FOUND == access) || (FILE_CORRUPTED == access))
+	{
+		printk("cda_user_proc_write: write_ef\n");
+		return WRITE_MANUFACTURE_FAIL;
+	}
+	return count;
+}
 
 static int skuid_show(struct seq_file *s, void *unused)
 {
@@ -1264,6 +1345,11 @@ static int root_status_open(struct inode *inode, struct file *file)
 	return single_open(file, root_status_info_show, &inode->i_private);
 }
 
+static int cda_user_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, cda_user_read_show, &inode->i_private);
+};
+
 static int uicolor_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, uicolor_show, &inode->i_private);
@@ -1292,6 +1378,11 @@ static int otg_last_flag_open(struct inode *inode, struct file *file)
 static int sim_number_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, sim_number_show, &inode->i_private);
+}
+
+static int nfc_support_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, nfc_support_show, &inode->i_private);
 }
 
 static int fqc_xml_path_open(struct inode *inode, struct file *file)
@@ -1500,6 +1591,14 @@ static const struct file_operations root_status_fops = {
 	.release	 = single_release,
 };
 
+static const struct file_operations cda_user_file_ops = {
+	.open    = cda_user_proc_open,
+	.read    = seq_read,
+	.write   = cda_user_proc_write,
+	.llseek  = seq_lseek,
+	.release = single_release
+};
+
 static const struct file_operations uicolor_fops = {
 	.open		 =  uicolor_open,
 	.write		 =  uicolor_write,
@@ -1547,6 +1646,13 @@ static const struct file_operations otg_last_flag_fops = {
 
 static const struct file_operations sim_number_fops = {
         .open        = sim_number_open,
+        .read        = seq_read,
+        .llseek      = seq_lseek,
+        .release     = single_release,
+};
+
+static const struct file_operations nfc_support_fops = {
+        .open        = nfc_support_open,
         .read        = seq_read,
         .llseek      = seq_lseek,
         .release     = single_release,
@@ -1695,6 +1801,7 @@ static void fih_read_hwid_info(void)
 				strcpy(model[hw_project].hw_family, hwid_info_tabel->hw_family);
 				strcpy(model[hw_project].hac, hwid_info_tabel->hac);
 				strcpy(model[hw_project].sim_num, hwid_info_tabel->sim_num);
+				strcpy(model[hw_project].nfc_support, hwid_info_tabel->nfc_support);
 				break;
 			}
 		}
@@ -1706,7 +1813,7 @@ static void fih_read_hwid_info(void)
 			memset(&model[hw_project], 0, sizeof(struct systeminfo));
 			memcpy(&model[hw_project], &model[0], sizeof(struct systeminfo));
 		}
-
+		strcpy(nfc_hw_support, model[hw_project].nfc_support);
 	}
 	else
 	{
@@ -1863,6 +1970,11 @@ static int __init proc_info_module_init(void)
 		printk("[dw]creat proc %s fail\n", PROC_STATUSROOT);
 	root_status_load = kmalloc(sizeof(char)*root_status_len, GFP_KERNEL);
 
+	proc_mkdir(FIH_PROC_CDA_USER_DIR, NULL);
+	entry = proc_create(FIH_PROC_CDA_USER_PATH, 0777, NULL, &cda_user_file_ops);
+	if(entry == NULL)
+		printk("[dw]creat proc %s fail\n", FIH_PROC_CDA_USER_PATH);
+
 	entry = proc_create(HWINFO_PROC, S_IFREG | S_IRUGO, NULL, &hwid_info_fops);
 	if(entry == NULL)
 		printk("creat proc %s fail\n", HWINFO_PROC);
@@ -1886,6 +1998,10 @@ static int __init proc_info_module_init(void)
 	entry = proc_create(SIM_NUMBER, S_IFREG | S_IRUGO, NULL, &sim_number_fops);
 	if(entry == NULL)
 		printk("creat proc %s fail\n", SIM_NUMBER);
+
+	entry = proc_create(NFC_SUPPORT, S_IFREG | S_IRUGO, NULL, &nfc_support_fops);
+        if(entry == NULL)
+                 printk("creat proc %s fail\n", NFC_SUPPORT);
 
 	entry = proc_create(FQCXMLPATH, S_IFREG | S_IRUGO, NULL, &fqc_xml_path_fops);
 	if(entry == NULL)

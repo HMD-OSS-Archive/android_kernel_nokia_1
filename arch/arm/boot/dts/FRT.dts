@@ -122,9 +122,9 @@
 };
 
 &i2c0 {
-	goodix_touch@5d {
+	goodix_touch@14 {
 		compatible = "mediatek,goodix_touch";
-		reg = <0x5d>;
+		reg = <0x14>;
 		status = "okay";
 	};
 };
@@ -179,6 +179,13 @@
 		is_batch_supported_ps = <0>;
 		is_batch_supported_als = <0>;
 	};
+
+	nfc_sec:nfc@27 {
+		compatible = "samsung,nfc";
+		reg = <0x27>;
+		status = "okay";
+	};
+
 };
 
 /* sensor gpio standization */
